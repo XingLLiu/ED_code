@@ -186,14 +186,17 @@ factor.columns <- c("Gender",
                     "FSA",
                     "Discharge.Admit.Time",
                     "Name_Of_Walkin",
-                    "Name_Of_Hospital")
+                    "Name_Of_Hospital",
+                    "Admitting.Provider",
+                    "Dispo")
 
 # a. Convert to Factors, Numerics
 EPIC[,(factor.columns):=lapply(.SD, as.factor),.SDcols=factor.columns]
 EPIC[,(numerics):=lapply(.SD, as.numeric),.SDcols=numerics]
 
+EPIC <- EPIC[,c(factor.columns, numerics), with=F]
 # b. One hot encode
-dmy <- dummyVars(" ~ .", data = EPIC)
-EPIC <- data.table(predict(dmy, newdata = EPIC))
+#dmy <- dummyVars(" ~ .", data = EPIC)
+#EPIC <- data.table(predict(dmy, newdata = EPIC))
 
 fwrite(EPIC, paste0(path, "preprocessed_EPIC.csv"))
