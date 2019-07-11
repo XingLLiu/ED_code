@@ -1,8 +1,3 @@
-library(data.table)
-library(dplyr)
-library(stringr)
-library(caret)
-
 # July 11th 2019
 # Preprocesses EPIC.csv (combined raw data) and outputs preprocessed_EPIC.csv (ready for training)
 
@@ -127,21 +122,23 @@ EPIC$Diastolic <- str_extract(EPIC$BP, "/[0-9]{2,3}")
 EPIC$Diastolic <- as.numeric(gsub("/", "", EPIC$Diastolic))
 
 # f. remove text >> numeric
-convertAge <- function(age) {
-  Age <- str_match(age, "([0-9]{1,3})([^0-9])")
-  num <- as.numeric(Age[2]); unit <- as.character(Age[3])
+convertAge <- function(data) {
+  data$Age.at.Visit <- as.character(data$Age.at.Visit)
+  month.indicies <- grep("m.o", data$Age.at.Visit)
+  year.indicies <- grep("y.o", data$Age.at.Visit)
+  day.indicies <- grep("days", data$Age.at.Visit)
+  week.indicies <- grep("wk.o", data$Age.at.Visit)
   
-  if (unit == "y") {
-    num <- num*12
-  } else if (unit %in% c("w", "wk")) {
-    num <- floor(num / 4)
-  } else if (unit == "") {
-    num <- floor(num/30)
-  }
-  return (num)
+  data$Age.at.Visit[month.indicies] <- as.numeric(gsub("m\\.o\\.", "", data$Age.at.Visit[month.indicies]))/12
+  data$Age.at.Visit[year.indicies] <- as.numeric(gsub("y\\.o\\.", "", data$Age.at.Visit[year.indicies]))
+  data$Age.at.Visit[day.indicies] <- as.numeric(gsub("days", "", data$Age.at.Visit[day.indicies])) / 365
+  data$Age.at.Visit[week.indicies] <- as.numeric(gsub("wk.o", "", data$Age.at.Visit[week.indicies])) / 52
+  
+  data$Age.at.Visit <- as.numeric(data$Age.at.Visit)
+  return (data)
 }
 
-EPIC$Age.at.Visit <- unlist(lapply(EPIC$Age.at.Visit, convertAge))
+EPIC <- convertAge(EPIC)
 
 
 # ============ 5. ENSURE CORRECT FACTOR TYPES ================= #
