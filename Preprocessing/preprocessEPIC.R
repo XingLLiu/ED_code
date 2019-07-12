@@ -32,7 +32,7 @@ createReturnInd <- function(data) {
 }
 
 
-path <- "./data/EPIC_DATA/"
+path <- "../../ED/data/EPIC_DATA/"
 
 # ============ 1. LOAD DATA ================= #
 EPIC <- fread(paste0(path, "EPIC.csv"))

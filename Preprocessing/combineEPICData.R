@@ -79,7 +79,7 @@ processClinNotes <- function(clinical.notes, note.types) {
 
 
 
-path <- "./data/EPIC_DATA/"
+path <- "../../ED/data/EPIC_DATA/"
 
 
 
