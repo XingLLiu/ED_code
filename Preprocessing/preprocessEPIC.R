@@ -70,8 +70,14 @@ EPIC$Pref.Language[!EPIC$Pref.Language %in% top.langs ] <- "Other"
 top.cc <- names(sort(table(EPIC$CC), decreasing = TRUE))[1:50]
 EPIC$CC[!EPIC$CC %in% top.cc ] <- "Other"
 
-# c. primary diagnoses: top 50
+# c. primary diagnoses: top 49 + Sepsis or Sepsis-related
 top.dx <- names(sort(table(EPIC$Primary.Dx), decreasing = TRUE))[1:50]
+top.dx[length(top.dx)] <- 'Sepsis or related'
+# Find all Sepsis or related cases
+if.Sepsis <- str_detect(EPIC$Primary.Dx, 'Sepsis') | str_detect(EPIC$Primary.Dx, 'sepsis')
+# Rename these cases
+EPIC$Primary.Dx[if.Sepsis] <- 'Sepsis or related'
+# Rename other cases
 EPIC$Primary.Dx[!EPIC$Primary.Dx %in% top.dx ] <- "Other"
 
 # d. first ED provider: top 50
