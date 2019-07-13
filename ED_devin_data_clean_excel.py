@@ -15,8 +15,8 @@ dir_data = args.dir_data
 dir_output = args.dir_output
 
 # For beta testing
-dir_code = '/home/erik/Documents/projects/ED/ED_code'
-dir_output = dir_code + "/../ED_EPIC_DATA"
+dir_code = '/home/xingliu/Documents/ED_code'
+dir_output = dir_code + "/../ED/data/EPIC_DATA/ED_EPIC_DATA"
 dir_data = dir_output + '/' + 'ED_EPIC_DATA_JUNE2018_JUNE24_2019'
 
 
