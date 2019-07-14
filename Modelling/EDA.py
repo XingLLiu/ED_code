@@ -252,7 +252,7 @@ sk.metrics.recall_score(yTest, lrPred)
 
 
 # Random forest
-rfc = sk.ensemble.RandomForestClassifier(n_estimators = 8, max_depth = 15).fit(XTrain, yTrain)
+rfc = sk.ensemble.RandomForestClassifier(n_estimators = 2, max_depth = 10).fit(XTrain, yTrain)
 # predict on test set
 rfcPred = rfc.predict(XTest)
 
