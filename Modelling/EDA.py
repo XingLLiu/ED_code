@@ -7,8 +7,9 @@ import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import sklearn.preprocessing as skprep
 from sklearn import model_selection
-from sklearn import linear_model, impute
+from sklearn import linear_model, impute, ensemble
 import sklearn as sk
+from imblearn.over_sampling import SMOTE
 import re
 import numpy as np
 import os
@@ -129,31 +130,136 @@ XCatImp = freqImp.transform(XCat)
 meanImp.fit(XNum)
 XNumImp = meanImp.transform(XNum)
 
-XCat.isna().sum()
-XNum.isna().sum()
+EPIC[catCols] = XCatImp
+EPIC[numCols] = XNumImp
+
+print( 'Total no. of missing values after imputation:', 
+        EPIC.isna().values.sum() + EPIC.isna().values.sum() )
 
 # ----------------------------------------------------
 # One-hot encode the categorical variables
 EPIC_enc = EPIC.copy()
 EPIC_enc = pd.get_dummies(EPIC_enc, columns = catCols)
-EPIC = EPIC.drop(catCols, axis = 1)
 
-# Final dataset
-EPIC = pd.concat([EPIC, EPIC_enc], axis = 1)
+# Encode the response as binary
+EPIC_enc['Primary.Dx'] = EPIC_enc['Primary.Dx'].astype('int')
+
+# EPIC = EPIC_enc
+# EPIC = EPIC.drop('Primary.Dx')
+
+# # Final dataset
+# EPIC = pd.concat([EPIC, EPIC_enc], axis = 1)
 
 
 # ----------------------------------------------------
 # Logistic regression
+y = EPIC_enc['Primary.Dx']
+X = EPIC_enc.drop('Primary.Dx', axis = 1)
 
 # Setting up testing and training sets
 XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27)
 # Fit logistic regression
-lr = sk.linear_model.LogisticRegression(solver = 'liblinear').fit(XTrain, yTrain)
+lr = sk.linear_model.LogisticRegression(solver = 'liblinear', 
+                                        max_iter = 1000).fit(XTrain, yTrain)
 
 lrPred = lr.predict(XTest)
 
+sk.metrics.f1_score(yTest, lrPred)
+sk.metrics.recall_score(yTest, lrPred)
+
+# Random forest
+rfc = sk.ensemble.RandomForestClassifier(n_estimators=10).fit(XTrain, yTrain)
+# predict on test set
+rfcPred = rfc.predict(XTest)
+
+sk.metrics.recall_score(yTest, rfcPred)
 
 
+# ----------------------------------------------------
+# Oversampling
+
+# concatenate our training data back together
+EPIC_train = pd.concat([XTrain, yTrain], axis=1)
+
+# separate minority and majority classes
+isSepsis = EPIC_train[EPIC_train['Primary.Dx'] == 1]
+notSepsis = EPIC_train[EPIC_train['Primary.Dx'] == 0]
+
+# upsample minority
+sepsisUpSampled = sk.utils.resample(isSepsis,
+                                    replace = True, 
+                                    n_samples = len(notSepsis), 
+                                    random_state = 27) 
+
+# combine majority and upsampled minority
+upSampled = pd.concat([notSepsis, sepsisUpSampled])
+
+# check new class counts
+upSampled['Primary.Dx'].value_counts()
+
+# Separate response and covariates
+y = upSampled['Primary.Dx']
+X = upSampled.drop('Primary.Dx', axis = 1)
+# Setting up testing and training sets
+XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27)
+
+# Fit logistic regression
+lr = sk.linear_model.LogisticRegression(solver = 'liblinear', 
+                                        max_iter = 1000).fit(XTrain, yTrain)
+
+lrPred = lr.predict(XTest)
+
+print('Logistic regression:')
+sk.metrics.f1_score(yTest, lrPred)
+sk.metrics.recall_score(yTest, lrPred)
+
+
+
+# Random forest
+rfc = sk.ensemble.RandomForestClassifier(n_estimators = 2).fit(XTrain, yTrain)
+# predict on test set
+rfcPred = rfc.predict(XTest)
+
+print('Random forest with 2 estimators:')
+sk.metrics.f1_score(yTest, rfcPred)
+sk.metrics.recall_score(yTest, rfcPred)
+
+
+# ----------------------------------------------------
+# SMOTE
+
+# Separate input features and target
+y = EPIC_enc['Primary.Dx']
+X = EPIC_enc.drop('Primary.Dx', axis = 1)
+# setting up testing and training sets
+XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27)
+
+sm = SMOTE(random_state = 27, sampling_strategy = 0.4)
+XTrain, yTrain = sm.fit_sample(XTrain, yTrain)
+ 
+ 
+
+# Fit logistic regression
+lr = sk.linear_model.LogisticRegression(solver = 'liblinear', 
+                                        max_iter = 1000).fit(XTrain, yTrain)
+
+lrPred = lr.predict(XTest)
+
+print('Logistic regression:')
+sk.metrics.precision_score(yTest, lrPred)
+sk.metrics.f1_score(yTest, lrPred)
+sk.metrics.recall_score(yTest, lrPred)
+
+
+# Random forest
+rfc = sk.ensemble.RandomForestClassifier(n_estimators = 8, max_depth = 15).fit(XTrain, yTrain)
+# predict on test set
+rfcPred = rfc.predict(XTest)
+
+print('Random forest with 2 estimators:')
+sk.metrics.precision_score(yTest, rfcPred)
+sk.metrics.f1_score(yTest, rfcPred)
+sk.metrics.recall_score(yTest, rfcPred)
 
 
 
