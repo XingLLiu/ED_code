@@ -9,6 +9,7 @@ import sklearn.preprocessing as skprep
 from sklearn import model_selection
 from sklearn import linear_model, impute, ensemble
 import sklearn as sk
+# from sklearn import *
 from imblearn.over_sampling import SMOTE
 import re
 import numpy as np
@@ -243,6 +244,7 @@ XTrain, yTrain = sm.fit_sample(XTrain, yTrain)
 lr = sk.linear_model.LogisticRegression(solver = 'liblinear', 
                                         max_iter = 1000).fit(XTrain, yTrain)
 
+
 lrPred = lr.predict(XTest)
 
 print('Logistic regression:')
@@ -255,12 +257,63 @@ sk.metrics.recall_score(yTest, lrPred)
 rfc = sk.ensemble.RandomForestClassifier(n_estimators = 2, max_depth = 10).fit(XTrain, yTrain)
 # predict on test set
 rfcPred = rfc.predict(XTest)
-
 print('Random forest with 2 estimators:')
 sk.metrics.precision_score(yTest, rfcPred)
 sk.metrics.f1_score(yTest, rfcPred)
 sk.metrics.recall_score(yTest, rfcPred)
 
+
+# One-class SVM
+plt.scatter(EPIC['Age.at.Visit'], EPIC['Last.Weight'], alpha = 0.7, c = EPIC['Primary.Dx'])
+_ = plt.xlabel('Age')
+_ = plt.ylabel('Weight')
+
+
+from sklearn.svm import OneClassSVM
+XTrainNormal = XTrain[ yTrain == 0]
+XTrainOutliers = XTrain[ yTrain == 1]
+outlierProp = len(XTrainOutliers) / len(XTrainNormal)
+algorithm = sk.svm.OneClassSVM(kernel ='rbf', nu = outlierProp, gamma = 0.000001)
+svmModel = algorithm.fit(XTrainNormal)
+
+svmPred = svmModel.predict(XTest)
+# Set labels to (0, 1) rather than (-1, 1)
+svmPred[svmPred == -1] = 0
+colors = np.array(['#377eb8', '#ff7f00'])
+plt.scatter(XTest['Age.at.Visit'], XTest['Last.Weight'], alpha = 0.7, c = colors[(svmPred + 1) // 2])
+_ = plt.xlabel('Age')
+_ = plt.ylabel('Weight')
+
+print('One-class SVM:')
+sk.metrics.precision_score(yTest, svmPred)
+sk.metrics.f1_score(yTest, svmPred)
+sk.metrics.recall_score(yTest, svmPred)
+
+sk.metrics.confusion_matrix(yTest, svmPred)
+
+
+
+# ROC curve
+def roc_plot(yTest, pred):
+    '''
+    Plot the roc curve of a given test set and predictions
+    Input:  yTest = test set (pd.dataframe or series)
+            pred = predictions (pd.dataframe or seires)
+    Output: ROC plot
+    '''
+    fpr, tpr, _ = sk.metrics.roc_curve(yTest, pred)
+    roc_auc = sk.metrics.auc(fpr, tpr)
+    plt.title('Receiver Operating Characteristic')
+    plt.plot(fpr, tpr, 'b', label = 'AUC = %0.2f' % roc_auc)
+    plt.legend(loc = 'lower right')
+    plt.plot([0, 1], [0, 1],'r--')
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
+    plt.show()
+
+roc_plot(yTest, lrPred)
 
 
 
