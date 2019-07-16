@@ -264,17 +264,38 @@ sk.metrics.recall_score(yTest, rfcPred)
 
 
 # One-class SVM
-plt.scatter(EPIC['Age.at.Visit'], EPIC['Last.Weight'], alpha = 0.7, c = EPIC['Primary.Dx'])
+plt.scatter(EPIC_enc['Age.at.Visit'], EPIC_enc['Last.Weight'], alpha = 0.7, c = EPIC_enc['Primary.Dx'])
+plt.scatter(EPIC_enc.loc[EPIC_enc['Primary.Dx'] == 1, 'Age.at.Visit'], EPIC_enc.loc[EPIC_enc['Primary.Dx'] == 1, 'Last.Weight'], c = 'goldenrod')
 _ = plt.xlabel('Age')
 _ = plt.ylabel('Weight')
+plt.show()
+
+
+def double_scatter(x_feature = None, y_feature = None, classes = 'Primary.Dx', data = None):
+    '''
+    Scatter plot for y_feature against x_feature, coloured accourding to classes.
+    Input:  x_feature: name of feature on the x axis (str)
+            y_feature: name of feature on the y axis (str)
+            class: multi-class categorical variable used for colouring
+            EPIC: the EPIC dataset
+    Output: plt.scatter
+    '''
+    plt.scatter(data[x_feature], data[y_feature], alpha = 0.7, c = data[classes])
+    plt.scatter(data.loc[data[classes] == 1, x_feature], data.loc[data[classes] == 1, y_feature], c = 'goldenrod')
+    _ = plt.xlabel(x_feature)
+    _ = plt.ylabel(y_feature)
+    plt.show()
+
+double_scatter('Pulse', 'Last.Weight', data = EPIC_enc.loc[EPIC_enc['Pulse'] < 300])
+
 
 
 from sklearn.svm import OneClassSVM
 XTrainNormal = XTrain[ yTrain == 0]
 XTrainOutliers = XTrain[ yTrain == 1]
 outlierProp = len(XTrainOutliers) / len(XTrainNormal)
-algorithm = sk.svm.OneClassSVM(kernel ='rbf', nu = outlierProp, gamma = 0.000001)
-svmModel = algorithm.fit(XTrainNormal)
+algorithm = sk.svm.OneClassSVM(kernel ='rbf', nu = outlierProp, gamma = 0.01)
+svmModel = algorithm.fit(XTrainNormal[:30000])
 
 svmPred = svmModel.predict(XTest)
 # Set labels to (0, 1) rather than (-1, 1)
@@ -288,9 +309,7 @@ print('One-class SVM:')
 sk.metrics.precision_score(yTest, svmPred)
 sk.metrics.f1_score(yTest, svmPred)
 sk.metrics.recall_score(yTest, svmPred)
-
 sk.metrics.confusion_matrix(yTest, svmPred)
-
 
 
 # ROC curve
