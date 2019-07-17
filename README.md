@@ -5,7 +5,9 @@ Contains code for ED project. Assume that ED_Code is a subfolder of ~/ED, where 
 ## Update after [16/07/2019]
 
 Now assume that ED_code is contained in the same subfolder as the ED folder available from the PHF. To run the preprocessing scripts:
-  Rscript ./Preprocessing/EPICscript.R
+```bash  
+Rscript ./Preprocessing/EPICscript.R
+```
 
 ## Code structure
 ```bash
