@@ -8,6 +8,7 @@ Now assume that ED_code is contained in the same subfolder as the ED folder avai
   Rscript ./Preprocessing/EPICscript.R
 
 ## Code structure
+```bash
 .
 |-- Modelling 
 |   |-- EDA.py                   # EDA and modelling on the preprocessed data
@@ -21,5 +22,5 @@ Now assume that ED_code is contained in the same subfolder as the ED folder avai
 |-- ED_support_funs.py
 |-- README.md
 |__ test.txt
-
+```
 
