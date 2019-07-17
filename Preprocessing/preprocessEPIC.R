@@ -8,9 +8,11 @@ formatTimes <- function(data) {
   data$ArrivalNumHoursSinceMidnight <- hour(as.ITime(data$Arrived))
   data$ArrivalNumHoursSinceMidnight[data$ArrivalNumHoursSinceMidnight < 0] <- NA
   data$ArrivalDayOfWeek <- weekdays(data$Arrived)
-  data$Disch.Date.Time <- hour(as.POSIXct(data$Disch.Date.Time, format="%d/%m/%Y %H%M", tz = "EST"))
+  data$Disch.Date.Time <- as.character(hour(as.POSIXct(data$Disch.Date.Time, 
+                                            format="%d/%m/%Y %H%M", tz = "EST")))
   data$Arrival.to.Room <-hour(strptime(data$Arrival.to.Room, "%H:%M"))
-  data$Roomed <- hour(as.POSIXct(data$Roomed, format="%d/%m %H%M", tz = "EST"))
+  data$Roomed <- as.character(hour(as.POSIXct(data$Roomed, 
+                                              format="%d/%m %H%M", tz = "EST")))
   
   return (data)
   
@@ -32,7 +34,7 @@ createReturnInd <- function(data) {
 }
 
 
-path <- "./data/EPIC_DATA/"
+path <- "../../ED/data/EPIC_DATA/"
 
 # ============ 1. LOAD DATA ================= #
 EPIC <- fread(paste0(path, "EPIC.csv"))
@@ -51,10 +53,10 @@ EPIC <- createReturnInd(EPIC)
 EPIC$SameFirstAndLast <- ifelse(EPIC$First.ED.Provider == EPIC$Last.ED.Provider , 1, 0)
 
 # b. numeric: size of treatment team (NOTE: could be duplicate names, not accounted for in code)
-EPIC$SizeOfTreatmentTeam <- unlist(lapply(EPIC$Treatment.Team, function(x) length(split(x, ";"))))
+EPIC$SizeOfTreatmentTeam <- unlist( lapply( EPIC$Treatment.Team, function(x) length( unlist( strsplit(x, ";") ) ) ) )
 
 # c. numeric: number of prescriptions
-EPIC$NumberOfPrescriptions <- unlist(lapply(EPIC$Current.Medications, function(x) length(split(x, ";"))))
+EPIC$NumberOfPrescriptions <- unlist( lapply( EPIC$Current.Medication, function(x) length( unlist( strsplit(x, ";") ) ) ) )
 
 # d. numeric: length of stay in minutes
 EPIC$LengthOfStayInMinutes <- (as.numeric(EPIC$ED.Completed.Length.of.Stay..Hours.)*60) + as.numeric(EPIC$ED.Completed.Length.of.Stay..Minutes.) 
@@ -70,8 +72,14 @@ EPIC$Pref.Language[!EPIC$Pref.Language %in% top.langs ] <- "Other"
 top.cc <- names(sort(table(EPIC$CC), decreasing = TRUE))[1:50]
 EPIC$CC[!EPIC$CC %in% top.cc ] <- "Other"
 
-# c. primary diagnoses: top 50
+# c. primary diagnoses: top 49 + Sepsis or Sepsis-related
 top.dx <- names(sort(table(EPIC$Primary.Dx), decreasing = TRUE))[1:50]
+top.dx[length(top.dx)] <- 'Sepsis or related'
+# Find all Sepsis or related cases
+if.Sepsis <- str_detect(EPIC$Primary.Dx, 'Sepsis') | str_detect(EPIC$Primary.Dx, 'sepsis')
+# Rename these cases
+EPIC$Primary.Dx[if.Sepsis] <- 'Sepsis or related'
+# Rename other cases
 EPIC$Primary.Dx[!EPIC$Primary.Dx %in% top.dx ] <- "Other"
 
 # d. first ED provider: top 50
@@ -91,6 +99,9 @@ EPIC$FSA <- str_extract(EPIC$Address, "[A-Z][0-9][A-Z]")
 top.FSAs <- names(sort(table(EPIC$FSA), decreasing = TRUE))[1:50]
 EPIC$FSA[!EPIC$FSA %in% top.FSAs ] <- "Other"
 
+# g. Admitting provider: top 50
+Admitting.provider <- names(sort(table(EPIC$Admitting.Provider), decreasing = TRUE))[1:50]
+EPIC$Admitting.Provider[!EPIC$Admitting.Provider %in% Admitting.provider ] <- "Other"
 
 # III. CLEANING UP:
 

@@ -10,9 +10,9 @@
 # 	---- ---- ED_data_process.sh
 
 # Get the base directory
-dir_base=$(pwd)/..
-dir_code=$dir_base/ED_code
-dir_output=$dir_base/ED_EPIC_DATA
+dir_base=$(pwd)/../..
+dir_code=$dir_base/ED_code/Preprocessing
+dir_output=$dir_base/ED/data/EPIC_DATA/ED_EPIC_DATA
 dir_data=$dir_output/ED_EPIC_DATA_JUNE2018_JUNE24_2019
 
 # Make sure the directory structure is appropriate
