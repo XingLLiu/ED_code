@@ -3,7 +3,7 @@
 
 formatTimes <- function(data) {
   # Feature engineering based on arrival times
-  data$Arrived <- as.POSIXct(data$Arrived, format="%d/%m/%Y %H%M", tz = "EST")
+  data$Arrived <- as.POSIXct(data$Arrived, format="%d/%m/%y %H%M", tz = "EST")
   data$ArrivalMonth <- month.name[as.numeric(format(data$Arrived, "%m"))]
   data$ArrivalNumHoursSinceMidnight <- hour(as.ITime(data$Arrived))
   data$ArrivalNumHoursSinceMidnight[data$ArrivalNumHoursSinceMidnight < 0] <- NA
