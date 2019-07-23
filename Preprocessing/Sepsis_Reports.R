@@ -50,14 +50,14 @@ path <- "./data/EPIC_DATA/"
 RN_files = Sys.glob(paste0(path, "Sepsis_Reports/*RN.csv")); RN_files
 # First apply read.csv, then rbind
 RN_reports = do.call(rbind, lapply(RN_files, function(x) read.csv(x, stringsAsFactors = FALSE)))
-RN_reports$Arrived <- as.POSIXct(RN_reports$Arrived, tz="EST", format="%d/%m/%y %H%M")
+RN_reports$Arrived <- as.POSIXct(RN_reports$Arrived, tz="EST", format="%d/%m/%Y %H%M")
 RN_reports <- RN_reports[order(RN_reports$Arrived),]
 
 
 # b. Get doctors files
 MD_files = Sys.glob(paste0(path, "/Sepsis_Reports/*MD.csv")); MD_files
 MD_reports = do.call(rbind, lapply(MD_files, function(x) read.csv(x, stringsAsFactors = FALSE)))
-MD_reports$Arrived <- as.POSIXct(MD_reports$Arrived, tz="EST", format="%d/%m/%y %H%M")
+MD_reports$Arrived <- as.POSIXct(MD_reports$Arrived, tz="EST", format="%d/%m/%Y %H%M")
 MD_reports <- MD_reports[order(MD_reports$Arrived),]
 
 
@@ -67,7 +67,7 @@ EPIC <- fread(paste0(path, "EPIC.csv"))
 
 # ============ 2. Preprocess EPIC ================= #
 
-EPIC$Arrived <- as.POSIXct(EPIC$Arrived, tz="EST", format="%d/%m/%y %H%M")
+EPIC$Arrived <- as.POSIXct(EPIC$Arrived, tz="EST", format="%d/%m/%Y %H%M")
 EPIC <- EPIC[order(EPIC$Arrived),]
 EPIC <- EPIC[!is.na(EPIC$Arrived),]
 
