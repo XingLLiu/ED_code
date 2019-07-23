@@ -3,13 +3,13 @@
 
 formatTimes <- function(data) {
   # Feature engineering based on arrival times
-  data$Arrived <- as.POSIXct(data$Arrived, format="%d/%m/%y %H%M", tz = "EST")
+  data$Arrived <- as.POSIXct(data$Arrived, format="%d/%m/%Y %H%M", tz = "EST")
   data$ArrivalMonth <- month.name[as.numeric(format(data$Arrived, "%m"))]
   data$ArrivalNumHoursSinceMidnight <- hour(as.ITime(data$Arrived))
   data$ArrivalNumHoursSinceMidnight[data$ArrivalNumHoursSinceMidnight < 0] <- NA
   data$ArrivalDayOfWeek <- weekdays(data$Arrived)
   data$Disch.Date.Time <- as.character(hour(as.POSIXct(data$Disch.Date.Time, 
-                                            format="%d/%m/%y %H%M", tz = "EST")))
+                                            format="%d/%m/%Y %H%M", tz = "EST")))
   data$Arrival.to.Room <-hour(strptime(data$Arrival.to.Room, "%H:%M"))
   data$Roomed <- as.character(hour(as.POSIXct(data$Roomed, 
                                               format="%d/%m %H%M", tz = "EST")))
