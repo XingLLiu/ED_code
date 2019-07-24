@@ -1,5 +1,6 @@
 import datetime
 import re
+import numpy as np
 
 months_abbrv = {'jan': '01', 'feb':'02', 'mar':'03', 'apr':'04', 'may':'05', 'jun':'06', 'jul':'07', 'aug':'08', 'sept':'09', 'oct':'10', 'nov':'11', 'dec':'12'}
 months_full = {'january': '01', 'february':'02', 'march':'03', 'april':'04', 'may':'05', 'june':'06', 'july':'07', 'august':'08', 'september':'09', 'october':'10', 'november':'11', 'december':'12'}
@@ -26,9 +27,12 @@ def findDates (text):
     
     pattern_1 = re.findall ("((?<!\d)\d\d|^\d\d)/(\d\d)/(\d\d(?!\d)|\d\d$)", text)
     for p in pattern_1:
-        date_found = (datetime.date(int('20' + p[2]), int(p[1]), int(p[0])))
-        dates_found.append (date_found)
-         
+        try:
+            date_found = (datetime.date(int('20' + p[2]), int(p[1]), int(p[0])))
+            dates_found.append (date_found)
+        except:
+            print('Unexpected date format')
+        
 
     pattern_2 = re.findall ("((?<!\d)\d\d|^\d\d)/(\d\d)/(\d{4,4}(?!\d)|\d\d\d\d$)", text)
     for p in pattern_2:
@@ -120,16 +124,21 @@ def findDates (text):
     #collect and remove all dates
     dates_found = []
     allDates = re.findall ("((?<!\d)\d{1,2}|^\d{1,2})/(\d{1,2})/(\d{1,2}(?!\d)|\d{1,2}$)", text)
+    allDates = np.array(allDates)[np.where([int(x[1])<12 for x in allDates])[0]]
+    
     for a in allDates:
-        date_found = (datetime.date(int('20' + a[2]), int(a[1]), int(a[0])))
-        dates_found.append (date_found)
-        if date_found.day < 10:
-            newDate = '0'+str(date_found.day)
-        else: newDate = (date_found.day)
-        if date_found.month < 10:
-            newMonth = '0'+str(date_found.month)
-        else: newMonth = (date_found.month)
-                
-        text = re.sub (a[0] + "/" + a[1] + "/" + a[2], str(newDate)+"/"+str(newMonth)+"/"+str(date_found.year)[-2:], text)    
-            
+        try:
+            date_found = (datetime.date(int('20' + a[2]), int(a[1]), int(a[0])))
+            dates_found.append (date_found)
+            if date_found.day < 10:
+                newDate = '0'+str(date_found.day)
+            else: newDate = (date_found.day)
+            if date_found.month < 10:
+                newMonth = '0'+str(date_found.month)
+            else: newMonth = (date_found.month)
+            text = re.sub (a[0] + "/" + a[1] + "/" + a[2], 
+                   str(newDate)+"/"+str(newMonth)+"/"+str(date_found.year)[-2:], text)    
+        except:
+            print('Date is not in proper format, skipping')
+
     return [dates_found, text]
