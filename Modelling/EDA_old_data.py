@@ -42,7 +42,7 @@ catCols = [col for col in EPIC.columns if col not in numCols]
 # print('Cases removed =', n - len(EPIC))
 
 # Convert into binary classification
-ifSepsis = EPIC['Primary.Dx'].str.contains('Sepsis')
+ifSepsis = EPIC['Primary.Dx'].str.contains('epsis')
 EPIC['Primary.Dx'][-ifSepsis] = 0
 print('Number of sepsis or sepsis-related', ifSepsis.sum())
 

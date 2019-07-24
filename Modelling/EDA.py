@@ -97,7 +97,7 @@ print('Numerical features:\n', numCols)
 
 # ----------------------------------------------------
 # Check if Primary.Dx contains Sepsis or related classes
-ifSepsis = EPIC['Primary.Dx'].str.contains('Sepsis')
+ifSepsis = EPIC['Primary.Dx'].str.contains('epsis')
 print('Number of sepsis or sepsis-related cases:', ifSepsis.sum())
 
 # Convert into binary class
