@@ -1,8 +1,6 @@
 # ----------------------------------------------------
 # Path and savePath need to be configured before running
 # ----------------------------------------------------
-
-
 import pandas as pd
 import seaborn as sns
 import statsmodels.api as sm
@@ -45,11 +43,11 @@ catCols = [col for col in EPIC.columns if col not in numCols]
 
 # Convert into binary classification
 ifSepsis = EPIC['Primary.Dx'].str.contains('Sepsis')
-EPIC['Primary.Dx'][-ifSepsis] = 'No'
+EPIC['Primary.Dx'][-ifSepsis] = 0
 print('Number of sepsis or sepsis-related', ifSepsis.sum())
 
 datSepOZ = EPIC
-datSepOZ['Diagnoses'][ifSepsis] = 'Yes'
+datSepOZ['Diagnoses'][ifSepsis] = 1
 
 # ----------------------------------------------------
 # Percentage of missing data
