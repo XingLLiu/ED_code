@@ -3,7 +3,7 @@
 
 formatTimes <- function(data) {
   # Feature engineering based on arrival times
-  data$Arrived <- as.POSIXct(EPIC$Arrived, format="%d/%m/%Y %H%M", tz = "EST")
+  data$Arrived <- as.POSIXct(data$Arrived, format="%d/%m/%y %H%M", tz = "EST")
   data$ArrivalMonth <- month.name[as.numeric(format(data$Arrived, "%m"))]
   data$ArrivalNumHoursSinceMidnight <- hour(as.ITime(data$Arrived))
   data$ArrivalNumHoursSinceMidnight[data$ArrivalNumHoursSinceMidnight < 0] <- NA
@@ -24,7 +24,6 @@ createReturnInd <- function(data) {
   repeats <- repeats %>% group_by(MRN) %>% mutate(diff=difftime(Arrived, lag(Arrived), units="hours"))
   repeats$WillReturn <- repeats$diff <= 72
   repeats$WillReturn[is.na(repeats$WillReturn)] <- 0 # treat those with NA for 'WillReturn' as not return
-  
   # filter those who will return to only those who were discharged at initial visit
   repeats <- repeats[repeats$WillReturn==1 & repeats$Dispo=="Discharge",] 
   repeat.encounter.numbers <- repeats$CSN[repeats$WillReturn==1]
@@ -34,7 +33,7 @@ createReturnInd <- function(data) {
 }
 
 
-path <- "../../ED/data/EPIC_DATA/"
+path <- "../../data/EPIC_DATA/"
 
 # ============ 1. LOAD DATA ================= #
 EPIC <- fread(paste0(path, "EPIC.csv"))
