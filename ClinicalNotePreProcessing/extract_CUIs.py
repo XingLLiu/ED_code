@@ -46,7 +46,7 @@ for x,col in enumerate([ED_notes, procedure_notes, provider_notes, triage_notes]
 #def read_output_files(): return #read_output_files()
 
 #add four columns with CUI codes to the csv file
-df_CUI = pd.DataFrame({'CUI':df.CSN, 'MRN':df.MRN,
+df_CUI = pd.DataFrame({'CSN':df.CSN, 'MRN':df.MRN,
                       'Processed.Note.Data_ED.Notes':ED_notes,
                       'Processed.Note.Data_ED.Procedure.Note':procedure_notes,
                       'Processed.Note.Data_ED.Provider.Notes':provider_notes,
