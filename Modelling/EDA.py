@@ -3,7 +3,6 @@
 # -------------------------------------------------------
 from ED_support_module import *  
 
-plt.style.use('bmh')
 
 # Load file
 # Path of file

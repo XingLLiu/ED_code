@@ -82,8 +82,8 @@ X = EPIC_enc.drop('Primary.Dx', axis = 1)
 
 XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
 
-sm = SMOTE(random_state = 27, sampling_strategy = 'auto') # 0.4
-XTrain, yTrain = sm.fit_sample(XTrain, yTrain)
+smote = SMOTE(random_state = 27, sampling_strategy = 'auto') # 0.4
+XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
 
 
 # SMOTE with PCA
@@ -91,8 +91,8 @@ y = EPIC_enc['Primary.Dx']
 X = EPIC_enc.drop('Primary.Dx', axis = 1)
 colNames = X.columns
 XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
-sm = SMOTE(random_state = 27, sampling_strategy = 'auto')
-XTrain, yTrain = sm.fit_sample(XTrain, yTrain)
+smote = SMOTE(random_state = 27, sampling_strategy = 'auto')
+XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
 XTrain, XTest = pd.DataFrame(XTrain), pd.DataFrame(XTest)
 XTrain.columns, XTest.columns = colNames, colNames
 
@@ -178,11 +178,10 @@ roc_plot(yTest, lrPred2)
 
 
 # Random forest
-# rfc = sk.ensemble.RandomForestClassifier(n_estimators = 1000, max_features = 8, max_depth = 15).fit(XTrain, yTrain)
-# rfc = sk.ensemble.RandomForestClassifier(n_estimators = 2000, max_depth = 12).fit(XTrain, yTrain)
 # rfc = sk.ensemble.RandomForestClassifier(n_estimators = 1000, max_depth = 12, max_features = 50).fit(XTrain, yTrain)
 # rfc = sk.ensemble.RandomForestClassifier(n_estimators = 500, max_depth = 12, max_features = 50).fit(XTrain, yTrain)
-rfc = sk.ensemble.RandomForestClassifier(n_estimators = 4000, max_depth = 5, max_features = 30).fit(XTrain, yTrain)  # no max feature: 0.75
+rfc = sk.ensemble.RandomForestClassifier(n_estimators = 4000, max_depth = 5, max_features = 30).fit(XTrain, yTrain)
+# rfc = sk.ensemble.RandomForestClassifier(n_estimators = 2000, max_depth = 80, max_features = 'auto', min_samples_split = 5).fit(XTrain, yTrain)  # no max feature: 0.75
 # predict on test set
 rfcPred = rfc.predict(XTest)
 print('Random forest:')
@@ -208,7 +207,7 @@ svmPred = -0.5 * svmPred + 0.5      # Set labels to (1, 0) rather than (-1, 1)
 print('One-class SVM:')
 roc_plot(yTest, svmPred)
 
-# Train lr, rf, svm, if
+
 
 # ----------------------------------------------------
 # ----------------------------------------------------
@@ -228,8 +227,7 @@ _ = isof.fit(XTrain)
 # isofPredTrain = isof.predict(XTrain)
 # isofPredTrain = -0.5 * isofPredTrain + 0.5
 isofPredTest = isof.predict(XTest)
-isofPredTest = -0.5 * isofPredTest + 0.5
-
+isofPredTest = np.array(-0.5 * isofPredTest + 0.5, dtype = 'int')
 
 # roc_plot(yTrain, isofPredTrain)
 roc_plot(yTest, isofPredTest)
@@ -257,7 +255,7 @@ anomalyScores = eisof.compute_paths(X_in = XTest.values)
 # sort the scores
 anomalyScoresSorted = np.argsort(anomalyScores)
 # retrieve indices of anomalous observations
-indicesWithPreds = anomalyScoresSorted[-int(np.ceil( 0.19 * XTest.shape[0] )):]   # 0.002 is the anomaly ratio
+indicesWithPreds = anomalyScoresSorted[-int(np.ceil( 0.1 * XTest.shape[0] )):]   # 0.002 is the anomaly ratio
 # create predictions 
 eisofPred = yTest * 0
 eisofPred.iloc[indicesWithPreds] = 1
@@ -313,8 +311,8 @@ dbscanPred[dbscanPred != -1] = 0
 lrResults = {}
 for i in range(2000):
     XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, stratify = y)
-    sm = SMOTE(random_state = 27, sampling_strategy = 'auto')
-    XTrain, yTrain = sm.fit_sample(XTrain, yTrain)
+    smote = SMOTE(random_state = 27, sampling_strategy = 'auto')
+    XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
     lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
                                         max_iter = 1000).fit(XTrain, yTrain)
     lrPred = lr.predict(XTest)
@@ -338,6 +336,7 @@ plt.title('Metrics for 2000 runs (Logistic Regression)')
 plt.show()
 
 
+# ----------------------------------------------------
 # Tuning random forest
 nEstimators = [50, 100, 200, 500, 1000, 2000, 5000]
 maxDepth = [5, 10, 12, 15, 20, 50, None]
@@ -366,17 +365,37 @@ _ = plt.xlabel('No. of estimators and max depth')
 _ = plt.ylabel('f1 score')
 plt.show()
 
-# 3D plot
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection = '3d')
-# x, y, z = np.meshgrid(nEstimators, maxDepth, aucVec)
-# _ = ax.scatter(x, y, z)
-# _ = plt.xlabel('No. of estimators')
-# _ = plt.ylabel('Max depth')
-# _ = plt.title('f1 score')
-# plt.show()
 
 
+# Number of trees in random forest
+n_estimators = [int(x) for x in np.linspace(start = 200, stop = 2000, num = 10)]
+n_estimators.append(3000)
+n_estimators.append(4000)
+# Number of features to consider at every split
+max_features = ['auto', 'sqrt']
+# Maximum number of levels in tree
+max_depth = [int(x) for x in np.linspace(10, 110, num = 11)]
+max_depth.append(None)
+# Minimum number of samples required to split a node
+min_samples_split = [2, 5, 10]
+
+randomGrid = {'n_estimators': n_estimators, 'max_features': max_features, 
+              'min_samples_split': min_samples_split, 
+              'max_depth': max_depth}
+
+
+# Use the random grid to search for best hyperparameters
+# First create the base model to tune
+rfc = sk.ensemble.RandomForestClassifier()
+# Random search of parameters, using 4 fold cross validation, 
+rfRandom = sk.model_selection.RandomizedSearchCV(estimator = rfc, param_distributions = randomGrid, n_iter = 100, 
+                                                    cv = 4, verbose = 2, random_state = 27, n_jobs = -1, scoring = 'f1')
+# Fit the random search model
+_ = rfRandom.fit(XTrain, yTrain)
+print('Best params RFC: ', rfRandom.best_params_)
+
+
+# ----------------------------------------------------
 # Tuning SVM
 nuList = [0.002, 0.02, 0.1, 0.2, 0.3, 0.4, 0.5]
 gammaList = [0.00001, 0.0001, 0.001, 0.01, 0.1, 0.2, 0.3]
@@ -402,7 +421,44 @@ _ = plt.ylabel('f1 score')
 plt.show()
 
 
-# Tune isolation forest
+
+# nu
+nu = [0.002, 0.003, 0.005, 0.008, 0.01, 0.015, 0.02, 0.1, 0.2, 0.3, 0.4, 0.5]
+# Gamma for the extend of fit
+gamma = [0.00001, 0.0001, 0.001, 0.01, 0.1, 0.2, 0.3, 'auto_deprecated']
+# kernel
+kernel = ['rbf']
+
+randomGrid = {'nu': nu, 'gamma': gamma, 'kernel': kernel}
+
+# First create the base model to tune
+svm = sk.svm.OneClassSVM()
+# Random search of parameters, using 4 fold cross validation, 
+svmRandom = sk.model_selection.RandomizedSearchCV(estimator = svm, param_distributions = randomGrid, n_iter = 60, 
+                                                    cv = 4, verbose = 2, random_state = 27, n_jobs = -1, scoring = 'f1')
+# Fit the random search model
+_ = svmRandom.fit(XTrain, -2 * yTrain + 1)
+print('Best params SVM: ', svmRandom.best_params_)
+
+
+# With poly kernel
+# kernel
+kernel = ['poly']
+# Degree
+degree = [1, 3, 5, 7]
+randomGrid = {'nu': nu, 'gamma': gamma, 'kernel': kernel, 'degree': degree}
+# First create the base model to tune
+svm = sk.svm.OneClassSVM()
+# Random search of parameters, using 4 fold cross validation, 
+svmRandom = sk.model_selection.RandomizedSearchCV(estimator = svm, param_distributions = randomGrid, n_iter = 60, 
+                                                    cv = 4, verbose = 2, random_state = 27, n_jobs = -1, scoring = 'f1')
+# Fit the random search model
+_ = svmRandom.fit(XTrain, -2 * yTrain + 1)
+print('Best params SVM: ', svmRandom.best_params_)
+
+
+# ----------------------------------------------------
+# Tuning isolation forest
 nEstimators = [100] # [50, 100, 200, 500, 1000, 2000]
 maxSamples = [128] # [128, 256, 512, 1024, 2048, 5012]
 contamination = [0.002, 0.006, 0.01, 0.02, 0.04, 0.08, 0.1, 0.15, 0.2, 0.3]
@@ -422,28 +478,31 @@ for nEst in nEstimators:
             isofResults[parameters] = metrics
 
 
-# Tune extended isolation forest
-nEstimators = [50] # [50, 100, 200, 500]
-maxSamples = [128] # [128, 256, 512, 1024]
-contamination = [0.01, 0.015, 0.02, 0.05, 0.1, 0.15, 0.2]
+# ----------------------------------------------------
+# Tuning extended isolation forest
+nEstimators = [25, 50, 100, 400] # [50] 
+maxSamples = [128, 256, 1024] # [128] 
+contamination = [0.01, 0.08, 0.2]
+extensionLevel = [0, 10, 20, 40, XTrain.shape[1] - 1]
 eisofResults = {}
 for nEst in nEstimators:
     for maxSam in maxSamples:
         for contam in contamination:
-            print('Training for nEstimator =', nEst, 'contamination:', contam)
-            eisof = eif.iForest(XTrain.values, 
-                     ntrees = nEst, 
-                     sample_size = maxSam, 
-                     ExtensionLevel = XTrain.shape[1] - 1)
-            anomalyScores = eisof.compute_paths(X_in = XTest.values)
-            anomalyScoresSorted = np.argsort(anomalyScores)
-            indicesWithPreds = anomalyScoresSorted[-int(np.ceil( contam * XTest.shape[0] )):]   
-            eisofPred = yTest * 0
-            eisofPred.iloc[indicesWithPreds] = 1
-            # Store metrics
-            metrics = roc_plot(yTest, eisofPred,  plot = False, show_results = False)
-            parameters = str(nEst) + '; ' + str(maxSam) + '; ' + str(contam)
-            eisofResults[parameters] = metrics
+            for extensionLev in extensionLevel:
+                print('Training for nEstimator =', nEst, 'Ex Level:', extensionLev)
+                eisof = eif.iForest(XTrain.values, 
+                        ntrees = nEst, 
+                        sample_size = maxSam, 
+                        ExtensionLevel = XTrain.shape[1] - 1)
+                anomalyScores = eisof.compute_paths(X_in = XTest.values)
+                anomalyScoresSorted = np.argsort(anomalyScores)
+                indicesWithPreds = anomalyScoresSorted[-int(np.ceil( contam * XTest.shape[0] )):]   
+                eisofPred = yTest * 0
+                eisofPred.iloc[indicesWithPreds] = 1
+                # Store metrics
+                metrics = roc_plot(yTest, eisofPred,  plot = False, show_results = False)
+                parameters = str(nEst) + '; ' + str(maxSam) + '; ' + str(contam) + ';' + str(extensionLev)
+                eisofResults[parameters] = metrics
 
 
 
@@ -459,8 +518,8 @@ i = 0
 for trainIndex, testIndex in cv.split(X):
     print("Epoch:", i + 1)   
     XTrain, XTest, yTrain, yTest = X.iloc[trainIndex], X.iloc[testIndex], y.iloc[trainIndex], y.iloc[testIndex]
-    sm = SMOTE(random_state = 27, sampling_strategy = 'auto')
-    XTrain, yTrain = sm.fit_sample(XTrain, yTrain)
+    smote = SMOTE(random_state = 27, sampling_strategy = 'auto')
+    XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
     lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
                                         max_iter = 1000).fit(XTrain, yTrain)
     lrPred = lr.predict(XTest)
@@ -481,8 +540,8 @@ i = 0
 for trainIndex, testIndex in cv.split(X):
     print("Epoch:", i + 1)   
     XTrain, XTest, yTrain, yTest = X.iloc[trainIndex], X.iloc[testIndex], y.iloc[trainIndex], y.iloc[testIndex]
-    sm = SMOTE(random_state = 27, sampling_strategy = 'auto')
-    XTrain, yTrain = sm.fit_sample(XTrain, yTrain)
+    smote = SMOTE(random_state = 27, sampling_strategy = 'auto')
+    XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
     rfc = sk.ensemble.RandomForestClassifier(n_estimators = nEst, max_depth = maxDep, max_features = None).fit(XTrain, yTrain)
     # predict on test set
     rfcPred = rfc.predict(XTest)
@@ -503,8 +562,8 @@ i = 0
 for trainIndex, testIndex in cv.split(X):
     print("Epoch:", i + 1)   
     XTrain, XTest, yTrain, yTest = X.iloc[trainIndex], X.iloc[testIndex], y.iloc[trainIndex], y.iloc[testIndex]
-    sm = SMOTE(random_state = 27, sampling_strategy = 'auto')
-    XTrain, yTrain = sm.fit_sample(XTrain, yTrain)
+    smote = SMOTE(random_state = 27, sampling_strategy = 'auto')
+    XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
     rfc = sk.ensemble.RandomForestClassifier(n_estimators = nEst, max_depth = maxDep, max_features = None).fit(XTrain, yTrain)
     # predict on test set
     rfcPred = rfc.predict(XTest)
@@ -521,7 +580,7 @@ saveModel(rfResults, './saved_results/rfCV')
 # Compare ROC plots
 # Logistic regression with customized threshold
 lrProba = lr.predict_proba(XTest)[:, 1]
-lrPred = lrProba > 0.9
+lrPred = lrProba > 0.93
 roc_plot(yTest, lrPred)
 lrRoc = lr_roc_plot(yTest, lrProba, title = '(Logistic Regression)')
 lrTpr = lrRoc['tpr']
@@ -589,7 +648,7 @@ eisofFpr = np.sort(fprLst)
 eisofTpr = [tprLst[item] for item in sortInd]
 eif_roc_auc = sk.metrics.auc(eisofFpr, eisofTpr)
 _ = plt.title('Receiver Operating Characteristic (Extended iForest)')
-_ = plt.plot(isofFpr, isofTpr, 'b', label = 'AUC = %0.2f' % eif_roc_auc)
+_ = plt.plot(eisofFpr, eisofTpr, 'b', label = 'AUC = %0.2f' % eif_roc_auc)
 _ = plt.legend(loc = 'lower right')
 _ = plt.plot([0, 1], [0, 1],'r--')
 _ = plt.xlim([0, 1])
@@ -603,7 +662,7 @@ plt.show()
 _ = plt.title('Receiver Operating Characteristic')
 _ = plt.plot(lrFpr, lrTpr, 'b', label = 'Logistic regression; AUC = %0.2f' % lr_roc_auc)
 _ = plt.plot(isofFpr, isofTpr, 'c-.', label = 'iForest; AUC = %0.2f' % if_roc_auc)
-_ = plt.plot(eisofFpr, eisofTpr, 'm:', label = 'Extended iForest; AUC = %0.2f' % eif_roc_auc)
+_ = plt.plot(eisofFpr, np.sort(eisofTpr), 'm:', label = 'Extended iForest; AUC = %0.2f' % eif_roc_auc)
 _ = plt.legend(loc = 'lower right')
 _ = plt.plot([0, 1], [0, 1],'r--')
 _ = plt.xlim([0, 1])
@@ -644,7 +703,7 @@ for i in range( len(summary) - 1 ):
     summary[key] = ls
 
 
-# Plot all AUC
+# AUC plot
 summary = pd.DataFrame(summary)
 # The AUC for lr, iforest and extended iForest should be computed from more than 1 threshold
 summary.loc[[0, 4, 5], 'auc'] = [lr_roc_auc, if_roc_auc, eif_roc_auc]
@@ -664,4 +723,23 @@ for i in range( len( modelNames ) ):
     _ = plt.text(y = i  , x = 0.2, s = np.round(f1[i], 3), size = 10)
 
 plt.show()
+
+
+
+# ----------------------------------------------------
+# LR
+XTrainMat = sm.add_constant(XTrain)
+lr2 = sm.GLM(yTrain, XTrainMat, family = sm.families.Binomial()).fit(maxiter = 1000)
+print(lr2.summary())
+lrPred2 = lr2.mu
+
+
+fig, ax = plt.subplots()
+
+ax.scatter(lrPred2, lr2.resid_pearson)
+ax.hlines(0, 0, 1)
+ax.set_xlim(0, 1)
+ax.set_title('Residual Dependence Plot')
+ax.set_ylabel('Pearson Residuals')
+ax.set_xlabel('Fitted values')
 

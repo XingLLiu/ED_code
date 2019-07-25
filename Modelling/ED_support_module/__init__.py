@@ -15,6 +15,8 @@ import pickle
 import eif
 from mpl_toolkits import mplot3d   # For 3D plots
 
+plt.style.use('seaborn')
+
 
 def double_scatter(x_feature = None, y_feature = None, classes = 'Primary.Dx', data = None):
     '''

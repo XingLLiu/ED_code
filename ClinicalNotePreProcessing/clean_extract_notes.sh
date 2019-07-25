@@ -1,6 +1,6 @@
 #!/bin/bash
 
-dir_apache=${1:-/usr/local/apache-ctakes-4.0.0/bin}
+dir_apache=~/Documents/Ctakes/apache-ctakes-4.0.0/bin
 
 # Maria's user/pass
 uname="MariaY"
@@ -27,7 +27,7 @@ echo "----- Running python cleaning script -----"
 python $dir/cleaning_script.py --path $dir_EPIC --local $dir
 echo "----- Changing folder to apache-ctakes -----"
 cd $dir_apache
-. $dir_apache/runClinicalPipeline.sh  -i $dir_EPIC/annotatorInput  --xmiOut $dir_EPIC/annotatorOutput   --user $uname  --pass $passwd
+$dir_apache/runClinicalPipeline.sh  -i $dir_EPIC/annotatorInput  --xmiOut $dir_EPIC/annotatorOutput   --user $uname  --pass $passwd
 echo "----- Running python CUI extractor script -----"
 cd $dir
 python $dir/extract_CUIs.py --path $dir_EPIC
