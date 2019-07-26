@@ -180,8 +180,8 @@ roc_plot(yTest, lrPred2)
 # Random forest
 # rfc = sk.ensemble.RandomForestClassifier(n_estimators = 1000, max_depth = 12, max_features = 50).fit(XTrain, yTrain)
 # rfc = sk.ensemble.RandomForestClassifier(n_estimators = 500, max_depth = 12, max_features = 50).fit(XTrain, yTrain)
-rfc = sk.ensemble.RandomForestClassifier(n_estimators = 4000, max_depth = 5, max_features = 30).fit(XTrain, yTrain)
-# rfc = sk.ensemble.RandomForestClassifier(n_estimators = 2000, max_depth = 80, max_features = 'auto', min_samples_split = 5).fit(XTrain, yTrain)  # no max feature: 0.75
+# rfc = sk.ensemble.RandomForestClassifier(n_estimators = 4000, max_depth = 5, max_features = 30).fit(XTrain, yTrain)
+rfc = sk.ensemble.RandomForestClassifier(n_estimators = 4000, max_depth = 80, max_features = 'auto', min_samples_split = 2).fit(XTrain, yTrain)  # no max feature: 0.75
 # predict on test set
 rfcPred = rfc.predict(XTest)
 print('Random forest:')
@@ -245,10 +245,14 @@ plt.show()
 
 
 # Extended isolation forest
+# eisof = eif.iForest(XTrain.values, 
+#                      ntrees = 50, 
+#                      sample_size = 128, 
+#                      ExtensionLevel = XTrain.shape[1] - 1)
 eisof = eif.iForest(XTrain.values, 
-                     ntrees = 50, 
+                     ntrees = 25, 
                      sample_size = 128, 
-                     ExtensionLevel = XTrain.shape[1] - 1)
+                     ExtensionLevel = 40)
 
 # calculate anomaly scores
 anomalyScores = eisof.compute_paths(X_in = XTest.values)
@@ -505,6 +509,17 @@ for nEst in nEstimators:
                 eisofResults[parameters] = metrics
 
 
+f1Vec = [scores[2] for scores in eisofResults.values()]
+_ = sns.scatterplot(range(len(eisofResults)), f1Vec)
+aucVec = [scores[3] for scores in eisofResults.values()]
+_ = sns.scatterplot(range(len(eisofResults)), aucVec)
+_ = plt.xlabel('No. of estimators and max depth')
+_ = plt.ylabel('f1 score')
+plt.show()
+
+params = list(eisofResults.keys())
+bestParams = params[aucVec.index(max(aucVec))]
+
 
 
 # ----------------------------------------------------
@@ -514,7 +529,7 @@ y = EPIC_enc['Primary.Dx']
 X = EPIC_enc.drop('Primary.Dx', axis = 1)
 cv = sk.model_selection.KFold(n_splits = 4, shuffle = True, random_state = 27)
 lrResults = {}
-i = 0
+i = 0; tpr = 0; tnr = 0;
 for trainIndex, testIndex in cv.split(X):
     print("Epoch:", i + 1)   
     XTrain, XTest, yTrain, yTest = X.iloc[trainIndex], X.iloc[testIndex], y.iloc[trainIndex], y.iloc[testIndex]
@@ -522,11 +537,16 @@ for trainIndex, testIndex in cv.split(X):
     XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
     lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
                                         max_iter = 1000).fit(XTrain, yTrain)
-    lrPred = lr.predict(XTest)
+    lrProba = lr.predict_proba(XTest)[:, 1]
+    lrPred = lrProba > 0.5
     metrics = roc_plot(yTest, lrPred, plot = False)
     lrResults[str(i)] = metrics
     i += 1
+    tpr += metrics[1]
+    tnr += (lrPred == 0).sum() / (yTest == 0).sum()
 
+
+print(tpr/4, tnr/4)
 
 saveModel(lrResults, './saved_results/lrCV')
 
@@ -580,8 +600,8 @@ saveModel(rfResults, './saved_results/rfCV')
 # Compare ROC plots
 # Logistic regression with customized threshold
 lrProba = lr.predict_proba(XTest)[:, 1]
-lrPred = lrProba > 0.93
-roc_plot(yTest, lrPred)
+lrPred = lrProba > 0.5
+roc_plot(yTest, lrPred, plot = False)
 lrRoc = lr_roc_plot(yTest, lrProba, title = '(Logistic Regression)')
 lrTpr = lrRoc['tpr']
 lrFpr = lrRoc['fpr']
@@ -626,9 +646,9 @@ fprLst, tprLst = [], []
 threshold = np.linspace(0, 1, 21)
 for i in range(21):
     eisof = eif.iForest(XTrain.values, 
-                     ntrees = 50, 
+                     ntrees = 25, 
                      sample_size = 128, 
-                     ExtensionLevel = XTrain.shape[1] - 1)
+                     ExtensionLevel = 40)
     anomalyScores = eisof.compute_paths(X_in = XTest.values)
     anomalyScoresSorted = np.argsort(anomalyScores)
     indicesWithPreds = anomalyScoresSorted[-int(np.ceil( threshold[i] * XTest.shape[0] )):]  
