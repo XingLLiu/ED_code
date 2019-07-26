@@ -9,7 +9,7 @@ path = '../../Epic_Sepsis_Alerts/'                          # Alert data folder
 pathRN = 'RN_Sepsis_Alerts'                                 # RN folder
 pathMD = 'MD_Sepsis_Triggers'                               # MD folder
 pathData = '../data/EPIC_DATA/EPIC.csv'                  # Original data
-pathSave = '../Data/EPIC_DATA/EPICwithSepsis.csv'           # Path of new data
+pathSave = '../data/EPIC_DATA/EPIC_with_alerts.csv'           # Path of new data
 os.chdir(path)
 
 # Read the original EPIC data
@@ -38,7 +38,9 @@ for i in range(2):
             EPIC[ EPIC['CSN'] == id, colName] = 1
     # Back to the parent folder
     os.chdir('../')
+    print('Added ' + colName)
 
 
+print('Writing to /data/EPIC_DATA/EPIC_with_alerts.csv')
 # Write new data to EPICwithAlerts.csv
-EPIC.to_csv('EPICwithAlerts.csv')
+EPIC.to_csv(pathSave, index = False)

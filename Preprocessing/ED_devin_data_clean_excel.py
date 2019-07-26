@@ -30,7 +30,7 @@ import numpy as np
 #import sys
 
 # Set folder directory
-os.chdir(dir_code)
+os.chdir(dir_code + '../')
 
 # Load in the support functions
 from ED_support_funs import str_subset, epic_date_to_data#, str_which

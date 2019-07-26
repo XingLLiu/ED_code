@@ -181,7 +181,7 @@ roc_plot(yTest, lrPred2)
 # rfc = sk.ensemble.RandomForestClassifier(n_estimators = 1000, max_depth = 12, max_features = 50).fit(XTrain, yTrain)
 # rfc = sk.ensemble.RandomForestClassifier(n_estimators = 500, max_depth = 12, max_features = 50).fit(XTrain, yTrain)
 # rfc = sk.ensemble.RandomForestClassifier(n_estimators = 4000, max_depth = 5, max_features = 30).fit(XTrain, yTrain)
-rfc = sk.ensemble.RandomForestClassifier(n_estimators = 4000, max_depth = 80, max_features = 'auto', min_samples_split = 2).fit(XTrain, yTrain)  # no max feature: 0.75
+rfc = sk.ensemble.RandomForestClassifier(n_estimators = 4000, max_depth = 5, max_features = 'auto', min_samples_split = 2).fit(XTrain, yTrain)  # no max feature: 0.75
 # predict on test set
 rfcPred = rfc.predict(XTest)
 print('Random forest:')

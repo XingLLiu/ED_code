@@ -16,7 +16,7 @@ fi
 # Get the current diectory 
 dir=$(pwd)
 # Folder that should have the EPIC.csv file in it
-dir_EPIC=$dir/../../data/EPIC_DATA
+dir_EPIC=$dir/../data/EPIC_DATA
 epic_hit=$(ls $dir_EPIC | grep ^EPIC.csv$ | wc -m)
 if [ $epic_hit -lt 5 ]; then
 	echo "Error! EPIC.csv was not found two folders up in ~data/"
