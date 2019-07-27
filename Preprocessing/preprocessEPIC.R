@@ -1,6 +1,9 @@
 # July 11th 2019
 # Preprocesses EPIC.csv (combined raw data) and outputs preprocessed_EPIC.csv (ready for training)
 
+# Load required packages
+source("requiredPackages.R")
+
 formatTimes <- function(data) {
   # Feature engineering based on arrival times
   data$Arrived <- as.POSIXct(data$Arrived, format="%d/%m/%y %H%M", tz = "EST")
@@ -36,7 +39,7 @@ createReturnInd <- function(data) {
 path <- "../../data/EPIC_DATA/"
 
 # ============ 1. LOAD DATA ================= #
-EPIC <- fread(paste0(path, "EPIC.csv"))
+EPIC <- fread(paste0(path, "EPIC_with_alerts.csv"))
 
 # ============ 2. PROCESS DATES ================= #
 EPIC <- formatTimes(EPIC)
@@ -124,7 +127,7 @@ EPIC$Discharge.Admit.Time[grepl("[^No previous discharge]", EPIC$Discharge.Admit
 EPIC$Pulse <- gsub("[^0-9]", "", EPIC$Pulse)
 EPIC$Resp <- as.numeric(gsub("[^0-9]", "", EPIC$Resp))
 EPIC$Temp <- as.numeric(gsub("[^0-9\\.]", "", EPIC$Temp))
-
+# Warning message for the above line
 # e. convert blood pressure to Systolic/Diastolic measures
 EPIC$Systolic <- str_extract(EPIC$BP, "[0-9]{2,3}/")
 EPIC$Systolic <- as.numeric(gsub("/", "", EPIC$Systolic))
@@ -198,7 +201,9 @@ factor.columns <- c("Gender",
                     "Name_Of_Walkin",
                     "Name_Of_Hospital",
                     "Admitting.Provider",
-                    "Dispo")
+                    "Dispo",
+                    "RN.Alert",
+                    "MD.Alert")
 
 # a. Convert to Factors, Numerics
 EPIC[,(factor.columns):=lapply(.SD, as.factor),.SDcols=factor.columns]

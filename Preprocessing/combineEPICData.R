@@ -1,3 +1,6 @@
+# Load required packages
+source("requiredPackages.R")
+
 processClinNotes <- function(clinical.notes, note.types) {
   # For each note type, for each unique visit, combine all the notes 
   # For each patient visit:
@@ -79,7 +82,7 @@ processClinNotes <- function(clinical.notes, note.types) {
 
 
 
-path <- "../../ED/data/EPIC_DATA/"
+path <- "../../data/EPIC_DATA/"
 
 
 
