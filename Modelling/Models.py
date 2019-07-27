@@ -198,7 +198,8 @@ roc_plot(yTest, cartPred)
 
 
 # One-class SVM
-algorithm = sk.svm.OneClassSVM(kernel ='rbf', nu = 0.2, gamma = 0.001) 
+# algorithm = sk.svm.OneClassSVM(kernel ='rbf', nu = 0.2, gamma = 0.001) 
+algorithm = sk.svm.OneClassSVM(kernel ='rbf', nu = 0.002, gamma = 0.001) 
 svmModel = algorithm.fit(XTrain)
 
 svmPred = svmModel.predict(XTest) 
