@@ -214,4 +214,11 @@ EPIC <- EPIC[,c(factor.columns, numerics), with=F]
 #dmy <- dummyVars(" ~ .", data = EPIC)
 #EPIC <- data.table(predict(dmy, newdata = EPIC))
 
+# c. Load and add CUIs
+CUI <- fread(paste0(path, "EPIC_CUIs.csv"))
+EPIC[, "Notes"] <- CUI[, "Processed.Note.Data_ED.Notes"]
+EPIC[, "Provider.Notes"] <- CUI[, "Processed.Note.Data_ED.Provider.Notes"]
+EPIC[, "Triage.Notes"] <- CUI[, "Processed.Note.Data_ED.Triage.Notes" ]
+
+
 fwrite(EPIC, paste0(path, "preprocessed_EPIC.csv"))
