@@ -11,18 +11,26 @@ Rscript ./Preprocessing/EPICpreProcessing.sh
 
 ## Code structure
 ```bash
-.
+
+|-- Archive                      # Archived files
 |-- Modelling 
 |   |-- EDA.py                   # EDA and modelling on the preprocessed data
-|   |__ EDA_old_data.py          # EDA on the orignial EPIC data
+|   |-- EDA_old_data.py          # EDA on the orignial EPIC data
+|   |-- Models.py                # Modelling
+|   |-- ED_support_module        # Functions used by other scripts
+|       |__ __init__.py
+|   |__ saved_results            # Saved results from the models
 |-- Preprocessing
 |   |-- ED_data_process.sh     
-|   |-- EPICscript.R             # Source combineEPICData.R and preprocessEPIC.R
 |   |-- combineEPICData.R        
-|   |__ preprocessEPIC.R  
-|-- ED_devin_data_clean_excel.py
-|-- ED_support_funs.py
-|-- README.md
-|__ test.txt
+|   |-- preprocessEPIC.R 
+|   |-- EPICpreProcessing.sh     # Produce EPIC.csv
+|   |-- appendAlerts.py          # Produce EPICpreProcessed.csv
+|   |-- requiredPackages.R       # Packages required by EPICpreProcessing.sh
+|   |__ Sepsis_Reports.R      
+|-- Exploratory
+|   |-- ED_devin_data_clean_excel.py
+|   |-- ED_support_funs.py
+|__ README.md
 ```
 
