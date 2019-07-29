@@ -14,6 +14,7 @@ from scipy import stats
 import pickle
 import eif
 from mpl_toolkits import mplot3d   # For 3D plots
+import mlxtend.evaluate            # For feature importance
 
 plt.style.use('seaborn')
 

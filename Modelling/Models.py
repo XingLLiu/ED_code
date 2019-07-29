@@ -1,6 +1,6 @@
 # ----------------------------------------------------
 from ED_support_module import *                      # Source required modules and functions
-from EDA import EPIC, EPIC_enc, numCols, catCols     # Source datasets from EDA.py
+from EDA import EPIC, EPIC_enc, EPIC_CUI, numCols, catCols     # Source datasets from EDA.py
 
 
 # ----------------------------------------------------
@@ -79,7 +79,6 @@ sk.metrics.recall_score(yTest, rfcPred)
 # Separate input features and target
 y = EPIC_enc['Primary.Dx']
 X = EPIC_enc.drop('Primary.Dx', axis = 1)
-
 XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
 
 smote = SMOTE(random_state = 27, sampling_strategy = 'auto') # 0.4
@@ -127,28 +126,6 @@ def numPCA(XTrain, XTest, numCols):
 
 
 # ----------------------------------------------------
-# # SMOTENC for mixed data
-# y = EPIC['Primary.Dx']
-# X = EPIC.drop('Primary.Dx', axis = 1)
-# XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
-
-# ifCat = [name in catCols for name in X.columns]
-# sm = SMOTENC(random_state = 27, sampling_strategy = 0.4, categorical_features = ifCat)
-# XTrain, yTrain = sm.fit_sample(XTrain, yTrain)
-
-# # Stratified sampling
-# XNormal, XIll = EPIC_enc.loc[y == 0], EPIC_enc.loc[y == 1]
-# yNormal, yIll = y.loc[y == 0], y.loc[y == 1]
-# # setting up testing and training sets
-# XTrainNormal, XTestNormal, yTrainNormal, yTestNormal = sk.model_selection.train_test_split(XNormal, yNormal, 
-#                                                                                         test_size=0.25, random_state=27)
-# XTrainIll, XTestIll, yTrainIll, yTestIll = sk.model_selection.train_test_split(XIll, yIll, 
-#                                                                             test_size=0.25, random_state=27)
-# XTrain = pd.concat([XTrainNormal, XTrainIll])
-# yTrain = pd.concat([yTrainNormal, yTrainIll])
-
-
-# ----------------------------------------------------
 # Logistic regression with SMOTE
 lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l1',
                                         max_iter = 1000).fit(XTrain, yTrain)
@@ -167,6 +144,7 @@ coeffsRm = [X.columns[i] for i in range(X.shape[1]) if ifZero[i]]
 # Refit 
 whichKeep = pd.Series( range( len( notZero ) ) )
 whichKeep = whichKeep.loc[notZero]
+XTrain = pd.DataFrame(XTrain, columns = X.columns)
 XTrain, XTest = XTrain.iloc[:, whichKeep], XTest.iloc[:, whichKeep]
 lr2 = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2', 
                                             max_iter = 1000).fit(XTrain, yTrain)
@@ -174,7 +152,34 @@ lr2 = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
 lrPred2 = lr2.predict(XTest)
 roc_plot(yTest, lrPred2)
 
+# Feature importance using permutation test
+impVals, impAll = mlxtend.evaluate.feature_importance_permutation(
+                    predict_method = lr2.predict, 
+                    X = np.array(XTest),
+                    y = np.array(yTest),
+                    metric = 'accuracy',
+                    num_rounds = 10,
+                    seed = 27)
 
+
+std = np.std(impAll, axis=1)
+indices = np.argsort(impVals)[::-1]
+# Plot importance values
+_ = plt.figure()
+_ = plt.title("Logistic regression feature importance via permutation importance w. std. dev.")
+_ = sns.barplot(y = XTest.columns[indices], x = impVals[indices],
+                xerr = std[indices])
+_ = plt.yticks(fontsize = 8)
+plt.show()
+
+# Plot beta values
+nonZeroCoeffs = lr.coef_[lr.coef_ != 0]
+indices = np.argsort(abs(nonZeroCoeffs))[::-1]
+_ = plt.figure()
+_ = plt.title("Logistic regression feature importance via permutation importance w. std. dev.")
+_ = sns.barplot(y = XTest.columns[indices], x = np.squeeze(nonZeroCoeffs)[indices])
+_ = plt.yticks(fontsize = 8)
+plt.show()
 
 
 # Random forest
@@ -187,6 +192,40 @@ rfcPred = rfc.predict(XTest)
 print('Random forest:')
 roc_plot(yTest, rfcPred)
 
+# Random forest feature importance
+# i) using Gini impurity
+importanceVals = rfc.feature_importances_
+std = np.std([tree.feature_importances_ for tree in rfc.estimators_],
+             axis=0)
+indices = np.argsort(importanceVals)[::-1]
+# Plot the feature importances of the forest
+_ = plt.figure()
+_ = plt.title("Random Forest feature importance (impurity)")
+_ = sns.barplot(y = XTrain.columns[indices], x = importanceVals[indices],
+                xerr = std[indices])
+_ = plt.yticks(fontsize = 8)
+plt.show()
+
+# ii) using permutation test
+impVals, impAll = mlxtend.evaluate.feature_importance_permutation(
+                    predict_method = rfc.predict, 
+                    X = np.array(XTest),
+                    y = np.array(yTest),
+                    metric = 'accuracy',
+                    num_rounds = 10,
+                    seed = 27)
+
+
+std = np.std(impAll, axis=1)
+indices = np.argsort(impVals)[::-1]
+# Plot importance values
+_ = plt.figure()
+_ = plt.title("Random Forest feature importance via permutation importance w. std. dev.")
+_ = sns.barplot(y = XTrain.columns[indices], x = impVals[indices],
+                xerr = std[indices])
+_ = plt.yticks(fontsize = 8)
+plt.show()
+
 
 # CART
 # cart = sk.tree.DecisionTreeClassifier(max_features = 40, class_weight = {1:200}, random_state = 27)
@@ -197,10 +236,19 @@ roc_plot(yTest, cartPred)
 
 
 
+# ----------------------------------------------------
+# ----------------------------------------------------
+# Unsupervised methods
+y = EPIC_enc['Primary.Dx']
+X = EPIC_enc.drop(['Primary.Dx', 'Diastolic'], axis = 1)  # EPIC_enc.drop(coeffsRm, axis = 1) 
+XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
+XTrainNormal = XTrain.loc[yTrain == 0, :]
+
+
 # One-class SVM
 # algorithm = sk.svm.OneClassSVM(kernel ='rbf', nu = 0.2, gamma = 0.001) 
-algorithm = sk.svm.OneClassSVM(kernel ='rbf', nu = 0.002, gamma = 0.001) 
-svmModel = algorithm.fit(XTrain)
+algorithm = sk.svm.OneClassSVM(kernel ='rbf', nu = 0.1, gamma = 0.0001) 
+svmModel = algorithm.fit(XTrain.loc[yTrain == 0, :])
 
 svmPred = svmModel.predict(XTest) 
 svmPred = -0.5 * svmPred + 0.5      # Set labels to (1, 0) rather than (-1, 1)
@@ -209,20 +257,11 @@ print('One-class SVM:')
 roc_plot(yTest, svmPred)
 
 
-
-# ----------------------------------------------------
-# ----------------------------------------------------
-# Unsupervised methods
-y = EPIC_enc['Primary.Dx']
-X = EPIC_enc.drop(['Primary.Dx', 'Diastolic'], axis = 1)  # EPIC_enc.drop(coeffsRm, axis = 1) 
-XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
-
-
 # Isolation forest
 # training the model
 isof = sk.ensemble.IsolationForest(n_estimators = 100, max_samples = 128, random_state = 27, 
                                     contamination = 0.1, behaviour = 'new')
-_ = isof.fit(XTrain)
+_ = isof.fit(XTrainNormal)
 
 # predictions
 # isofPredTrain = isof.predict(XTrain)
@@ -250,7 +289,7 @@ plt.show()
 #                      ntrees = 50, 
 #                      sample_size = 128, 
 #                      ExtensionLevel = XTrain.shape[1] - 1)
-eisof = eif.iForest(XTrain.values, 
+eisof = eif.iForest(XTrainNormal.values, 
                      ntrees = 25, 
                      sample_size = 128, 
                      ExtensionLevel = 40)
@@ -373,16 +412,16 @@ plt.show()
 
 
 # Number of trees in random forest
-n_estimators = [int(x) for x in np.linspace(start = 200, stop = 2000, num = 10)]
+n_estimators = [200, 500, 1000, 2000]
 n_estimators.append(3000)
 n_estimators.append(4000)
 # Number of features to consider at every split
 max_features = ['auto', 'sqrt']
 # Maximum number of levels in tree
-max_depth = [int(x) for x in np.linspace(10, 110, num = 11)]
+max_depth = [int(x) for x in np.linspace(10, 110, num = 6)]
 max_depth.append(None)
 # Minimum number of samples required to split a node
-min_samples_split = [2, 5, 10]
+min_samples_split = [2]   # [2, 5, 10]
 
 randomGrid = {'n_estimators': n_estimators, 'max_features': max_features, 
               'min_samples_split': min_samples_split, 
@@ -393,8 +432,8 @@ randomGrid = {'n_estimators': n_estimators, 'max_features': max_features,
 # First create the base model to tune
 rfc = sk.ensemble.RandomForestClassifier()
 # Random search of parameters, using 4 fold cross validation, 
-rfRandom = sk.model_selection.RandomizedSearchCV(estimator = rfc, param_distributions = randomGrid, n_iter = 100, 
-                                                    cv = 4, verbose = 2, random_state = 27, n_jobs = -1, scoring = 'f1')
+rfRandom = sk.model_selection.GridSearchCV(estimator = rfc, param_grid = randomGrid, cv = 4,
+                                           verbose = 2, n_jobs = -1, scoring = 'f1')
 # Fit the random search model
 _ = rfRandom.fit(XTrain, yTrain)
 print('Best params RFC: ', rfRandom.best_params_)
@@ -402,8 +441,8 @@ print('Best params RFC: ', rfRandom.best_params_)
 
 # ----------------------------------------------------
 # Tuning SVM
-nuList = [0.002, 0.02, 0.1, 0.2, 0.3, 0.4, 0.5]
-gammaList = [0.00001, 0.0001, 0.001, 0.01, 0.1, 0.2, 0.3]
+nuList = [0.02, 0.1, 0.2, 0.3, 0.4, 0.5]
+gammaList = [0.00001, 0.0001, 0.001, 0.01, 0.1]
 svmResults = {}
 for nu in nuList:
     for gamma in gammaList:
@@ -428,9 +467,9 @@ plt.show()
 
 
 # nu
-nu = [0.002, 0.003, 0.005, 0.008, 0.01, 0.015, 0.02, 0.1, 0.2, 0.3, 0.4, 0.5]
+nu = [0.01, 0.02, 0.1, 0.2, 0.3, 0.5]
 # Gamma for the extend of fit
-gamma = [0.00001, 0.0001, 0.001, 0.01, 0.1, 0.2, 0.3, 'auto_deprecated']
+gamma = [0.00001, 0.0001, 0.001, 0.01, 0.1, 'auto_deprecated']
 # kernel
 kernel = ['rbf']
 
@@ -439,10 +478,10 @@ randomGrid = {'nu': nu, 'gamma': gamma, 'kernel': kernel}
 # First create the base model to tune
 svm = sk.svm.OneClassSVM()
 # Random search of parameters, using 4 fold cross validation, 
-svmRandom = sk.model_selection.RandomizedSearchCV(estimator = svm, param_distributions = randomGrid, n_iter = 60, 
-                                                    cv = 4, verbose = 2, random_state = 27, n_jobs = -1, scoring = 'f1')
+svmRandom = sk.model_selection.GridSearchCV(estimator = svm, param_grid = randomGrid, cv = 4,
+                                            verbose = 2, n_jobs = -1, scoring = 'f1')
 # Fit the random search model
-_ = svmRandom.fit(XTrain, -2 * yTrain + 1)
+_ = svmRandom.fit(XTrainNormal, yTrain.loc[yTrain == 0] + 1)
 print('Best params SVM: ', svmRandom.best_params_)
 
 
@@ -455,10 +494,10 @@ randomGrid = {'nu': nu, 'gamma': gamma, 'kernel': kernel, 'degree': degree}
 # First create the base model to tune
 svm = sk.svm.OneClassSVM()
 # Random search of parameters, using 4 fold cross validation, 
-svmRandom = sk.model_selection.RandomizedSearchCV(estimator = svm, param_distributions = randomGrid, n_iter = 60, 
-                                                    cv = 4, verbose = 2, random_state = 27, n_jobs = -1, scoring = 'f1')
+svmRandom = sk.model_selection.GridSearchCV(estimator = svm, param_grid = randomGrid, cv = 4, 
+                                                  verbose = 2, n_jobs = -1, scoring = 'f1')
 # Fit the random search model
-_ = svmRandom.fit(XTrain, -2 * yTrain + 1)
+_ = svmRandom.fit(XTrainNormal, yTrain.loc[yTrain == 0] + 1)
 print('Best params SVM: ', svmRandom.best_params_)
 
 
@@ -615,7 +654,7 @@ threshold = np.linspace(0, 1, 21)
 for i in range(21):
     isof = sk.ensemble.IsolationForest(n_estimators = 100, max_samples = 128, random_state = 27, 
                                     contamination = threshold[i], behaviour = 'new')
-    _ = isof.fit(XTrain)
+    _ = isof.fit(XTrainNormal)
     isofPred = isof.predict(XTest)
     isofPred = -0.5 * isofPred + 0.5
     fpr, tpr, _ = sk.metrics.roc_curve(yTest, isofPred)
@@ -646,7 +685,7 @@ plt.show()
 fprLst, tprLst = [], []
 threshold = np.linspace(0, 1, 21)
 for i in range(21):
-    eisof = eif.iForest(XTrain.values, 
+    eisof = eif.iForest(XTrainNormal.values, 
                      ntrees = 25, 
                      sample_size = 128, 
                      ExtensionLevel = 40)
