@@ -260,7 +260,7 @@ roc_plot(yTest, svmPred)
 # Isolation forest
 # training the model
 isof = sk.ensemble.IsolationForest(n_estimators = 100, max_samples = 128, random_state = 27, 
-                                    contamination = 0.05, behaviour = 'new')
+                                    contamination = 0.1, behaviour = 'new')
 _ = isof.fit(XTrainNormal)
 
 # predictions
