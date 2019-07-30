@@ -174,7 +174,7 @@ plt.show()
 
 # Plot beta values
 nonZeroCoeffs = lr.coef_[lr.coef_ != 0]
-indices = np.argsort(abs(nonZeroCoeffs))[::-1]
+indices = np.argsort(abs(nonZeroCoeffs))[::-1][:50]
 _ = plt.figure()
 _ = plt.title("Logistic regression feature importance via permutation importance w. std. dev.")
 _ = sns.barplot(y = XTest.columns[indices], x = np.squeeze(nonZeroCoeffs)[indices])
@@ -260,7 +260,7 @@ roc_plot(yTest, svmPred)
 # Isolation forest
 # training the model
 isof = sk.ensemble.IsolationForest(n_estimators = 100, max_samples = 128, random_state = 27, 
-                                    contamination = 0.1, behaviour = 'new')
+                                    contamination = 0.05, behaviour = 'new')
 _ = isof.fit(XTrainNormal)
 
 # predictions
@@ -283,8 +283,46 @@ _ = plt.ylabel('Score')
 _ = plt.title('Isolation forest score for each instance')
 plt.show()
 
+# ii) using permutation test
+impVals, impAll = mlxtend.evaluate.feature_importance_permutation(
+                    predict_method = isof.predict, 
+                    X = np.array(XTest),
+                    y = np.array(1 -2 * yTest),
+                    metric = 'accuracy',
+                    num_rounds = 10,
+                    seed = 27)
+
+
+std = np.std(impAll, axis=1)
+indices = np.argsort(impVals)[::-1]
+# Plot importance values
+_ = plt.figure()
+_ = plt.title("Random Forest feature importance via permutation importance w. std. dev.")
+_ = sns.barplot(y = XTrain.columns[indices], x = impVals[indices],
+                xerr = std[indices])
+_ = plt.yticks(fontsize = 8)
+plt.show()
+
 
 # Extended isolation forest
+# # Normalizing the numerical features
+# y = EPIC_enc['Primary.Dx']
+# X = EPIC_enc.drop('Primary.Dx', axis = 1)
+# XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
+
+# # Transform the numerical features
+# XTrainNum, XTestNum = pd.DataFrame(XTrain)[numCols], pd.DataFrame(XTest)[numCols]
+# transformer = sk.preprocessing.RobustScaler().fit(XTrainNum)
+# XTrainNum = transformer.transform(XTrainNum)
+# XTestNUm = transformer.transform(XTestNum)
+# XTrainNum, XTestNum = pd.DataFrame(XTrainNum), pd.DataFrame(XTestNum)
+# XTrainNum.index, XTestNum.index = XTrain.index, XTest.index
+
+# # Replace the numerical features with the transfered features
+# XTrain = pd.concat([pd.DataFrame(XTrainNum), pd.DataFrame(XTrain.drop(numCols, axis = 1))], axis = 1, sort = False)
+# XTest = pd.concat([pd.DataFrame(XTestNum), pd.DataFrame(XTest.drop(numCols, axis = 1))], axis = 1, sort = False)
+# XTrainNormal = XTrain.loc[yTrain == 0, :]
+
 # eisof = eif.iForest(XTrain.values, 
 #                      ntrees = 50, 
 #                      sample_size = 128, 
@@ -344,9 +382,17 @@ _ = plt.xlabel('Pulse')
 _ = plt.ylabel('Temp')
 plt.show()
 
-dbscanPred = labels
-dbscanPred[dbscanPred == -1] = 1
+dbscanPred = labels.copy()
 dbscanPred[dbscanPred != -1] = 0
+dbscanPred[dbscanPred == -1] = 1
+roc_plot(y, dbscanPred)
+
+# Proportion of class 1 lables for each cluster
+for i in pd.Series(labels).unique():
+    print(i)
+    print( sum((dbscanPred == i) & (y == 1)) / sum(dbscanPred == i) )
+
+
 '''
 
 
@@ -787,6 +833,7 @@ plt.show()
 
 
 # ----------------------------------------------------
+'''
 # LR
 XTrainMat = sm.add_constant(XTrain)
 lr2 = sm.GLM(yTrain, XTrainMat, family = sm.families.Binomial()).fit(maxiter = 1000)
@@ -802,4 +849,74 @@ ax.set_xlim(0, 1)
 ax.set_title('Residual Dependence Plot')
 ax.set_ylabel('Pearson Residuals')
 ax.set_xlabel('Fitted values')
+'''
+
+
+# ----------------------------------------------------
+# Clinical notes
+# Show term frequencies for Sepsis
+ifSepsis = EPIC['Primary.Dx'] == 1
+CUISepsis = EPIC_CUI.iloc[ifSepsis.values]
+
+triageNotes = {}
+# The following for loops can be simplified
+for i in CUISepsis.index:
+    cuiLst = [cui for cui in CUISepsis.loc[i, 'Triage.Notes']]
+    for cui in cuiLst:
+        triageNotes[cui] = 0            
+
+
+# Count number of occurance
+for i in CUISepsis.index:
+    cuiLst = [cui for cui in CUISepsis.loc[i, 'Triage.Notes']]
+    for cui in cuiLst:
+        try:
+            triageNotes[cui] += 1
+        except:
+            continue
+
+
+# Create TF-IDF dataframe
+triageDf = pd.DataFrame(index = range(len(EPIC_CUI)), columns = range(len(triageNotes)), dtype = 'float')
+triageDf.iloc[:, :] = 0
+triageDf.columns = triageNotes.keys()
+triageDf.index = EPIC_enc.index
+
+# Compute TF and IDF
+corpusLen = sum(triageNotes.values())
+for i in triageDf.index:
+    notes = EPIC_CUI.loc[i, 'Triage.Notes']
+    for cui in notes:
+        if cui in triageNotes.keys():
+            # TF 
+            tf = sum([term == cui for term in notes]) / len(notes)
+            # IDF 
+            idf = np.log( corpusLen / triageNotes[cui] )
+            # Store TF-IDF
+            triageDf.loc[i, cui] = tf * idf
+
+
+# Append to EPIC_enc
+EPIC_enc = pd.concat([EPIC_enc, triageDf], axis = 1, sort = False)
+
+# Split to train and test
+y = EPIC_enc['Primary.Dx']
+X = EPIC_enc.drop(['Primary.Dx', 'Diastolic'], axis = 1)  # EPIC_enc.drop(coeffsRm, axis = 1) 
+XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
+XTrainNormal = XTrain.loc[yTrain == 0, :]
+
+
+
+
+
+# Full triage note
+# Append triage notes to X
+triageNotes = {}
+for i in EPIC_enc.index:
+    cuiLst = [cui for cui in EPIC_CUI.loc[i, 'Triage.Notes']]
+    for cui in cuiLst:
+        try:
+            triageNotes[cui] += 1
+        except:
+            triageNotes[cui] = 1
 

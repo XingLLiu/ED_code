@@ -38,8 +38,11 @@ createReturnInd <- function(data) {
 
 path <- "../../data/EPIC_DATA/"
 
-# ============ 1. LOAD DATA ================= #
+# ============ 0. LOAD DATA ================= #
 EPIC <- fread(paste0(path, "EPIC_with_alerts.csv"))
+
+# ============ 1. ADD CUIS ================= #
+
 
 # ============ 2. PROCESS DATES ================= #
 EPIC <- formatTimes(EPIC)
@@ -214,11 +217,10 @@ EPIC <- EPIC[,c(factor.columns, numerics), with=F]
 #dmy <- dummyVars(" ~ .", data = EPIC)
 #EPIC <- data.table(predict(dmy, newdata = EPIC))
 
-# c. Load and add CUIs
+# CUIs
 CUI <- fread(paste0(path, "EPIC_CUIs.csv"))
 EPIC[, "Notes"] <- CUI[, "Processed.Note.Data_ED.Notes"]
 EPIC[, "Provider.Notes"] <- CUI[, "Processed.Note.Data_ED.Provider.Notes"]
 EPIC[, "Triage.Notes"] <- CUI[, "Processed.Note.Data_ED.Triage.Notes" ]
-
 
 fwrite(EPIC, paste0(path, "preprocessed_EPIC.csv"))

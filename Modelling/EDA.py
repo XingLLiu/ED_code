@@ -18,6 +18,13 @@ savePath = '/home/xingliu/Documents/code/figures'
 
 
 # ----------------------------------------------------
+# Convert three cols of notes to list
+for col in notes:
+    noteLst = pd.Series( map( lambda note: note[2:-2].split('\', \''), EPIC_CUI[col] ) )
+    EPIC_CUI[col] = noteLst
+
+
+# ----------------------------------------------------
 # Unify format of column names
 colNames = list(EPIC.columns)
 for i in range(len(colNames)):
@@ -49,7 +56,6 @@ EPIC['Will.Return'] = EPIC['Will.Return'].astype('object')
 # ----------------------------------------------------
 # Overview of the dataset (6298 x 51)
 print('Dimension of data:', EPIC.shape)
-EPIC.info()
 
 # Discard the following features in modelling
 colRem = ['Care.Area', 'First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',
@@ -133,6 +139,7 @@ cond5 = EPIC['Pulse'] > 300
 cond = cond1 | cond2 | cond3 | cond4 | cond5
 sepRmNum = EPIC.loc[cond]['Primary.Dx'].sum()
 EPIC = EPIC.loc[~cond]
+EPIC_CUI = EPIC_CUI.loc[~cond]
 
 print( 'Removed {} obvious outliers from the dataset'.format( cond.sum() ) )
 print('{} of these are Sepsis or related cases'.format(sepRmNum))
