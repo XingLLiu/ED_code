@@ -283,7 +283,7 @@ _ = plt.ylabel('Score')
 _ = plt.title('Isolation forest score for each instance')
 plt.show()
 
-# ii) using permutation test
+# Feature importance using permutation test
 impVals, impAll = mlxtend.evaluate.feature_importance_permutation(
                     predict_method = isof.predict, 
                     X = np.array(XTest),
@@ -710,8 +710,8 @@ for i in range(21):
         print('Current iteration:', i)
 
 
-fprLst[-1], tprLst[-1] = 0, 0
-fprLst[0], fprLst[0] = 1, 1
+fprLst[-1], tprLst[-1] = 1, 1
+fprLst[0], tprLst[0] = 0, 0
 sortInd = np.argsort(fprLst)
 isofFpr = np.sort(fprLst)
 isofTpr = [tprLst[item] for item in sortInd]
@@ -747,8 +747,8 @@ for i in range(21):
         print('Current iteration:', i)
 
 
-fprLst[-1], tprLst[-1] = 0, 0
-fprLst[0], fprLst[0] = 1, 1
+fprLst[-1], tprLst[-1] = 1, 1
+fprLst[0], tprLst[0] = 0, 0
 sortInd = np.argsort(fprLst)
 eisofFpr = np.sort(fprLst)
 eisofTpr = [tprLst[item] for item in sortInd]
@@ -883,6 +883,7 @@ triageDf.columns = triageNotes.keys()
 triageDf.index = EPIC_enc.index
 
 # Compute TF and IDF
+# Vectorize this!
 corpusLen = sum(triageNotes.values())
 for i in triageDf.index:
     notes = EPIC_CUI.loc[i, 'Triage.Notes']
