@@ -214,8 +214,8 @@ EPIC[,(numerics):=lapply(.SD, as.numeric),.SDcols=numerics]
 
 EPIC <- EPIC[,c(factor.columns, numerics), with=F]
 # b. One hot encode
-#dmy <- dummyVars(" ~ .", data = EPIC)
-#EPIC <- data.table(predict(dmy, newdata = EPIC))
+# dmy <- dummyVars(" ~ .", data = EPIC)
+# EPIC <- data.table(predict(dmy, newdata = EPIC))
 
 # CUIs
 CUI <- fread(paste0(path, "EPIC_CUIs.csv"))

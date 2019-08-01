@@ -182,6 +182,7 @@ _ = plt.yticks(fontsize = 8)
 plt.show()
 
 
+# ----------------------------------------------------
 # Random forest
 # rfc = sk.ensemble.RandomForestClassifier(n_estimators = 1000, max_depth = 12, max_features = 50).fit(XTrain, yTrain)
 # rfc = sk.ensemble.RandomForestClassifier(n_estimators = 500, max_depth = 12, max_features = 50).fit(XTrain, yTrain)
@@ -191,6 +192,7 @@ rfc = sk.ensemble.RandomForestClassifier(n_estimators = 4000, max_depth = 5, max
 rfcPred = rfc.predict(XTest)
 print('Random forest:')
 roc_plot(yTest, rfcPred)
+
 
 # Random forest feature importance
 # i) using Gini impurity
@@ -227,13 +229,13 @@ _ = plt.yticks(fontsize = 8)
 plt.show()
 
 
+# ----------------------------------------------------
 # CART
 # cart = sk.tree.DecisionTreeClassifier(max_features = 40, class_weight = {1:200}, random_state = 27)
 cart = sk.tree.DecisionTreeClassifier(max_features = 40, class_weight = 'balanced', random_state = 27)
 cart = cart.fit(XTrain, yTrain)
 cartPred = cart.predict(XTest)
 roc_plot(yTest, cartPred)
-
 
 
 # ----------------------------------------------------
@@ -245,6 +247,7 @@ XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_si
 XTrainNormal = XTrain.loc[yTrain == 0, :]
 
 
+# ----------------------------------------------------
 # One-class SVM
 # algorithm = sk.svm.OneClassSVM(kernel ='rbf', nu = 0.2, gamma = 0.001) 
 algorithm = sk.svm.OneClassSVM(kernel ='rbf', nu = 0.1, gamma = 0.0001) 
@@ -257,6 +260,7 @@ print('One-class SVM:')
 roc_plot(yTest, svmPred)
 
 
+# ----------------------------------------------------
 # Isolation forest
 # training the model
 isof = sk.ensemble.IsolationForest(n_estimators = 100, max_samples = 128, random_state = 27, 
@@ -293,8 +297,9 @@ impVals, impAll = mlxtend.evaluate.feature_importance_permutation(
                     seed = 27)
 
 
+saveModel({'impVals': impVals, 'impAll': impAll}, './saved_results/feature_importance/isof')
 std = np.std(impAll, axis=1)
-indices = np.argsort(impVals)[::-1]
+indices = np.argsort(impVals)[::-1][:50]
 # Plot importance values
 _ = plt.figure()
 _ = plt.title("Random Forest feature importance via permutation importance w. std. dev.")
@@ -304,25 +309,8 @@ _ = plt.yticks(fontsize = 8)
 plt.show()
 
 
+# ----------------------------------------------------
 # Extended isolation forest
-# # Normalizing the numerical features
-# y = EPIC_enc['Primary.Dx']
-# X = EPIC_enc.drop('Primary.Dx', axis = 1)
-# XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
-
-# # Transform the numerical features
-# XTrainNum, XTestNum = pd.DataFrame(XTrain)[numCols], pd.DataFrame(XTest)[numCols]
-# transformer = sk.preprocessing.RobustScaler().fit(XTrainNum)
-# XTrainNum = transformer.transform(XTrainNum)
-# XTestNUm = transformer.transform(XTestNum)
-# XTrainNum, XTestNum = pd.DataFrame(XTrainNum), pd.DataFrame(XTestNum)
-# XTrainNum.index, XTestNum.index = XTrain.index, XTest.index
-
-# # Replace the numerical features with the transfered features
-# XTrain = pd.concat([pd.DataFrame(XTrainNum), pd.DataFrame(XTrain.drop(numCols, axis = 1))], axis = 1, sort = False)
-# XTest = pd.concat([pd.DataFrame(XTestNum), pd.DataFrame(XTest.drop(numCols, axis = 1))], axis = 1, sort = False)
-# XTrainNormal = XTrain.loc[yTrain == 0, :]
-
 # eisof = eif.iForest(XTrain.values, 
 #                      ntrees = 50, 
 #                      sample_size = 128, 
@@ -337,7 +325,7 @@ anomalyScores = eisof.compute_paths(X_in = XTest.values)
 # sort the scores
 anomalyScoresSorted = np.argsort(anomalyScores)
 # retrieve indices of anomalous observations
-indicesWithPreds = anomalyScoresSorted[-int(np.ceil( 0.1 * XTest.shape[0] )):]   # 0.002 is the anomaly ratio
+indicesWithPreds = anomalyScoresSorted[-int(np.ceil( 0.05 * XTest.shape[0] )):]   # 0.05 is the anomaly ratio
 # create predictions 
 eisofPred = yTest * 0
 eisofPred.iloc[indicesWithPreds] = 1
@@ -356,6 +344,7 @@ plt.show()
 
 # ----------------------------------------------------
 # DBSCAN
+'''
 # Scale the data
 y = EPIC_enc['Primary.Dx']
 X = EPIC_enc.drop('Primary.Dx', axis = 1)
@@ -365,7 +354,6 @@ robust = sk.preprocessing.RobustScaler()
 X[numCols] = robust.fit_transform(X[numCols])
 
 # Fit DBSCAN
-'''
 dbscan = sk.cluster.DBSCAN(eps = 3, min_samples = 4, metric = 'euclidean')
 dbscanModel = dbscan.fit(X)
 
@@ -686,82 +674,26 @@ saveModel(rfResults, './saved_results/rfCV')
 # Compare ROC plots
 # Logistic regression with customized threshold
 lrProba = lr.predict_proba(XTest)[:, 1]
-lrPred = lrProba > 0.5
-roc_plot(yTest, lrPred, plot = False)
-lrRoc = lr_roc_plot(yTest, lrProba, title = '(Logistic Regression)')
+lrRoc = lr_roc_plot(yTest, lrProba, title = '(Logistic Regression)', n_pts = 101)
 lrTpr = lrRoc['tpr']
 lrFpr = lrRoc['fpr']
 lr_roc_auc = sk.metrics.auc(lrFpr, lrTpr)
 
 
 # Isolation forest
-fprLst, tprLst = [], []
-threshold = np.linspace(0, 1, 21)
-for i in range(21):
-    isof = sk.ensemble.IsolationForest(n_estimators = 100, max_samples = 128, random_state = 27, 
-                                    contamination = threshold[i], behaviour = 'new')
-    _ = isof.fit(XTrainNormal)
-    isofPred = isof.predict(XTest)
-    isofPred = -0.5 * isofPred + 0.5
-    fpr, tpr, _ = sk.metrics.roc_curve(yTest, isofPred)
-    fprLst.append(fpr[1])
-    tprLst.append(tpr[1])
-    if i % 4 == 0:
-        print('Current iteration:', i)
-
-
-fprLst[-1], tprLst[-1] = 1, 1
-fprLst[0], tprLst[0] = 0, 0
-sortInd = np.argsort(fprLst)
-isofFpr = np.sort(fprLst)
-isofTpr = [tprLst[item] for item in sortInd]
+isofScore = isof.score_samples(XTest)
+isofRoc = if_roc_plot(yTest, isofScore, title = '(iForest)', n_pts = 101)
+isofTpr = isofRoc['tpr']
+isofFpr = isofRoc['fpr']
 if_roc_auc = sk.metrics.auc(isofFpr, isofTpr)
-_ = plt.title('Receiver Operating Characteristic (iForest)')
-_ = plt.plot(isofFpr, isofTpr, 'b', label = 'AUC = %0.2f' % if_roc_auc)
-_ = plt.legend(loc = 'lower right')
-_ = plt.plot([0, 1], [0, 1],'r--')
-_ = plt.xlim([0, 1])
-_ = plt.ylim([0, 1.01])
-_ = plt.ylabel('True Positive Rate')
-_ = plt.xlabel('False Positive Rate')
-plt.show()
 
 
 # Extended isolation forest
-fprLst, tprLst = [], []
-threshold = np.linspace(0, 1, 21)
-for i in range(21):
-    eisof = eif.iForest(XTrainNormal.values, 
-                     ntrees = 25, 
-                     sample_size = 128, 
-                     ExtensionLevel = 40)
-    anomalyScores = eisof.compute_paths(X_in = XTest.values)
-    anomalyScoresSorted = np.argsort(anomalyScores)
-    indicesWithPreds = anomalyScoresSorted[-int(np.ceil( threshold[i] * XTest.shape[0] )):]  
-    eisofPred = yTest * 0
-    eisofPred.iloc[indicesWithPreds] = 1
-    fpr, tpr, _ = sk.metrics.roc_curve(yTest, eisofPred)
-    fprLst.append(fpr[1])
-    tprLst.append(tpr[1])
-    if i % 4 == 0:
-        print('Current iteration:', i)
-
-
-fprLst[-1], tprLst[-1] = 1, 1
-fprLst[0], tprLst[0] = 0, 0
-sortInd = np.argsort(fprLst)
-eisofFpr = np.sort(fprLst)
-eisofTpr = [tprLst[item] for item in sortInd]
+eisofRoc = if_roc_plot(yTest, anomalyScores, title = '(iForest)', 
+                        n_pts = 101, extended = True)
+eisofTpr = eisofRoc['tpr']
+eisofFpr = eisofRoc['fpr']
 eif_roc_auc = sk.metrics.auc(eisofFpr, eisofTpr)
-_ = plt.title('Receiver Operating Characteristic (Extended iForest)')
-_ = plt.plot(eisofFpr, eisofTpr, 'b', label = 'AUC = %0.2f' % eif_roc_auc)
-_ = plt.legend(loc = 'lower right')
-_ = plt.plot([0, 1], [0, 1],'r--')
-_ = plt.xlim([0, 1])
-_ = plt.ylim([0, 1.01])
-_ = plt.ylabel('True Positive Rate')
-_ = plt.xlabel('False Positive Rate')
-plt.show()
 
 
 # Plot LR, IF and EIF on the same ROC
@@ -858,22 +790,20 @@ ax.set_xlabel('Fitted values')
 ifSepsis = EPIC['Primary.Dx'] == 1
 CUISepsis = EPIC_CUI.iloc[ifSepsis.values]
 
+# Get all unique CUIs
 triageNotes = {}
-# The following for loops can be simplified
 for i in CUISepsis.index:
     cuiLst = [cui for cui in CUISepsis.loc[i, 'Triage.Notes']]
     for cui in cuiLst:
-        triageNotes[cui] = 0            
+        if cui not in triageNotes.keys():
+            triageNotes[cui] = 0
 
 
-# Count number of occurance
-for i in CUISepsis.index:
-    cuiLst = [cui for cui in CUISepsis.loc[i, 'Triage.Notes']]
-    for cui in cuiLst:
-        try:
+# For each unique CUI, count the number of documents that contains it
+for notes in EPIC_CUI['Triage.Notes']:
+    for cui in triageNotes.keys():
+        if cui in notes:
             triageNotes[cui] += 1
-        except:
-            continue
 
 
 # Create TF-IDF dataframe
@@ -884,10 +814,11 @@ triageDf.index = EPIC_enc.index
 
 # Compute TF and IDF
 # Vectorize this!
-corpusLen = sum(triageNotes.values())
+corpusLen = len(EPIC_CUI)
 for i in triageDf.index:
     notes = EPIC_CUI.loc[i, 'Triage.Notes']
     for cui in notes:
+        # Compute TF-IDF if cui is in vocab
         if cui in triageNotes.keys():
             # TF 
             tf = sum([term == cui for term in notes]) / len(notes)
@@ -898,6 +829,7 @@ for i in triageDf.index:
 
 
 # Append to EPIC_enc
+cuiCols = triageDf.columns
 EPIC_enc = pd.concat([EPIC_enc, triageDf], axis = 1, sort = False)
 
 # Split to train and test

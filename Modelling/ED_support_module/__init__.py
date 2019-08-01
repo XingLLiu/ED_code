@@ -67,21 +67,25 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True):
 
 
 # Full ROC curve for logistic regression
-def lr_roc_plot(yTest = None, proba = None, plot = True, title = None):
+def lr_roc_plot(yTest = None, proba = None, plot = True, title = None, n_pts = 51):
     '''
-    Plot the roc curve of a given test set and predicted probability.
+    Plot the roc curve of a trained logistic regression model.
     Input:  yTest = test set (pd.dataframe or series)
             proba = predicted probability (np.array)
     Output: ROC plot
     '''
     fprLst, tprLst = [], []
-    threshold = np.linspace(0, 1, 21)
-    for i in range(21):
-        pred = proba > threshold[i]
+    threshold = np.linspace(0, 1, n_pts)
+    scoreSorted = np.argsort(proba)
+    for i in range(n_pts):
+        indicesWithPreds = scoreSorted[-int(np.ceil( threshold[i] * yTest.shape[0] )):] 
+        pred = yTest * 0
+        pred.iloc[indicesWithPreds] = 1
         fpr, tpr, _ = sk.metrics.roc_curve(yTest, pred)
         fprLst.append(fpr[1])
         tprLst.append(tpr[1])
-    fprLst[-1], tprLst[-1] = 0, 0
+    fprLst[-1], tprLst[-1] = 1, 1
+    fprLst[0], tprLst[0] = 0, 0
     roc_auc = sk.metrics.auc(fprLst, tprLst)
     if plot == True:
         plt.title('Receiver Operating Characteristic ' + title)
@@ -89,9 +93,49 @@ def lr_roc_plot(yTest = None, proba = None, plot = True, title = None):
         plt.legend(loc = 'lower right')
         plt.plot([0, 1], [0, 1],'r--')
         plt.xlim([0, 1])
-        plt.ylim([0, 1])
+        plt.ylim([0, 1.01])
         plt.ylabel('True Positive Rate')
         plt.xlabel('False Positive Rate')
+        plt.show()
+    return({'tpr':tprLst, 'fpr':fprLst})
+
+
+def if_roc_plot(yTest = None, score = None, plot = True, 
+                title = None, n_pts = 51, extended = False):
+    '''
+    Plot the roc curve of a trained isolation forest model.
+    Input:  yTest = test set (pd.dataframe or series)
+            proba = predicted probability (np.array)
+    Output: ROC plot
+    '''
+    fprLst, tprLst = [], []
+    threshold = np.linspace(0, 1, n_pts)
+    scoreSorted = np.argsort(score)
+    for i in range(n_pts):
+        if not extended:
+            indicesWithPreds = scoreSorted[:int(np.ceil( threshold[i] * yTest.shape[0] ))] 
+        else:
+            indicesWithPreds = scoreSorted[-int(np.ceil( threshold[i] * yTest.shape[0] )):] 
+        pred = yTest * 0
+        pred.iloc[indicesWithPreds] = 1
+        fpr, tpr, _ = sk.metrics.roc_curve(yTest, pred)
+        fprLst.append(fpr[1])
+        tprLst.append(tpr[1])
+    fprLst[-1], tprLst[-1] = 1, 1
+    fprLst[0], tprLst[0] = 0, 0
+    sortInd = np.argsort(fprLst)
+    fpr = np.sort(fprLst)
+    tpr = [tprLst[item] for item in sortInd]
+    roc_auc = sk.metrics.auc(fpr, tpr)
+    if plot == True:
+        _ = plt.title('Receiver Operating Characteristic ' + title)
+        _ = plt.plot(fpr, tpr, 'b', label = 'AUC = %0.2f' % roc_auc)
+        _ = plt.legend(loc = 'lower right')
+        _ = plt.plot([0, 1], [0, 1],'r--')
+        _ = plt.xlim([0, 1])
+        _ = plt.ylim([0, 1.01])
+        _ = plt.ylabel('True Positive Rate')
+        _ = plt.xlabel('False Positive Rate')
         plt.show()
     return({'tpr':tprLst, 'fpr':fprLst})
 
@@ -122,7 +166,7 @@ def metricsPlot(results, model_name):
 # Save models
 def saveModel(model, filename):
     '''
-    Save sklearn model as 'filename' in ./saved_models.
+    Save sklearn model as 'filename' in current directory.
     Input:  model: sklearn model
             filename: name of the model file (str)
     '''
@@ -132,7 +176,7 @@ def saveModel(model, filename):
 # Load models
 def loadModel(filename):
     '''
-    Load sklearn model 'filename' from ./saved_models.
+    Load sklearn model 'filename' in current directory.
     Input:  model: sklearn model
             filename: name of the model file (str)
     '''

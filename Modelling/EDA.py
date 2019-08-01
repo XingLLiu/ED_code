@@ -11,7 +11,7 @@ EPIC = pd.read_csv(path, encoding = 'ISO-8859-1')
 
 notes = ['Notes', 'Provider.Notes', 'Triage.Notes']
 EPIC_CUI = EPIC[notes]
-EPIC = EPIC.drop(notes, axis = 1)
+# EPIC = EPIC.drop(notes, axis = 1)
 
 # Set current wd (for saving figures)
 savePath = '/home/xingliu/Documents/code/figures'
@@ -21,7 +21,7 @@ savePath = '/home/xingliu/Documents/code/figures'
 # Convert three cols of notes to list
 for col in notes:
     noteLst = pd.Series( map( lambda note: note[2:-2].split('\', \''), EPIC_CUI[col] ) )
-    EPIC_CUI[col] = noteLst
+    EPIC[col] = noteLst
 
 
 # ----------------------------------------------------
@@ -60,7 +60,7 @@ print('Dimension of data:', EPIC.shape)
 # Discard the following features in modelling
 colRem = ['Care.Area', 'First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',
             'Day.of.Arrival', 'Arrival.Month', 'FSA', 'Name.Of.Walkin', 'Name.Of.Hospital', 'Lab.Status', 'Rad.Status', 
-            'Admitting.Provider', 'Disch.Date.Time', 'Roomed', 
+            'Admitting.Provider', 'Disch.Date.Time', 'Roomed', 'Discharge.Admit.Time',
             'Distance.To.Sick.Kids', 'Distance.To.Walkin', 'Distance.To.Hospital', 'Systolic']
 # colRem = ['First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',
 #             'Day.of.Arrival', 'Lab.Status', 'Rad.Status', 'Admitting.Provider'
@@ -76,8 +76,8 @@ topLangs = EPIC['Pref.Language'].value_counts().index[:4]
 ifTopLangs = [not language in topLangs for language in EPIC['Pref.Language'].values]
 EPIC['Pref.Language'].loc[ ifTopLangs ] = 'Other'
 
-# CC: Keep top 9 + others
-topCC = EPIC['CC'].value_counts().index[:9]
+# CC: Keep top 19 + others
+topCC = EPIC['CC'].value_counts().index[:19]
 ifTopCC = [not complaint in topCC for complaint in EPIC['CC'].values]
 EPIC['CC'].loc[ ifTopCC ] = 'Other'
 
@@ -96,18 +96,18 @@ EPIC['Arrival.Method'].loc[ ifTopMethods ] = 'Other'
 # Show data types. Select categorical and numerical features
 print( list(set(EPIC.dtypes.tolist())) )
 numCols = list(EPIC.select_dtypes(include = ['float64', 'int64']).columns)
-catCols = [col for col in EPIC.columns if col not in numCols]
+catCols = [col for col in EPIC.columns if (col not in numCols) and (col not in notes)]
 # Remove response variable
 catCols.remove('Primary.Dx')
 
-print('Categorical features:\n', catCols)
-print('Numerical features:\n', numCols)
+# print('Categorical features:\n', catCols)
+# print('Numerical features:\n', numCols)
 
 
 # ----------------------------------------------------
 # Check if Primary.Dx contains Sepsis or related classes
 ifSepsis = EPIC['Primary.Dx'].str.contains('epsis')
-print('Number of sepsis or sepsis-related cases:', ifSepsis.sum())
+# print('Number of sepsis or sepsis-related cases:', ifSepsis.sum())
 
 # Convert into binary class
 # Note: patients only healthy w.r.t. Sepsis
@@ -125,24 +125,23 @@ cond1 = EPIC['Age.at.Visit'] > 40
 # Temperature > 50 or < 30
 cond2 = (EPIC['Temp'] > 50) | (EPIC['Temp'] < 30)
 
-# Blood pressure > 200
-cond3 = (EPIC['Diastolic'] > 200)
+# Blood pressure > 240
+cond3 = (EPIC['Diastolic'] > 240)
 
 # Resp > 100
-cond4 = EPIC['Resp'] > 100
+cond4 = EPIC['Resp'] > 300
 
 # Pulse > 300
 cond5 = EPIC['Pulse'] > 300
 
 # Remove these outlisers
-# cond = cond1 | cond2 | cond3 | cond4
 cond = cond1 | cond2 | cond3 | cond4 | cond5
 sepRmNum = EPIC.loc[cond]['Primary.Dx'].sum()
 EPIC = EPIC.loc[~cond]
 EPIC_CUI = EPIC_CUI.loc[~cond]
 
 print( 'Removed {} obvious outliers from the dataset'.format( cond.sum() ) )
-print('{} of these are Sepsis or related cases'.format(sepRmNum))
+print( '{} of these are Sepsis or related cases'.format(sepRmNum) )
 
 
 # ----------------------------------------------------
@@ -210,6 +209,7 @@ plt.show()
 # Separate input features and target
 y = EPIC['Primary.Dx']
 X = EPIC.drop('Primary.Dx', axis = 1)
+X = X.drop(notes, axis = 1)
 XCat = X.drop(numCols, axis = 1)
 XNum = X.drop(catCols, axis = 1)
 
@@ -238,12 +238,16 @@ print( 'Total no. of missing values after imputation:', EPIC.isna().values.sum()
 # KNN imputer
 
 
+# ----------------------------------------------------
+# Separate 3 notes columns from EPIC and EPIC_enc
+EPIC_CUI = EPIC[notes]
+EPIC = EPIC.drop(notes, axis = 1)
 
 
 # ----------------------------------------------------
 # One-hot encode the categorical variables
 EPIC_enc = EPIC.copy()
-EPIC_enc = pd.get_dummies(EPIC_enc, columns = catCols)
+EPIC_enc = pd.get_dummies(EPIC_enc, columns = catCols, drop_first = True)
 
 # Encode the response as binary
 EPIC_enc['Primary.Dx'] = EPIC_enc['Primary.Dx'].astype('int')
