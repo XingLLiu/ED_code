@@ -19,12 +19,12 @@ if not os.path.exists(results_dir):
 feature_size = EPIC_enc.shape[1] - 1
 h_dim = 15
 z_dim = 10
-num_epochs = 250
+num_epochs = 200
 batch_size = 128
 learning_rate = 1e-3
 
 # Prepare taining set
-# EPIC_enc = TFIDF(EPIC_CUI, EPIC_enc)
+EPIC_enc = TFIDF(EPIC_CUI, EPIC_enc)
 y = EPIC_enc['Primary.Dx']
 X = EPIC_enc.drop('Primary.Dx', axis = 1)
 XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
@@ -42,6 +42,12 @@ XTestNum = pd.DataFrame(XTest)[numCols]
 XTestNum = scaler.transform(XTestNum)
 XTestNum = pd.DataFrame(XTestNum)
 XTestNum.index = XTest.index
+
+# PCA on the numerical entries   # 27, 11
+# pca = sk.decomposition.PCA(0.95).fit(XTrainNum)
+# XTrainNum = pd.DataFrame(pca.transform(XTrainNum))
+# XTestNum = pd.DataFrame(pca.transform(XTestNum))
+# XTrainNum.index, XTestNum.index = XTrainNormal.index, XTest.index
 
 # Construct scaled datasets
 XTrainNormal = pd.concat([pd.DataFrame(XTrainNum), pd.DataFrame(XTrainNormal.drop(numCols, axis = 1))],
@@ -197,5 +203,7 @@ def vaePredict(loss_train = None, loss_test = None, batch_size = None, sample_si
 vaePred, threshold = vaePredict(recLossVec + klDivVec, testKL + testRL, batch_size, k = 0, percent = 0.1)
 roc_plot(yTest, vaePred)
 
+vaePred, threshold = vaePredict(klDivVec, testRL, batch_size, k = 0, percent = 0.1)
+roc_plot(yTest, vaePred)
 
 
