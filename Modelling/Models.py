@@ -1,5 +1,5 @@
 # ----------------------------------------------------
-from ED_support_module import *                      # Source required modules and functions
+from ED_support_module import *                                # Source required modules and functions
 from EDA import EPIC, EPIC_enc, EPIC_CUI, numCols, catCols     # Source datasets from EDA.py
 
 
@@ -786,52 +786,48 @@ ax.set_xlabel('Fitted values')
 
 # ----------------------------------------------------
 # Clinical notes
-# Show term frequencies for Sepsis
-ifSepsis = EPIC['Primary.Dx'] == 1
-CUISepsis = EPIC_CUI.iloc[ifSepsis.values]
+def TFIDF(EPIC_CUI, EPIC_enc):
+    # Find all Sepsis
+    ifSepsis = EPIC_enc['Primary.Dx'] == 1
+    CUISepsis = EPIC_CUI.iloc[ifSepsis.values]
+    # Get all unique CUIs
+    triageNotes = {}
+    for i in CUISepsis.index:
+        cuiLst = [cui for cui in CUISepsis.loc[i, 'Triage.Notes']]
+        for cui in cuiLst:
+            if cui not in triageNotes.keys():
+                triageNotes[cui] = 0
+    # For each unique CUI, count the number of documents that contains it
+    for notes in EPIC_CUI['Triage.Notes']:
+        for cui in triageNotes.keys():
+            if cui in notes:
+                triageNotes[cui] += 1
+    # Create TF-IDF dataframe
+    triageDf = pd.DataFrame(index = range(len(EPIC_CUI)), columns = range(len(triageNotes)), dtype = 'float')
+    triageDf.iloc[:, :] = 0
+    triageDf.columns = triageNotes.keys()
+    triageDf.index = EPIC_enc.index
+    # Compute TF and IDF
+    # Vectorize this!
+    corpusLen = len(EPIC_CUI)
+    for i in triageDf.index:
+        notes = EPIC_CUI.loc[i, 'Triage.Notes']
+        for cui in notes:
+            # Compute TF-IDF if cui is in vocab
+            if cui in triageNotes.keys():
+                # TF 
+                tf = sum([term == cui for term in notes]) / len(notes)
+                # IDF 
+                idf = np.log( corpusLen / triageNotes[cui] )
+                # Store TF-IDF
+                triageDf.loc[i, cui] = tf * idf
+    # Append to EPIC_enc
+    cuiCols = triageDf.columns
+    EPIC_enc = pd.concat([EPIC_enc, triageDf], axis = 1, sort = False)
+    return EPIC_enc
 
-# Get all unique CUIs
-triageNotes = {}
-for i in CUISepsis.index:
-    cuiLst = [cui for cui in CUISepsis.loc[i, 'Triage.Notes']]
-    for cui in cuiLst:
-        if cui not in triageNotes.keys():
-            triageNotes[cui] = 0
 
-
-# For each unique CUI, count the number of documents that contains it
-for notes in EPIC_CUI['Triage.Notes']:
-    for cui in triageNotes.keys():
-        if cui in notes:
-            triageNotes[cui] += 1
-
-
-# Create TF-IDF dataframe
-triageDf = pd.DataFrame(index = range(len(EPIC_CUI)), columns = range(len(triageNotes)), dtype = 'float')
-triageDf.iloc[:, :] = 0
-triageDf.columns = triageNotes.keys()
-triageDf.index = EPIC_enc.index
-
-# Compute TF and IDF
-# Vectorize this!
-corpusLen = len(EPIC_CUI)
-for i in triageDf.index:
-    notes = EPIC_CUI.loc[i, 'Triage.Notes']
-    for cui in notes:
-        # Compute TF-IDF if cui is in vocab
-        if cui in triageNotes.keys():
-            # TF 
-            tf = sum([term == cui for term in notes]) / len(notes)
-            # IDF 
-            idf = np.log( corpusLen / triageNotes[cui] )
-            # Store TF-IDF
-            triageDf.loc[i, cui] = tf * idf
-
-
-# Append to EPIC_enc
-cuiCols = triageDf.columns
-EPIC_enc = pd.concat([EPIC_enc, triageDf], axis = 1, sort = False)
-
+EPIC_enc = TFIDF(EPIC_CUI, EPIC_enc)
 # Split to train and test
 y = EPIC_enc['Primary.Dx']
 X = EPIC_enc.drop(['Primary.Dx', 'Diastolic'], axis = 1)  # EPIC_enc.drop(coeffsRm, axis = 1) 
@@ -845,11 +841,11 @@ XTrainNormal = XTrain.loc[yTrain == 0, :]
 # Full triage note
 # Append triage notes to X
 triageNotes = {}
-for i in EPIC_enc.index:
+for i in EPIC_CUI.index:
     cuiLst = [cui for cui in EPIC_CUI.loc[i, 'Triage.Notes']]
     for cui in cuiLst:
-        try:
-            triageNotes[cui] += 1
-        except:
-            triageNotes[cui] = 1
+        if cui not in triageNotes.keys():
+            triageNotes[cui] = 0
+
+
 

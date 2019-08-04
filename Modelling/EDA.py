@@ -255,4 +255,4 @@ EPIC_enc['Primary.Dx'] = EPIC_enc['Primary.Dx'].astype('int')
 
 # ----------------------------------------------------
 print('\n----------------------------------------------------')
-print('\n \nSourcing completed')
+print('\nSourcing completed \n')
