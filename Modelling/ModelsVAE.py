@@ -36,7 +36,7 @@ XTrainNum = XTrainNormal[numCols]
 XTestNum = XTest[numCols]
 
 # PCA on the numerical entries   # 27, 11  # Without PCA: 20, 18
-sk.decomposition.SparsePCA(0.95).fit(XTrainNum)
+pca = sk.decomposition.SparsePCA(0.95).fit(XTrainNum)
 # pca = sk.decomposition.PCA(0.95).fit(XTrainNum)
 XTrainNum = pd.DataFrame(pca.transform(XTrainNum))
 XTestNum = pd.DataFrame(pca.transform(XTestNum))
