@@ -24,7 +24,7 @@ batch_size = 128
 learning_rate = 1e-3
 
 # Prepare taining set
-EPIC_enc = TFIDF(EPIC_CUI, EPIC_enc)
+# EPIC_enc = TFIDF(EPIC_CUI, EPIC_enc)
 y = EPIC_enc['Primary.Dx']
 X = EPIC_enc.drop('Primary.Dx', axis = 1)
 XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
@@ -66,14 +66,14 @@ class VAE(nn.Module):
         self.fc4 = nn.Linear(z_dim, h_dim)
         self.fc5 = nn.Linear(h_dim, feature_size)
     def encode(self, x):
-        h = F.relu(self.fc1(x))
+        h = torch.tanh(self.fc1(x))
         return self.fc2(h), self.fc3(h)
     def reparameterize(self, mu, log_var):
         std = torch.exp(log_var/2)
         eps = torch.randn_like(std)
         return mu + eps * std
     def decode(self, z):
-        h = F.relu(self.fc4(z))
+        h = torch.tanh(self.fc4(z))
         return torch.sigmoid(self.fc5(h))
     def forward(self, x):
         mu, log_var = self.encode(x)
@@ -135,7 +135,7 @@ model = loadModel('./saved_results/vae/vaeModel')
 
 testLoader = torch.utils.data.DataLoader(dataset = torch.from_numpy(XTest),
                                           batch_size = 1,
-                                          shuffle = True)
+                                          shuffle = False)
 
 
 testRL = np.zeros(len(XTest))
@@ -145,7 +145,7 @@ with torch.no_grad():
         data = data.float()
         x_reconst, mu, log_var = model(data)
         # Reconstruction loss
-        reconst_loss = F.binary_cross_entropy(x_reconst, data)
+        reconst_loss = F.binary_cross_entropy(x_reconst, data, reduction = 'sum')
         kl_div = - 0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
         testRL[i] = reconst_loss
         testKL[i] = kl_div
@@ -156,11 +156,46 @@ with torch.no_grad():
 
 
 xVec = np.linspace(1, len(testRL), len(testRL))
-sns.scatterplot(x = xVec, y = testRL)
-sns.scatterplot(x = xVec[yTest == 1], y = testRL[yTest == 1], color = 'red')
+_ = sns.scatterplot(x = xVec, y = testRL)
+_ = sns.scatterplot(x = xVec[yTest == 1], y = testRL[yTest == 1], color = 'red')
 plt.show()
 
-sns.scatterplot(x = xVec, y = testKL)
-sns.scatterplot(x = xVec[yTest == 1], y = testKL[yTest == 1], color = 'red')
+_ = sns.scatterplot(x = xVec, y = testKL)
+_ = sns.scatterplot(x = xVec[yTest == 1], y = testKL[yTest == 1], color = 'red')
 plt.show()
-'''
+
+_ = sns.scatterplot(x = xVec, y = testKL + testRL)
+_ = sns.scatterplot(x = xVec[yTest == 1], y = testKL[yTest == 1] + testRL[yTest == 1], color = 'red')
+plt.show()
+
+
+# Set threshold to be the mean of 
+def vaePredict(loss_train = None, loss_test = None, batch_size = None, sample_size = 1000, k = 1, percent = 0.1):
+    '''
+    Make prediction based on the train loss and the test loss.
+    Threshold is set to be mu + k * std, where mu and std are computed
+    from the last sample_size batches.
+    Input : loss_train = loss of the train set (np.array or pd.Series)
+            loss_test = loss of the test set (np.array or pd.Series)
+            batch_size = batch size used in the training
+            sample_size = size of the sample used to set the threshold
+            k = parameter for setting the threshold
+    '''
+    # Set threshold
+    # mu = (loss_train[-sample_size:] / batch_size).mean()
+    # std = np.sqrt( ( loss_train[-sample_size:] / batch_size ).var() )
+    # threshold = mu + k * std
+    ## Outlier if loss > threshold
+    # yPred = loss_test > threshold
+    testLossSorted = np.sort(loss_test)
+    threshold = testLossSorted[-int( np.ceil( percent * len(loss_test) ) )]
+    yPred = loss_test > threshold
+    return(yPred, threshold)
+
+
+# Plot summary statistics
+vaePred, threshold = vaePredict(recLossVec + klDivVec, testKL + testRL, batch_size, k = 0, percent = 0.1)
+roc_plot(yTest, vaePred)
+
+
+
