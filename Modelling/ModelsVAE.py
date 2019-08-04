@@ -24,30 +24,34 @@ batch_size = 128
 learning_rate = 1e-3
 
 # Prepare taining set
-EPIC_enc = TFIDF(EPIC_CUI, EPIC_enc)
+EPIC_enc, cuiCols = TFIDF(EPIC_CUI, EPIC_enc)
 y = EPIC_enc['Primary.Dx']
 X = EPIC_enc.drop('Primary.Dx', axis = 1)
 XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
 XTrainNormal = XTrain.loc[yTrain == 0]
 
+# Separate the numerical and categorical features
+numCols = numCols + list(cuiCols)
+XTrainNum = XTrainNormal[numCols]
+XTestNum = XTest[numCols]
+
+# PCA on the numerical entries   # 27, 11  # Without PCA: 20, 18
+sk.decomposition.SparsePCA(0.95).fit(XTrainNum)
+# pca = sk.decomposition.PCA(0.95).fit(XTrainNum)
+XTrainNum = pd.DataFrame(pca.transform(XTrainNum))
+XTestNum = pd.DataFrame(pca.transform(XTestNum))
+XTrainNum.index, XTestNum.index = XTrainNormal.index, XTest.index
+
 # Transform the train set
-XTrainNum = pd.DataFrame(XTrainNormal)[numCols]
 scaler = sk.preprocessing.MinMaxScaler()
 XTrainNum = scaler.fit_transform(XTrainNum)
 XTrainNum = pd.DataFrame(XTrainNum)
 XTrainNum.index = XTrainNormal.index
 
 # Transform the test set
-XTestNum = pd.DataFrame(XTest)[numCols]
 XTestNum = scaler.transform(XTestNum)
 XTestNum = pd.DataFrame(XTestNum)
 XTestNum.index = XTest.index
-
-# PCA on the numerical entries   # 27, 11
-# pca = sk.decomposition.PCA(0.95).fit(XTrainNum)
-# XTrainNum = pd.DataFrame(pca.transform(XTrainNum))
-# XTestNum = pd.DataFrame(pca.transform(XTestNum))
-# XTrainNum.index, XTestNum.index = XTrainNormal.index, XTest.index
 
 # Construct scaled datasets
 XTrainNormal = pd.concat([pd.DataFrame(XTrainNum), pd.DataFrame(XTrainNormal.drop(numCols, axis = 1))],
@@ -72,14 +76,14 @@ class VAE(nn.Module):
         self.fc4 = nn.Linear(z_dim, h_dim)
         self.fc5 = nn.Linear(h_dim, feature_size)
     def encode(self, x):
-        h = torch.tanh(self.fc1(x))
+        h = torch.relu(self.fc1(x))
         return self.fc2(h), self.fc3(h)
     def reparameterize(self, mu, log_var):
         std = torch.exp(log_var/2)
         eps = torch.randn_like(std)
         return mu + eps * std
     def decode(self, z):
-        h = torch.tanh(self.fc4(z))
+        h = torch.relu(self.fc4(z))
         return torch.sigmoid(self.fc5(h))
     def forward(self, x):
         mu, log_var = self.encode(x)

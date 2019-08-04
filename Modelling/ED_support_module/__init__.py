@@ -213,6 +213,7 @@ def TFIDF(EPIC_CUI, EPIC_enc):
     triageDf.index = EPIC_enc.index
     # Compute TF and IDF
     # Vectorize this!
+    print('Start computing TF-IDF ...')
     corpusLen = len(EPIC_CUI)
     for i in triageDf.index:
         notes = EPIC_CUI.loc[i, 'Triage.Notes']
@@ -226,7 +227,8 @@ def TFIDF(EPIC_CUI, EPIC_enc):
                 # Store TF-IDF
                 triageDf.loc[i, cui] = tf * idf
     # Append to EPIC_enc
+    print('Complete')
     cuiCols = triageDf.columns
     EPIC_enc = pd.concat([EPIC_enc, triageDf], axis = 1, sort = False)
-    return EPIC_enc
+    return EPIC_enc, cuiCols
 
