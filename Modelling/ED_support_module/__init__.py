@@ -233,3 +233,26 @@ def TFIDF(EPIC_CUI, EPIC_enc):
     EPIC_enc = pd.concat([EPIC_enc, triageDf], axis = 1, sort = False)
     return EPIC_enc, cuiCols
 
+
+# Prediction with VAE
+def vaePredict(loss_train = None, loss_test = None, batch_size = None, sample_size = 1000, k = 1, percent = 0.1):
+    '''
+    Make prediction based on the train loss and the test loss.
+    Threshold is set to be mu + k * std, where mu and std are computed
+    from the last sample_size batches.
+    Input : loss_train = loss of the train set (np.array or pd.Series)
+            loss_test = loss of the test set (np.array or pd.Series)
+            batch_size = batch size used in the training
+            sample_size = size of the sample used to set the threshold
+            k = parameter for setting the threshold
+    '''
+    # Set threshold
+    # mu = (loss_train[-sample_size:] / batch_size).mean()
+    # std = np.sqrt( ( loss_train[-sample_size:] / batch_size ).var() )
+    # threshold = mu + k * std
+    ## Outlier if loss > threshold
+    # yPred = loss_test > threshold
+    testLossSorted = np.sort(loss_test)
+    threshold = testLossSorted[-int( np.ceil( percent * len(loss_test) ) )]
+    yPred = loss_test > threshold
+    return(yPred, threshold)

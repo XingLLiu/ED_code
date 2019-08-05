@@ -50,8 +50,6 @@ else:
 
 
 # ----------------------------------------------------
-# Variational autoencoder
-
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -59,6 +57,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 results_dir = 'saved_results/vae/' + mode
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
+
+# ----------------------------------------------------
+# Variational autoencoder
 
 
 # Prepare taining set
@@ -226,30 +227,6 @@ plt.show()
 _ = sns.scatterplot(x = xVec, y = testKL + testRL)
 _ = sns.scatterplot(x = xVec[yTest == 1], y = testKL[yTest == 1] + testRL[yTest == 1], color = 'red')
 plt.show()
-
-
-# Set threshold to be the mean of 
-def vaePredict(loss_train = None, loss_test = None, batch_size = None, sample_size = 1000, k = 1, percent = 0.1):
-    '''
-    Make prediction based on the train loss and the test loss.
-    Threshold is set to be mu + k * std, where mu and std are computed
-    from the last sample_size batches.
-    Input : loss_train = loss of the train set (np.array or pd.Series)
-            loss_test = loss of the test set (np.array or pd.Series)
-            batch_size = batch size used in the training
-            sample_size = size of the sample used to set the threshold
-            k = parameter for setting the threshold
-    '''
-    # Set threshold
-    # mu = (loss_train[-sample_size:] / batch_size).mean()
-    # std = np.sqrt( ( loss_train[-sample_size:] / batch_size ).var() )
-    # threshold = mu + k * std
-    ## Outlier if loss > threshold
-    # yPred = loss_test > threshold
-    testLossSorted = np.sort(loss_test)
-    threshold = testLossSorted[-int( np.ceil( percent * len(loss_test) ) )]
-    yPred = loss_test > threshold
-    return(yPred, threshold)
 
 
 # Plot summary statistics
