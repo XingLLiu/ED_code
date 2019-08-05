@@ -1,6 +1,52 @@
 # ----------------------------------------------------
-from ED_support_module import *                                # Source required modules and functions
-from EDA import EPIC, EPIC_enc, EPIC_CUI, numCols, catCols     # Source datasets from EDA.py
+# Command arguments: mode, no. of epochs, batch size, learning rate
+from ED_support_module import *                                
+from EDA import EPIC, EPIC_enc, EPIC_CUI, numCols, catCols 
+
+
+# ----------------------------------------------------
+# Choose preprocessing pipeline
+'''
+Choose mode:
+a -- No PCA, no TF-IDF
+b -- PCA, no TF-IDF
+c -- No PCA, TF-IDF
+d -- PCA, but not on TF-IDF
+e -- PCA, TF-IDF
+f -- Sparse PCA, TF-IDF
+'''
+mode = sys.argv[1]
+if mode == 'a':
+    suffix = 'NoPCA_noTF-IDF'
+elif mode == 'b':
+    suffix = 'PCA_noTF-IDF'
+elif mode == 'c':
+    suffix = 'NoPCA_TF-IDF'
+elif mode == 'd':
+    suffix = 'PCA_but_not_on_TF-IDF'
+elif mode == 'e':
+    suffix = 'PCA_TF-IDF'
+elif mode == 'f':
+    suffix = 'Sparse_PCA_TF-IDF'
+else:
+    print('Invalid mode')
+    quit()
+
+
+# ----------------------------------------------------
+# Hyper-parameters
+h_dim = 15
+z_dim = 10
+hyper_params = sys.argv[2:]
+
+if len(hyper_params) == 3:
+    num_epochs = int(hyper_params[0])
+    batch_size = int(hyper_params[1])
+    learning_rate = float(hyper_params[2])
+else:
+    num_epochs = 200
+    batch_size = 128
+    learning_rate = 1e-3
 
 
 # ----------------------------------------------------
@@ -10,37 +56,39 @@ from EDA import EPIC, EPIC_enc, EPIC_CUI, numCols, catCols     # Source datasets
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Create a directory if not exists
-results_dir = 'saved_results/vae'
+results_dir = 'saved_results/vae/' + mode
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 
 
-# Hyper-parameters
-feature_size = EPIC_enc.shape[1] - 1
-h_dim = 15
-z_dim = 10
-num_epochs = 200
-batch_size = 128
-learning_rate = 1e-3
-
 # Prepare taining set
-EPIC_enc, cuiCols = TFIDF(EPIC_CUI, EPIC_enc)
+if mode not in ['a', 'b']:
+    EPIC_enc, cuiCols = TFIDF(EPIC_CUI, EPIC_enc)
+
+
 y = EPIC_enc['Primary.Dx']
 X = EPIC_enc.drop('Primary.Dx', axis = 1)
 XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
 XTrainNormal = XTrain.loc[yTrain == 0]
 
 # Separate the numerical and categorical features
-numCols = numCols + list(cuiCols)
+if mode in ['e', 'f']:
+    numCols = numCols + list(cuiCols)
+
+
 XTrainNum = XTrainNormal[numCols]
 XTestNum = XTest[numCols]
 
 # PCA on the numerical entries   # 27, 11  # Without PCA: 20, 18
-pca = sk.decomposition.SparsePCA(0.95).fit(XTrainNum)
-# pca = sk.decomposition.PCA(0.95).fit(XTrainNum)
-XTrainNum = pd.DataFrame(pca.transform(XTrainNum))
-XTestNum = pd.DataFrame(pca.transform(XTestNum))
-XTrainNum.index, XTestNum.index = XTrainNormal.index, XTest.index
+if mode in ['b', 'd', 'e', 'f']:
+    if mode in ['f']:
+        # Sparse PCA 
+        pca = sk.decomposition.SparsePCA(int(np.ceil(XTrainNum.shape[1]/2))).fit(XTrainNum)
+    elif mode in ['b', 'd', 'e']:
+        pca = sk.decomposition.PCA(0.95).fit(XTrainNum)
+    XTrainNum = pd.DataFrame(pca.transform(XTrainNum))
+    XTestNum = pd.DataFrame(pca.transform(XTestNum))
+    XTrainNum.index, XTestNum.index = XTrainNormal.index, XTest.index
 
 # Transform the train set
 scaler = sk.preprocessing.MinMaxScaler()
@@ -92,7 +140,8 @@ class VAE(nn.Module):
         return x_reconst, mu, log_var
 
 
-model = VAE(feature_size=XTrainNormal.shape[1]).to(device)
+feature_size = XTrainNormal.shape[1]
+model = VAE(feature_size=feature_size).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 # Initialize vectors to store the loss
@@ -125,9 +174,9 @@ for epoch in range(num_epochs):
 
 
 # Save results
-saveModel(recLossVec, './saved_results/vae/recLossVec')
-saveModel(klDivVec, './saved_results/vae/klDivVec')
-saveModel(model, './saved_results/vae/vaeModel')
+saveModel(recLossVec, './saved_results/vae/recLossVec' + '_' + suffix)
+saveModel(klDivVec, './saved_results/vae/klDivVec' + '_' + suffix)
+saveModel(model, './saved_results/vae/vaeModel' + '_' + suffix)
 
 
 # Plot losses
@@ -139,9 +188,9 @@ plt.show()
 
 
 # Prediction
-recLossVec = loadModel('./saved_results/vae/recLossVec')
-klDivVec = loadModel('./saved_results/vae/klDivVec')
-model = loadModel('./saved_results/vae/vaeModel')
+recLossVec = loadModel('./saved_results/vae/recLossVec' + '_' + suffix)
+klDivVec = loadModel('./saved_results/vae/klDivVec' + '_' + suffix)
+model = loadModel('./saved_results/vae/vaeModel' + '_' + suffix)
 
 testLoader = torch.utils.data.DataLoader(dataset = torch.from_numpy(XTest),
                                           batch_size = 1,
