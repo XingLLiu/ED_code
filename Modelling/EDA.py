@@ -59,7 +59,7 @@ print('Dimension of data:', EPIC.shape)
 
 # Discard the following features in modelling
 colRem = ['Care.Area', 'First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',
-            'Day.of.Arrival', 'Arrival.Month', 'FSA', 'Name.Of.Walkin', 'Name.Of.Hospital', 'Lab.Status', 'Rad.Status', 
+            'Day.of.Arrival', 'Arrival.Month', 'FSA', 'Name.Of.Walkin', 'Name.Of.Hospital', 'Lab.Status', 'Rad.Status',
             'Admitting.Provider', 'Disch.Date.Time', 'Roomed', 'Discharge.Admit.Time',
             'Distance.To.Sick.Kids', 'Distance.To.Walkin', 'Distance.To.Hospital', 'Systolic']
 # colRem = ['First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',

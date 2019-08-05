@@ -14,6 +14,7 @@ c -- No PCA, TF-IDF
 d -- PCA, but not on TF-IDF
 e -- PCA, TF-IDF
 f -- Sparse PCA, TF-IDF
+05/08 c is the best
 '''
 mode = sys.argv[1]
 if mode == 'a':
@@ -73,7 +74,7 @@ XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_si
 XTrainNormal = XTrain.loc[yTrain == 0]
 
 # Separate the numerical and categorical features
-if mode in ['e', 'f']:
+if mode in ['c', 'e', 'f']:
     numCols = numCols + list(cuiCols)
 
 
