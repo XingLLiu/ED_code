@@ -174,9 +174,9 @@ for epoch in range(num_epochs):
 
 
 # Save results
-saveModel(recLossVec, './saved_results/vae/recLossVec' + '_' + suffix)
-saveModel(klDivVec, './saved_results/vae/klDivVec' + '_' + suffix)
-saveModel(model, './saved_results/vae/vaeModel' + '_' + suffix)
+saveModel(recLossVec, './saved_results/vae/' + mode + '/recLossVec' + '_' + suffix)
+saveModel(klDivVec, './saved_results/vae/' + mode + '/klDivVec' + '_' + suffix)
+saveModel(model, './saved_results/vae/' + mode + '/vaeModel' + '_' + suffix)
 
 
 # Plot losses
@@ -188,9 +188,9 @@ plt.show()
 
 
 # Prediction
-recLossVec = loadModel('./saved_results/vae/recLossVec' + '_' + suffix)
-klDivVec = loadModel('./saved_results/vae/klDivVec' + '_' + suffix)
-model = loadModel('./saved_results/vae/vaeModel' + '_' + suffix)
+recLossVec = loadModel('./saved_results/vae/' + mode + '/recLossVec' + '_' + suffix)
+klDivVec = loadModel('./saved_results/vae/' + mode + '/klDivVec' + '_' + suffix)
+model = loadModel('./saved_results/vae/' + mode + '/vaeModel' + '_' + suffix)
 
 testLoader = torch.utils.data.DataLoader(dataset = torch.from_numpy(XTest),
                                           batch_size = 1,
