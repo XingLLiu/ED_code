@@ -75,11 +75,10 @@ sk.metrics.recall_score(yTest, rfcPred)
 
 # ----------------------------------------------------
 # SMOTE
-
 # Separate input features and target
 y = EPIC_enc['Primary.Dx']
 X = EPIC_enc.drop('Primary.Dx', axis = 1)
-XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=27, stratify = y)
+XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=57, stratify = y)
 
 smote = SMOTE(random_state = 27, sampling_strategy = 'auto') # 0.4
 XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
@@ -161,19 +160,18 @@ impVals, impAll = mlxtend.evaluate.feature_importance_permutation(
                     num_rounds = 10,
                     seed = 27)
 
-
 std = np.std(impAll, axis=1)
 indices = np.argsort(impVals)[::-1]
 # Plot importance values
 _ = plt.figure()
-_ = plt.title("Logistic regression feature importance via permutation importance w. std. dev.")
+_ = plt.title("Logistic regression feature importance via permutation importance with std. dev.")
 _ = sns.barplot(y = XTest.columns[indices], x = impVals[indices],
                 xerr = std[indices])
 _ = plt.yticks(fontsize = 8)
 plt.show()
 
 # Plot beta values
-nonZeroCoeffs = lr.coef_[lr.coef_ != 0]
+nonZeroCoeffs = lr2.coef_[lr2.coef_ != 0]
 indices = np.argsort(abs(nonZeroCoeffs))[::-1][:50]
 _ = plt.figure()
 _ = plt.title("Logistic regression values of coefficients.")

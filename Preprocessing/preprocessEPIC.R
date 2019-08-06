@@ -204,9 +204,7 @@ factor.columns <- c("Gender",
                     "Name_Of_Walkin",
                     "Name_Of_Hospital",
                     "Admitting.Provider",
-                    "Dispo",
-                    "RN.Alert",
-                    "MD.Alert")
+                    "Dispo")
 
 # a. Convert to Factors, Numerics
 EPIC[,(factor.columns):=lapply(.SD, as.factor),.SDcols=factor.columns]

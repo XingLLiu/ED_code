@@ -238,7 +238,7 @@ print( 'Total no. of missing values after imputation:', EPIC.isna().values.sum()
 
 
 # ----------------------------------------------------
-# Separate 3 notes columns from EPIC and EPIC_enc
+# Separate 3 notes columns from EPIC
 EPIC_CUI = EPIC[notes]
 EPIC = EPIC.drop(notes, axis = 1)
 
