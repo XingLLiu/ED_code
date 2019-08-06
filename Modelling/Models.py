@@ -146,7 +146,7 @@ whichKeep = pd.Series( range( len( notZero ) ) )
 whichKeep = whichKeep.loc[notZero]
 XTrain = pd.DataFrame(XTrain, columns = X.columns)
 XTrain, XTest = XTrain.iloc[:, whichKeep], XTest.iloc[:, whichKeep]
-lr2 = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2', 
+lr2 = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
                                             max_iter = 1000).fit(XTrain, yTrain)
 
 lrPred2 = lr2.predict(XTest)
@@ -154,7 +154,7 @@ roc_plot(yTest, lrPred2)
 
 # Feature importance using permutation test
 impVals, impAll = mlxtend.evaluate.feature_importance_permutation(
-                    predict_method = lr2.predict, 
+                    predict_method = lr2.predict,
                     X = np.array(XTest),
                     y = np.array(yTest),
                     metric = 'accuracy',
@@ -176,7 +176,7 @@ plt.show()
 nonZeroCoeffs = lr.coef_[lr.coef_ != 0]
 indices = np.argsort(abs(nonZeroCoeffs))[::-1][:50]
 _ = plt.figure()
-_ = plt.title("Logistic regression feature importance via permutation importance w. std. dev.")
+_ = plt.title("Logistic regression values of coefficients.")
 _ = sns.barplot(y = XTest.columns[indices], x = np.squeeze(nonZeroCoeffs)[indices])
 _ = plt.yticks(fontsize = 8)
 plt.show()

@@ -59,12 +59,14 @@ print('Dimension of data:', EPIC.shape)
 
 # Discard the following features in modelling
 colRem = ['Care.Area', 'First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',
-            'Day.of.Arrival', 'Arrival.Month', 'FSA', 'Name.Of.Walkin', 'Name.Of.Hospital', 'Lab.Status', 'Rad.Status',
-            'Admitting.Provider', 'Disch.Date.Time', 'Roomed', 'Discharge.Admit.Time',
-            'Distance.To.Sick.Kids', 'Distance.To.Walkin', 'Distance.To.Hospital', 'Systolic']
-# colRem = ['First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',
-#             'Day.of.Arrival', 'Lab.Status', 'Rad.Status', 'Admitting.Provider'
-#             'Distance.To.Sick.Kids', 'Distance.To.Walkin', 'Distance.To.Hospital']
+            'Day.of.Arrival', 'Arrival.Month', 'FSA', 'Discharge.Admit.Time', 'Name.Of.Walkin', 'Name.Of.Hospital', 
+            'Admitting.Provider', 'Disch.Date.Time', 'Roomed',
+            'Distance.To.Sick.Kids', 'Distance.To.Walkin', 'Distance.To.Hospital', 'Systolic',
+            'Size.Of.Treatment.Team', 'Arrival.to.Room']
+# (Some) features obtained after triage
+colAT = ['Lab.Status', 'Rad.Status', 'ED.PIA.Threshold', 'Same.First.And.Last', 'Dispo', 'Size.Of.Treatment.Team',
+         'Number.Of.Prescriptions', 'Length.Of.Stay.In.Minutes', 'Arrival.to.Room']
+# colRem = colRem + colAT
 EPIC =  EPIC.drop(colRem, axis = 1)          
 
 
@@ -81,9 +83,9 @@ topCC = EPIC['CC'].value_counts().index[:19]
 ifTopCC = [not complaint in topCC for complaint in EPIC['CC'].values]
 EPIC['CC'].loc[ ifTopCC ] = 'Other'
 
-# Arrival method: combine 'Unknown' and 'Other' and keep top 4 + others
+# Arrival method: combine 'Unknown' and 'Other' and keep top 9 + others
 EPIC.loc[EPIC['Arrival.Method'] == 'Unknown', 'Arrival.Method'] = 'Other'
-topMethods = EPIC['Arrival.Method'].value_counts().index[:4]
+topMethods = EPIC['Arrival.Method'].value_counts().index[:9]
 ifTopMethods = [not method in topMethods for method in EPIC['Arrival.Method'].values]
 EPIC['Arrival.Method'].loc[ ifTopMethods ] = 'Other'
 
@@ -128,7 +130,7 @@ cond2 = (EPIC['Temp'] > 50) | (EPIC['Temp'] < 30)
 # Blood pressure > 240
 cond3 = (EPIC['Diastolic'] > 240)
 
-# Resp > 100
+# Resp > 300
 cond4 = EPIC['Resp'] > 300
 
 # Pulse > 300
@@ -233,9 +235,6 @@ EPIC[catCols] = XCatImp
 EPIC[numCols] = XNumImp
 
 print( 'Total no. of missing values after imputation:', EPIC.isna().values.sum() )
-
-
-# KNN imputer
 
 
 # ----------------------------------------------------
