@@ -16,16 +16,16 @@
 <br><br>
 <b>Testing the pipeline with customized clinical notes:
 ## Change to the directory ./ClinicalNotePreProcessing/InputExample
-'''bash
+```bash
   cd ./ClinicalNotePreProcessing/InputExample
-'''
+```
 ## Run the pipeline with customized notes (3 inputs). See below for the input format.
-'''bash
+```bash
   python input_example.py input1 input2 input3
-'''
+```
 
 ## Input format:
-Three strings wrapped by quotation marks (""):
+Three strings wrapped by quotation marks ("inputX"):
 1. dd/mm/yyyy tttt, Some Name
 2. description of patient
 3. description of symptoms
