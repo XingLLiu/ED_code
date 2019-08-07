@@ -66,6 +66,8 @@ calculateTimeLapse <- function(wellSoft, reg_codes, data.path) {
   # Number of visits per person 
   
   rel.ids <- unique.PMRN[!unique.PMRN %in% single.visit.ids]
+  
+
   num.rows <- sum((num.returns %>% filter(PrimaryMedicalRecordNumber %in% rel.ids))$num.returns) - length(rel.ids)
   
   time.lapse <- data.frame(matrix(ncol = 4, nrow = (num.rows)))
@@ -74,7 +76,7 @@ calculateTimeLapse <- function(wellSoft, reg_codes, data.path) {
   colnames(time.lapse) <- c("PrimaryMedicalRecordNumber", "RegistrationNumberVisit1", 
                             "RegistrationNumberVisit2", "DifferenceInDays")
   print("Process return visits")
-  length(rel.ids)
+
 
   j <- 1
   for (i in 1:length(rel.ids)) {
@@ -91,9 +93,9 @@ calculateTimeLapse <- function(wellSoft, reg_codes, data.path) {
     
 
     time.lapse[j:(j+length(differences)-1),] <- c(rep_len(patient.id, length(differences)),
-                                    						 as.character(visit.1.reg.num),
-                                    					 	 as.character(visit.2.reg.num),
-                                    						 differences)
+						 as.character(visit.1.reg.num),
+					 	 as.character(visit.2.reg.num),
+						 differences)
 
     j <- j + length(differences)
 
@@ -104,9 +106,19 @@ calculateTimeLapse <- function(wellSoft, reg_codes, data.path) {
 
   print("Saving timeLapse.csv")
   fwrite(time.lapse, paste0(data.path, "timeLapse.csv"))
-
+  #saveRDS(time.lapse, "timeLapse.rds")
   
   return(time.lapse)
   
   
 }
+
+#data.path <- "/home/lebo/mybigdata/data/"
+data.path <- "./data/wellSoft_DATA/"
+source(paste0(data.path, 'dischargeCategories.R'))
+library(data.table)
+library(dplyr)
+
+reg_codes <- fread(paste0(data.path, "processedRegistrationCodes.csv"))
+wellSoft <- fread(paste0(data.path, "cleaned_wellSoft.csv"))
+timeLapse <- calculateTimeLapse(wellSoft, reg_codes, data.path)
