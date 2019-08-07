@@ -14,7 +14,7 @@
 <br>- modify clean_extract_notes.sh to have your UMLS license username and password, the absolute path locations storing the annotatorInput and annotatorOutput folders (should be in ED_code), and the absolute path location where your cTAKES installation is located
 <br>- check that cleaning_script.py and extract_CUIs.py read and write to the correct csv file
 <br><br>
-<b>Testing the pipeline with customized clinical notes:
+# Testing the pipeline with customized clinical notes:
 ## Change to the directory ./ClinicalNotePreProcessing/InputExample
 ```bash
   cd ./ClinicalNotePreProcessing/InputExample
