@@ -60,9 +60,10 @@ print('Dimension of data:', EPIC.shape)
 # Discard the following features in modelling
 colRem = ['Care.Area', 'First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',
             'Day.of.Arrival', 'Arrival.Month', 'FSA', 'Discharge.Admit.Time', 'Name.Of.Walkin', 'Name.Of.Hospital', 
-            'Admitting.Provider', 'Disch.Date.Time', 'Roomed',
+            'Admitting.Provider', 'Disch.Date.Time', 
             'Distance.To.Sick.Kids', 'Distance.To.Walkin', 'Distance.To.Hospital', 'Systolic',
-            'Size.Of.Treatment.Team', 'Arrival.to.Room']
+            'Size.Of.Treatment.Team', 'Arrival.to.Room',
+            'Roomed', 'Same.First.And.Last']
 # (Some) features obtained after triage
 colAT = ['Lab.Status', 'Rad.Status', 'ED.PIA.Threshold', 'Same.First.And.Last', 'Dispo', 'Size.Of.Treatment.Team',
          'Number.Of.Prescriptions', 'Length.Of.Stay.In.Minutes', 'Arrival.to.Room']
