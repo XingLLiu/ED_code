@@ -204,16 +204,24 @@ factor.columns <- c("Gender",
                     "Name_Of_Walkin",
                     "Name_Of_Hospital",
                     "Admitting.Provider",
-                    "Dispo")
+                    "Dispo",
+                    "Diagnosis",
+                    "Diagnoses")
 
 # a. Convert to Factors, Numerics
 EPIC[,(factor.columns):=lapply(.SD, as.factor),.SDcols=factor.columns]
 EPIC[,(numerics):=lapply(.SD, as.numeric),.SDcols=numerics]
+# Store arrival date for train-test split
+arrival.date <- as.numeric(format(EPIC$Arrived, format="20%y%m"))
+# Store MRN for removing returning patients
+MRN <- EPIC$MRN
 
 EPIC <- EPIC[,c(factor.columns, numerics), with=F]
 # b. One hot encode
 # dmy <- dummyVars(" ~ .", data = EPIC)
 # EPIC <- data.table(predict(dmy, newdata = EPIC))
+
+fwrite(EPIC, paste0(path, "preprocessed_EPIC.csv"))
 
 # CUIs
 CUI <- fread(paste0(path, "EPIC_CUIs.csv"))
@@ -221,4 +229,13 @@ EPIC[, "Notes"] <- CUI[, "Processed.Note.Data_ED.Notes"]
 EPIC[, "Provider.Notes"] <- CUI[, "Processed.Note.Data_ED.Provider.Notes"]
 EPIC[, "Triage.Notes"] <- CUI[, "Processed.Note.Data_ED.Triage.Notes" ]
 
-fwrite(EPIC, paste0(path, "preprocessed_EPIC.csv"))
+# EPIC with dates and CUIs
+EPIC.with.dates <- EPIC
+EPIC.with.dates$MRN <- MRN
+EPIC.with.dates$Arrived <- arrival.date
+
+# EPIC with CUIs
+fwrite(EPIC, paste0(path, "preprocessed_EPIC_with_notes.csv"))
+# EPIC with CUIs and arrival dates
+fwrite(EPIC.with.dates, paste0(path, "preprocessed_EPIC_with_dates_and_notes.csv"))
+

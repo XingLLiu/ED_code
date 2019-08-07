@@ -6,27 +6,43 @@ from ED_support_module import *
 
 # Load file
 # Path of file
-path = '/home/xingliu/Documents/ED/data/EPIC_DATA/preprocessed_EPIC.csv'
+path = '/home/xingliu/Documents/ED/data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv'
 EPIC = pd.read_csv(path, encoding = 'ISO-8859-1')
-
-notes = ['Notes', 'Provider.Notes', 'Triage.Notes']
-EPIC_CUI = EPIC[notes]
-# EPIC = EPIC.drop(notes, axis = 1)
 
 # Set current wd (for saving figures)
 savePath = '/home/xingliu/Documents/code/figures'
+
+# ----------------------------------------------------
+# Separate 3 notes columns from EPIC
+notes = ['Notes', 'Provider.Notes', 'Triage.Notes']
+EPIC_CUI = EPIC[notes]
+EPIC = EPIC.drop(notes, axis = 1)
+
+# Separate MRN and arrival date
+EPIC_arrival = EPIC[['MRN', 'Arrived']]
+EPIC = EPIC.drop(['MRN', 'Arrived'], axis = 1)
+
+# Separate diagnoses columns
+diagnosis = EPIC['Diagnosis']
+diagnoses = EPIC['Diagnoses']
+EPIC = EPIC.drop(['Diagnosis', 'Diagnoses'], axis = 1)
 
 
 # ----------------------------------------------------
 # Convert three cols of notes to list
 for col in notes:
     noteLst = pd.Series( map( lambda note: note[2:-2].split('\', \''), EPIC_CUI[col] ) )
-    EPIC[col] = noteLst
+    EPIC_CUI[col] = noteLst
 
 
 # ----------------------------------------------------
 # Unify format of column names
 colNames = list(EPIC.columns)
+# Special cases
+indexVec = np.linspace(0, len(colNames) - 1, len(colNames), dtype = 'int')
+ifCC = int(indexVec[EPIC.columns == 'CC'])
+ifFSA = int(indexVec[EPIC.columns == 'FSA'])
+
 for i in range(len(colNames)):
     name = colNames[i]
     # Change names of the form 'XX XXX'
@@ -39,11 +55,18 @@ for i in range(len(colNames)):
     colNames[i] = name
 
 
-# Assign CC and FSA back
-colNames[5] = 'CC'
-colNames[17] = 'FSA'
+# Assign special cases back
+colNames[ifCC] = 'CC'
+colNames[ifFSA] = 'FSA'
+
 # Re-assign col names
 EPIC.columns = colNames
+
+# Print error warning if there is empty colname remaining
+for name in colNames:
+    if len(colNames) == 0:
+        print('Empty name warning! Column name assignment may be wrong!')
+
 
 # Change 'Disch.Date.Time' and 'Roomed' to categorical
 EPIC['Disch.Date.Time'] = EPIC['Disch.Date.Time'].astype('object')
@@ -54,33 +77,32 @@ EPIC['Will.Return'] = EPIC['Will.Return'].astype('object')
 
 
 # ----------------------------------------------------
-# Overview of the dataset (6298 x 51)
+# Overview of the dataset 
 print('Dimension of data:', EPIC.shape)
 
 # Discard the following features in modelling
-colRem = ['Care.Area', 'First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',
-            'Day.of.Arrival', 'Arrival.Month', 'FSA', 'Discharge.Admit.Time', 'Name.Of.Walkin', 'Name.Of.Hospital', 
-            'Admitting.Provider', 'Disch.Date.Time', 
+colRem = ['First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',
+            'Day.of.Arrival', 'Arrival.Month', 'FSA', 'Discharge.Admit.Time', 'Name.Of.Walkin', 'Name.Of.Hospital',
+            'Admitting.Provider', 'Disch.Date.Time',
             'Distance.To.Sick.Kids', 'Distance.To.Walkin', 'Distance.To.Hospital', 'Systolic',
-            'Size.Of.Treatment.Team', 'Arrival.to.Room',
-            'Roomed', 'Same.First.And.Last']
+            'Size.Of.Treatment.Team', 'Resp']
 # (Some) features obtained after triage
 colAT = ['Lab.Status', 'Rad.Status', 'ED.PIA.Threshold', 'Same.First.And.Last', 'Dispo', 'Size.Of.Treatment.Team',
-         'Number.Of.Prescriptions', 'Length.Of.Stay.In.Minutes', 'Arrival.to.Room']
-# colRem = colRem + colAT
-EPIC =  EPIC.drop(colRem, axis = 1)          
+         'Number.Of.Prescriptions', 'Length.Of.Stay.In.Minutes', 'Arrival.to.Room', 'Roomed']
+colRem = colRem + colAT
+EPIC =  EPIC.drop(colRem, axis = 1)
 
 
 # ----------------------------------------------------
 ## Previous choice that produced good logistirc regression results:
 ## only changed Pref.Language and CC
 # Pref.Language: Keep top 4 languages + others
-topLangs = EPIC['Pref.Language'].value_counts().index[:4]
+topLangs = EPIC['Pref.Language'].value_counts().index[:9]
 ifTopLangs = [not language in topLangs for language in EPIC['Pref.Language'].values]
 EPIC['Pref.Language'].loc[ ifTopLangs ] = 'Other'
 
 # CC: Keep top 19 + others
-topCC = EPIC['CC'].value_counts().index[:19]
+topCC = EPIC['CC'].value_counts().index[:24]
 ifTopCC = [not complaint in topCC for complaint in EPIC['CC'].values]
 EPIC['CC'].loc[ ifTopCC ] = 'Other'
 
@@ -103,13 +125,16 @@ catCols = [col for col in EPIC.columns if (col not in numCols) and (col not in n
 # Remove response variable
 catCols.remove('Primary.Dx')
 
-# print('Categorical features:\n', catCols)
-# print('Numerical features:\n', numCols)
-
 
 # ----------------------------------------------------
 # Check if Primary.Dx contains Sepsis or related classes
-ifSepsis = EPIC['Primary.Dx'].str.contains('epsis')
+ifSepsis1 = EPIC['Primary.Dx'].str.contains('epsis')
+# Check if Diagnosis contains Sepsis or related classes
+ifSepsis2 = diagnosis.str.contains('epsis')
+# Check if Diagnoses contains Sepsis or related classes
+ifSepsis3 = diagnoses.str.contains('epsis')
+# Lable as sepsis if any of the above contains Sepsis
+ifSepsis = ifSepsis1 | ifSepsis2 | ifSepsis3
 # print('Number of sepsis or sepsis-related cases:', ifSepsis.sum())
 
 # Convert into binary class
@@ -131,14 +156,15 @@ cond2 = (EPIC['Temp'] > 50) | (EPIC['Temp'] < 30)
 # Blood pressure > 240
 cond3 = (EPIC['Diastolic'] > 240)
 
-# Resp > 300
-cond4 = EPIC['Resp'] > 300
+# # Resp > 300
+# cond4 = EPIC['Resp'] > 300
 
 # Pulse > 300
 cond5 = EPIC['Pulse'] > 300
 
 # Remove these outlisers
-cond = cond1 | cond2 | cond3 | cond4 | cond5
+# cond = cond1 | cond2 | cond3 | cond4 | cond5
+cond = cond1 | cond2 | cond3 | cond5
 sepRmNum = EPIC.loc[cond]['Primary.Dx'].sum()
 EPIC = EPIC.loc[~cond]
 EPIC_CUI = EPIC_CUI.loc[~cond]
@@ -155,64 +181,10 @@ missingPer = missingPer / len(EPIC)
 
 
 # ----------------------------------------------------
-'''
-# Heatmap
-corrMat = EPIC.corr()
-_ = sns.heatmap(corrMat, cmap = 'YlGnBu', square = True)
-# _ = plt.xticks(rotation = 30)
-plt.subplots_adjust(left = 0.125, top = 0.95)
-plt.xticks(rotation = 45, fontsize = 6)
-plt.show()
-'''
-
-'''
-# Write summary of each feature into ./colSum.txt
-file = open('colSum.txt', 'w')
-# table = EPIC['Gender'].describe()
-for col in colNames:
-    _ = file.write('\n\n')
-    _ = file.write(col)
-    _ = file.write('\n')
-    _ = file.write(EPIC[col].describe().to_string())
-
-file.close()
-
-'''
-
-'''
-# Pairplots
-sns.pairplot(EPIC[numCols[:4]])
-sns.pairplot(EPIC[numCols[4:8]])
-sns.pairplot(EPIC[numCols[8:12]])
-sns.pairplot(EPIC[numCols[12:16]])
-
-# Countplots (for categorical variables):
-for j in range(3):
-    for i in range(6):
-        name = catCols[i + 6* j]
-        _ = plt.subplot(2, 3, i + 1)
-        _ = sns.countplot(y = name, data = EPIC, 
-                        order = EPIC[name].value_counts().index)
-    plt.subplots_adjust(wspace = 1.2)
-    plt.show()
-
-for i in range(4):
-    name = catCols[i + 18]
-    _ = plt.subplot(2, 2, i + 1)
-    _ = sns.countplot(y = name, data = EPIC, 
-                    order = EPIC[name].value_counts().index)
-
-plt.subplots_adjust(wspace = 0.6)
-plt.show()
-'''
-
-
-# ----------------------------------------------------
 # Data imputation
 # Separate input features and target
 y = EPIC['Primary.Dx']
 X = EPIC.drop('Primary.Dx', axis = 1)
-X = X.drop(notes, axis = 1)
 XCat = X.drop(numCols, axis = 1)
 XNum = X.drop(catCols, axis = 1)
 
@@ -239,18 +211,21 @@ print( 'Total no. of missing values after imputation:', EPIC.isna().values.sum()
 
 
 # ----------------------------------------------------
-# Separate 3 notes columns from EPIC
-EPIC_CUI = EPIC[notes]
-EPIC = EPIC.drop(notes, axis = 1)
-
-
-# ----------------------------------------------------
 # One-hot encode the categorical variables
 EPIC_enc = EPIC.copy()
 EPIC_enc = pd.get_dummies(EPIC_enc, columns = catCols, drop_first = True)
 
 # Encode the response as binary
 EPIC_enc['Primary.Dx'] = EPIC_enc['Primary.Dx'].astype('int')
+
+# ----------------------------------------------------
+# EPIC with arrival date
+# Fill in NAN with adjacent records
+nullDate = EPIC_arrival.index[EPIC_arrival['Arrived'].isnull()].astype('int')
+EPIC_arrival['Arrived'][nullDate] = EPIC_arrival.loc[nullDate - 1, 'Arrived']
+
+# Append arrival date
+EPIC_arrival = pd.concat([EPIC_enc, EPIC_arrival['Arrived'].astype('int')], axis = 1)
 
 
 # ----------------------------------------------------

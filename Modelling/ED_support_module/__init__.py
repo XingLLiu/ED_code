@@ -20,6 +20,7 @@ import torch.nn.functional as F
 import torchvision
 from torchvision import transforms
 import sys
+import datetime
 
 
 plt.style.use('seaborn')
@@ -43,7 +44,8 @@ def double_scatter(x_feature = None, y_feature = None, classes = 'Primary.Dx', d
 
 
 # ROC curve
-def roc_plot(yTest = None, pred = None, plot = True, show_results = True):
+def roc_plot(yTest = None, pred = None, plot = True, show_results = True,
+             save_path = None):
     '''
     Plot the roc curve of a given test set and predictions
     Input:  yTest = test set (pd.dataframe or series)
@@ -65,6 +67,8 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True):
         plt.ylim([0, 1])
         plt.ylabel('True Positive Rate')
         plt.xlabel('False Positive Rate')
+        if not save_path == False:
+            plt.savefig(save_path, format='eps', dpi=1000)
         plt.show()
     if show_results:
         print(' precision: {} \n recall:    {} \n f1_score:  {} '.format(precision, recall, f1_score)) 
@@ -74,7 +78,7 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True):
 
 
 # Full ROC curve for logistic regression
-def lr_roc_plot(yTest = None, proba = None, plot = True, title = None, n_pts = 51):
+def lr_roc_plot(yTest = None, proba = None, plot = True, title = None, n_pts = 51, save_path = False):
     '''
     Plot the roc curve of a trained logistic regression model.
     Input:  yTest = test set (pd.dataframe or series)
@@ -103,11 +107,13 @@ def lr_roc_plot(yTest = None, proba = None, plot = True, title = None, n_pts = 5
         plt.ylim([0, 1.01])
         plt.ylabel('True Positive Rate')
         plt.xlabel('False Positive Rate')
+        if not save_path == False:
+            plt.savefig(save_path, format='eps', dpi=1000)
         plt.show()
     return({'tpr':tprLst, 'fpr':fprLst})
 
 
-def if_roc_plot(yTest = None, score = None, plot = True, 
+def if_roc_plot(yTest = None, score = None, plot = True,
                 title = None, n_pts = 51, extended = False):
     '''
     Plot the roc curve of a trained isolation forest model.
@@ -120,9 +126,9 @@ def if_roc_plot(yTest = None, score = None, plot = True,
     scoreSorted = np.argsort(score)
     for i in range(n_pts):
         if not extended:
-            indicesWithPreds = scoreSorted[:int(np.ceil( threshold[i] * yTest.shape[0] ))] 
+            indicesWithPreds = scoreSorted[:int(np.ceil( threshold[i] * yTest.shape[0] ))]
         else:
-            indicesWithPreds = scoreSorted[-int(np.ceil( threshold[i] * yTest.shape[0] )):] 
+            indicesWithPreds = scoreSorted[-int(np.ceil( threshold[i] * yTest.shape[0] )):]
         pred = yTest * 0
         pred.iloc[indicesWithPreds] = 1
         fpr, tpr, _ = sk.metrics.roc_curve(yTest, pred)
@@ -256,3 +262,25 @@ def vaePredict(loss_train = None, loss_test = None, batch_size = None, sample_si
     threshold = testLossSorted[-int( np.ceil( percent * len(loss_test) ) )]
     yPred = loss_test > threshold
     return(yPred, threshold)
+
+
+# Train-test split by arrival date
+def time_split(data, threshold = 201903):
+    '''
+    Sort data by the feature 'Arrived' and output train and test sets
+    as specified by threshold.
+    Input : data = EPIC dataset with feature 'Arrived'
+            threshold = time of the train/test split
+    Output: XTrain, XTest, yTrain, yTest
+    '''
+    # Sort by arrival date
+    data = data.sort_values(by = ['Arrived'])
+    # Split by threshold
+    train = data.loc[data['Arrived'] <= threshold]
+    test = data.loc[data['Arrived'] > threshold]
+    yTrain = train['Primary.Dx']
+    XTrain = train.drop(['Primary.Dx'], axis = 1)
+    yTest = test['Primary.Dx']
+    XTest = test.drop(['Primary.Dx'], axis = 1)
+    return(XTrain, XTest, yTrain, yTest)
+

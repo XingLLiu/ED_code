@@ -3,6 +3,14 @@ from ED_support_module import *
 from EDA import EPIC, EPIC_enc, EPIC_CUI, numCols, catCols
 
 # ----------------------------------------------------
+# Path to save figures
+path = '/'.join(os.getcwd().split('/')[:3]) + '/Pictures/logistic_regression/'
+# Create folder if not already exist
+if not os.path.exists(path):
+    os.makedirs(path)
+
+
+# ----------------------------------------------------
 # Input random seed. seed = 27 by default.
 try: 
     seed = int(sys.argv[1])
@@ -21,12 +29,14 @@ XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_si
 smote = SMOTE(random_state = 27, sampling_strategy = 'auto')
 XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
 
+
 # ----------------------------------------------------
 # Logistic regression with L1 loss
+print('Start fitting logistic regression...\n')
 lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l1',
                                         max_iter = 1000).fit(XTrain, yTrain)
 lrPred = lr.predict(XTest)
-roc_plot(yTest, lrPred)
+roc_plot(yTest, lrPred, save_path = path + 'roc1.eps')
 
 # Remove the zero coefficients
 ifZero = (lr.coef_ == 0).reshape(-1)
@@ -44,7 +54,7 @@ lr2 = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
                                             max_iter = 1000).fit(XTrain, yTrain)
 
 lrPred2 = lr2.predict(XTest)
-roc_plot(yTest, lrPred2)
+roc_plot(yTest, lrPred2, save_path = path + 'roc2.eps')
 
 
 # ----------------------------------------------------
@@ -65,6 +75,7 @@ _ = plt.title("Logistic regression feature importance via permutation importance
 _ = sns.barplot(y = XTest.columns[indices], x = impVals[indices],
                 xerr = std[indices])
 _ = plt.yticks(fontsize = 8)
+plt.savefig(path + 'feature_importance.eps', format='eps', dpi=1000)
 plt.show()
 
 # Plot beta values
@@ -74,13 +85,15 @@ _ = plt.figure()
 _ = plt.title("Logistic regression values of coefficients.")
 _ = sns.barplot(y = XTest.columns[indices], x = np.squeeze(nonZeroCoeffs)[indices])
 _ = plt.yticks(fontsize = 8)
+plt.savefig(path + 'coeffs.eps', format='eps', dpi=1000)
 plt.show()
 
 
 # ----------------------------------------------------
 # Plot AUC
 lrProba = lr2.predict_proba(XTest)[:, 1]
-lrRoc = lr_roc_plot(yTest, lrProba, title = '(Logistic Regression)', n_pts = 101)
+lrRoc = lr_roc_plot(yTest, lrProba, title = '(Logistic Regression)', n_pts = 101,
+                    save_path = path + 'roc.eps')
 lrTpr = lrRoc['tpr']
 lrFpr = lrRoc['fpr']
 lr_roc_auc = sk.metrics.auc(lrFpr, lrTpr)
