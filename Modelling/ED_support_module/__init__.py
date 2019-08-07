@@ -68,7 +68,7 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True):
         plt.show()
     if show_results:
         print(' precision: {} \n recall:    {} \n f1_score:  {} '.format(precision, recall, f1_score)) 
-        print(' Confusion matrix: \n')
+        print(' \nConfusion matrix:')
         print(confMat)
     return([precision, recall, f1_score, roc_auc])
 

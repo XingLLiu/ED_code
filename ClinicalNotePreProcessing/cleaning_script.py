@@ -50,7 +50,7 @@ def clean_text(text):
         return ''
     
     #date extraction and replacement
-#    dates = findDates(text)[0] # USE ME PLEASE!
+    # dates = findDates(text)[0] # USE ME PLEASE!
     text = findDates(text)[1]
     
     #note structure
