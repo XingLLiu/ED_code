@@ -13,3 +13,19 @@
 <b>Getting Ready to run the Pipeline:</b>
 <br>- modify clean_extract_notes.sh to have your UMLS license username and password, the absolute path locations storing the annotatorInput and annotatorOutput folders (should be in ED_code), and the absolute path location where your cTAKES installation is located
 <br>- check that cleaning_script.py and extract_CUIs.py read and write to the correct csv file
+<br><br>
+<b>Testing the pipeline with customized clinical notes:</b>
+1. Change to the directory ./ClinicalNotePreProcessing/InputExample
+```bash
+  cd ./ClinicalNotePreProcessing/InputExample
+```
+2. Run the pipeline with customized notes (3 inputs). See below for the input format.
+```bash
+  python input_example.py input1 input2 input3
+```
+
+<b>Input format:</b>
+Three strings wrapped by quotation marks ("inputX"):
+1. dd/mm/yyyy tttt, Some Name
+2. description of patient
+3. description of symptoms

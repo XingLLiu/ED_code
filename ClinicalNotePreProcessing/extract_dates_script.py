@@ -5,24 +5,27 @@ import numpy as np
 months_abbrv = {'jan': '01', 'feb':'02', 'mar':'03', 'apr':'04', 'may':'05', 'jun':'06', 'jul':'07', 'aug':'08', 'sept':'09', 'oct':'10', 'nov':'11', 'dec':'12'}
 months_full = {'january': '01', 'february':'02', 'march':'03', 'april':'04', 'may':'05', 'june':'06', 'july':'07', 'august':'08', 'september':'09', 'october':'10', 'november':'11', 'december':'12'}
 
-#this function extracts the dates located in text and returns a list with the list of dates at its first index and the text with all of its dates rewritten in the same format at its second index
 def findDates (text):
-    #date formats:
-         #dd/mm/yy - pattern 1 
-         #dd/mm/yyyy - pattern 2 
-         #mon date yy - pattern 3 
-         #mon date year - pattern 4 
-         #mon date(abbrev) yy - pattern 5 
-         #mon date(abbrev) year - pattern 6 
-         #mon date - pattern 7 
-         #mon date(abbrev) - pattern 8 
-         #month date yy - pattern 9 
-         #month date year - pattern 10 
-         #month date(abbrev) yy - pattern 11 
-         #month date(abbrev) year - pattern 12 
-         #month date - pattern 13 
-         #month date(abbrev) - pattern 14 
-    
+    '''
+    This function extracts the dates located in text and returns a list with the list of dates at its
+    first index and the text with all of its dates rewritten in the same format at its second index.
+    date formats:
+        dd/mm/yy - pattern 1 
+        dd/mm/yyyy - pattern 2 
+        mon date yy - pattern 3 
+        mon date year - pattern 4 
+        mon date(abbrev) yy - pattern 5 
+        mon date(abbrev) year - pattern 6 
+        mon date - pattern 7 
+        mon date(abbrev) - pattern 8 
+        month date yy - pattern 9 
+        month date year - pattern 10 
+        month date(abbrev) yy - pattern 11 
+        month date(abbrev) year - pattern 12 
+        month date - pattern 13 
+        month date(abbrev) - pattern 14 
+    '''
+
     dates_found = []
     
     pattern_1 = re.findall ("((?<!\d)\d\d|^\d\d)/(\d\d)/(\d\d(?!\d)|\d\d$)", text)

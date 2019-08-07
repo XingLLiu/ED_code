@@ -78,9 +78,9 @@ sk.metrics.recall_score(yTest, rfcPred)
 # Separate input features and target
 y = EPIC_enc['Primary.Dx']
 X = EPIC_enc.drop('Primary.Dx', axis = 1)
-XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=57, stratify = y)
+XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=37, stratify = y)
 
-smote = SMOTE(random_state = 27, sampling_strategy = 'auto') # 0.4
+smote = SMOTE(random_state = 27, sampling_strategy = 'auto')
 XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
 
 
