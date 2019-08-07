@@ -7,6 +7,7 @@ library(reshape2)
 library(scales)
 library(RColorBrewer)
 library(data.table)
+library(openxlsx)
 
 
 # Processes Current Sepsis RN and MD Trigger # 
@@ -41,28 +42,30 @@ generateStats <- function(predictions, labels) {
 }
 
 
-
 path <- "./data/EPIC_DATA/"
 
 # ============ 1. Load Files ================= #
 
 # a. Get Nurses files
-RN_files = Sys.glob(paste0(path, "Sepsis_Reports/*RN.csv")); RN_files
+#RN_files = Sys.glob(paste0(path, "Sepsis_Reports/_*RN.csv")); RN_files
+RN_files = Sys.glob(paste0(path, "Sepsis_Reports/RN_Sepsis_Alerts/*.xlsx")); RN_files
 # First apply read.csv, then rbind
-RN_reports = do.call(rbind, lapply(RN_files, function(x) read.csv(x, stringsAsFactors = FALSE)))
+RN_reports = do.call(rbind, lapply(RN_files, function(x) read.xlsx(x, sheet =1)))
 RN_reports$Arrived <- as.POSIXct(RN_reports$Arrived, tz="EST", format="%d/%m/%Y %H%M")
 RN_reports <- RN_reports[order(RN_reports$Arrived),]
 
 
 # b. Get doctors files
-MD_files = Sys.glob(paste0(path, "/Sepsis_Reports/*MD.csv")); MD_files
-MD_reports = do.call(rbind, lapply(MD_files, function(x) read.csv(x, stringsAsFactors = FALSE)))
+#MD_files = Sys.glob(paste0(path, "/Sepsis_Reports/*MD.csv")); MD_files
+MD_files = Sys.glob(paste0(path, "Sepsis_Reports/MD_Sepsis_Triggers/*.xlsx")); MD_files
+MD_reports = do.call(rbind, lapply(MD_files, function(x) read.xlsx(x, sheet=1)))
 MD_reports$Arrived <- as.POSIXct(MD_reports$Arrived, tz="EST", format="%d/%m/%Y %H%M")
 MD_reports <- MD_reports[order(MD_reports$Arrived),]
 
 
 # c. Get EPIC file
 EPIC <- fread(paste0(path, "EPIC.csv"))
+
 
 
 # ============ 2. Preprocess EPIC ================= #
@@ -86,46 +89,34 @@ EPIC$Age.at.Visit[week.indicies] <- as.numeric(gsub("wk.o", "", EPIC$Age.at.Visi
 
 EPIC$Age.at.Visit <- as.numeric(EPIC$Age.at.Visit)
 
-
-# ============ 3. Explore Definition of Sepsis ================= #
-# currently,  RN and MD reports only have Diagnosis Column 
-# --> Primary.Dx, Diagnosis, Diangoses all potentially indicate Sepsis 
-#     --> change once get access to other columns/determine best way to define Sepsis
-
-diagnosis <- grepl('*(S|s)epsis*', EPIC$Diagnosis); length(diagnosis)
-diagnoses <- grepl('*(S|s)epsis*', EPIC$Diagnoses); length(diagnoses)
-primary.dx <- grepl('*(S|s)epsis*', EPIC$Primary.Dx); length(primary.dx)
-
-potential.Sepsis <- EPIC[(diagnosis | diagnoses | primary.dx),c("MRN", "CSN", "Diagnosis", "Diagnoses", "Primary.Dx")]
-dim(potential.Sepsis)
-nrow(potential.Sepsis[grepl("epsis", potential.Sepsis$Primary.Dx),])
-
-
-table(potential.Sepsis[grepl("(S|s)epsis", potential.Sepsis$Diagnosis) & 
-                         !grepl("(S|s)epsis", potential.Sepsis$Primary.Dx),c("Diagnoses",  "Primary.Dx")])
-
-table(potential.Sepsis[grepl("(S|s)epsis", potential.Sepsis$Diagnoses) & 
-                         !grepl("(S|s)epsis", potential.Sepsis$Primary.Dx),c("Diagnoses",  "Primary.Dx")])
+plot.levels <- c("Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun")
+plot.data <- EPIC %>% filter(Primary.Dx=="None" | Diagnosis=="")
+plot.data$Month <- factor(plot.data$Month, levels=plot.levels)
+plot.data$Disposition <- plot.data$Dispo
+plot.data$Disposition[plot.data$Disposition=="Lbt1" | plot.data$Disposition=="Lbt2"] <- "Lbt1 or Lbt2"
+plot.data$Disposition[plot.data$Disposition=="Lwbr" | plot.data$Disposition=="Lwbs"] <- "Lwbr or Lwbs"
 
 
 
-# ============ 4. Create correct Sepsis Labels ================= #
-# Find Sepsis labels --> need to change to correct label! 
-RN_diagnosed_sepsis <- RN_reports[grep('*(S|s)epsis*', RN_reports$Diagnosis),]; dim(RN_diagnosed_sepsis)
-MD_diagnosed_sepsis <- MD_reports[grep('*(S|s)epsis*', MD_reports$Diagnosis),]; dim(MD_diagnosed_sepsis)
-EPIC_diagnosed_sepsis <- EPIC[grep('*(S|s)epsis*', EPIC$Diagnosis, useBytes = TRUE),]; dim(EPIC_diagnosed_sepsis)
+ggplot(data=plot.data, 
+       aes(x=Month,
+       fill=Disposition)) + 
+  geom_bar() + 
+  xlab("Month") + 
+  ylab("Number of Patients") + 
+  ggtitle("Patients Missing Primary.Dx or Diagnosis") + 
+  theme_bw()
 
+ggplot(data=plot.data %>% filter(Dispo!="Lwbr" & Dispo!="Lwbs" & Dispo !="Lbt1" & Dispo != "Lbt2" & Dispo!=""), 
+       aes(x=Month,
+           fill=Disposition)) + 
+  geom_bar() + 
+  xlab("Month") + 
+  ylab("Number of Patients") + 
+  ggtitle("Patients Missing Primary.Dx or Diagnosis (not including left before being seen or missing dispo)") + 
+  theme_bw()
 
-EPIC$RN_prediction <- ifelse(EPIC$CSN %in% RN_reports$CSN, 1, 0)
-EPIC$RN_True_Sepsis <- ifelse(EPIC$CSN %in% RN_diagnosed_sepsis$CSN, 1, 0)
-EPIC$MD_prediction <- ifelse(EPIC$CSN %in% MD_reports$CSN, 1, 0)
-EPIC$MD_True_Sepsis <- ifelse(EPIC$CSN %in% MD_diagnosed_sepsis$CSN, 1, 0)
-EPIC$True_Sepsis <- ifelse(EPIC$CSN %in% EPIC_diagnosed_sepsis$CSN, 1, 0)
-
-
-
-
-# ============ 5. Limit time frames of data ================= #
+# ============ 3. Limit time frames of data ================= #
 # Limit time frames on all three data sets so comparison of false negs/false positives
 # are accurate
 
@@ -147,47 +138,128 @@ RN_reports <- RN_reports %>% dplyr::filter(Arrived >= min.date)
 MD_reports <- MD_reports %>% dplyr::filter(Arrived >= min.date)
 
 
-# ============ 5. Remove Young Patients ================= #
-# Remove super young false negatives as their Sepsis labels could be incorrect
-tool.false.negs <- (EPIC %>% dplyr::filter(RN_prediction==0 & 
-                                             MD_prediction==0 & 
-                                             True_Sepsis==1 & 
-                                             Age.at.Visit <= 0.33))$CSN; tool.false.negs
+setdiff(RN_reports$CSN, EPIC$CSN)
+setdiff(MD_reports$CSN, EPIC$CSN)
 
-EPIC <- EPIC %>% dplyr::filter(!CSN %in% tool.false.negs)
-RN_diagnosed_sepsis <- RN_diagnosed_sepsis %>% dplyr::filter(!CSN %in% tool.false.negs)
-MD_diagnosed_sepsis <- MD_diagnosed_sepsis %>% dplyr::filter(!CSN %in% tool.false.negs)
-EPIC_diagnosed_sepsis <- EPIC_diagnosed_sepsis %>% dplyr::filter(!CSN %in% tool.false.negs)
+# ============ 4. Create extra diagnosis columns for RN and MD reports ================= #
+# replace diagnosis column in RN/MD_reports with diagnosis column from EPIC --> NEED TO FIX WHEN SORTED OUT DATA ISSUE
 
 
-# ============ 6. Manually check differences between tools vs Reality ================= #
+correct.RN.diagnosis <- RN_reports %>% select(CSN, Diagnosis)
+correct.MD.diagnosis <- MD_reports %>% select(CSN, Diagnosis)
+
+correct.diagnoses <- merge(x=correct.RN.diagnosis,
+                           y=correct.MD.diagnosis,
+                           by=c("CSN"),
+                          all=TRUE)
+correct.diagnoses$Diagnosis_extra <- ifelse(is.na(correct.diagnoses$Diagnosis.x), correct.diagnoses$Diagnosis.y, correct.diagnoses$Diagnosis.x)
+head(correct.diagnoses)
+EPIC <- merge(x=EPIC,
+              y=correct.diagnoses %>% select(CSN, Diagnosis_extra),
+              by=c("CSN"),
+              all.x=TRUE)
+nrow(EPIC)
+EPIC$Diagnosis <- ifelse(!is.na(EPIC$Diagnosis_extra), EPIC$Diagnosis_extra, EPIC$Diagnosis)
+EPIC$Diagnosis_extra <- NULL
+
+RN.colnames <- colnames(RN_reports)
+RN_reports <- merge(x=EPIC %>% filter(CSN %in% RN_reports$CSN) %>% select(CSN, MRN, Diagnosis, Diagnoses, Primary.Dx),
+                   y=RN_reports,
+                   by=c("MRN", "CSN", "Diagnosis"),
+                   all.y=T)
+nrow(RN_reports)
+
+MD.colnames <- colnames(MD_reports)
+MD_reports <- merge(x=EPIC %>% filter(CSN %in% MD_reports$CSN) %>% select(CSN, MRN, Diagnosis, Diagnoses, Primary.Dx),
+                    y=MD_reports,
+                    by=c("MRN", "CSN", "Diagnosis"),
+                    all.y=T)
+nrow(RN_reports_test);
+# head(MD_reports)
+
+
+# ============ 5. Explore Definition of Sepsis ================= #
+# currently,  RN and MD reports only have Diagnosis Column 
+# --> Primary.Dx, Diagnosis, Diangoses all potentially indicate Sepsis 
+#     --> change once get access to other columns/determine best way to define Sepsis
+
+diagnosis <- grepl('*(S|s)epsis*', EPIC$Diagnosis); sum(diagnosis)
+diagnoses <- grepl('*(S|s)epsis*', EPIC$Diagnoses); sum(diagnoses)
+primary.dx <- grepl('*(S|s)epsis*', EPIC$Primary.Dx); sum(primary.dx)
+
+RN.diagnosis <- grepl('*(S|s)epsis*', RN_reports$Diagnosis); sum(RN.diagnosis)
+RN.diagnoses <- grepl('*(S|s)epsis*', RN_reports$Diagnoses); sum(RN.diagnoses)
+RN.primary.dx <- grepl('*(S|s)epsis*', RN_reports$Primary.Dx); sum(RN.primary.dx)
+
+MD.diagnosis <- grepl('*(S|s)epsis*', MD_reports$Diagnosis); sum(MD.diagnosis)
+MD.diagnoses <- grepl('*(S|s)epsis*', MD_reports$Diagnoses); sum(MD.diagnoses)
+MD.primary.dx <- grepl('*(S|s)epsis*', MD_reports$Primary.Dx); sum(MD.primary.dx)
+
+potential.Sepsis <- EPIC[(diagnosis | diagnoses | primary.dx),c("MRN", "CSN", "Diagnosis", "Diagnoses", "Primary.Dx")]
+dim(potential.Sepsis); head(potential.Sepsis)
+nrow(potential.Sepsis[grepl("epsis", potential.Sepsis$Primary.Dx),])
+
+
+table(potential.Sepsis[grepl("(S|s)epsis", potential.Sepsis$Diagnosis) & 
+                         !grepl("(S|s)epsis", potential.Sepsis$Primary.Dx),c("Diagnoses",  "Primary.Dx")])
+
+table(potential.Sepsis[grepl("(S|s)epsis", potential.Sepsis$Diagnoses) & 
+                         !grepl("(S|s)epsis", potential.Sepsis$Primary.Dx),c("Diagnoses",  "Primary.Dx")])
+
+
+
+
+# ============ 6. Create correct Sepsis Labels ================= #
+# Find Sepsis labels --> need to change to correct label! 
+RN_diagnosed_sepsis <- RN_reports[(RN.diagnosis | RN.diagnoses | RN.primary.dx),]; dim(RN_diagnosed_sepsis)
+MD_diagnosed_sepsis <- MD_reports[(MD.diagnosis | MD.diagnoses | MD.primary.dx),]; dim(MD_diagnosed_sepsis)
+EPIC_diagnosed_sepsis <- EPIC[(diagnosis | diagnoses | primary.dx),]; dim(EPIC_diagnosed_sepsis)
+
+
+head(RN_diagnosed_sepsis %>% select(CSN, Diagnosis, Diagnoses, Primary.Dx))
+head(MD_diagnosed_sepsis %>% select(CSN, Diagnosis, Diagnoses, Primary.Dx))
+
+EPIC$RN_prediction <- ifelse(EPIC$CSN %in% RN_reports$CSN, 1, 0)
+EPIC$RN_True_Sepsis <- ifelse(EPIC$CSN %in% RN_diagnosed_sepsis$CSN, 1, 0)
+EPIC$MD_prediction <- ifelse(EPIC$CSN %in% MD_reports$CSN, 1, 0)
+EPIC$MD_True_Sepsis <- ifelse(EPIC$CSN %in% MD_diagnosed_sepsis$CSN, 1, 0)
+EPIC$True_Sepsis <- ifelse(EPIC$CSN %in% EPIC_diagnosed_sepsis$CSN, 1, 0)
+
+
+
+
+
+
+# ============ 7. Manually check differences between tools vs Reality ================= #
 #check for differences between RN and MD tool firing
-RN_MD_Discrepency_CSN <- setdiff(RN_diagnosed_sepsis$CSN, MD_diagnosed_sepsis$CSN); RN_MD_Discrepency_CSN # 3 alerts fired by nurses tool and missed by MD tool
-MD_RN_Discrepency_CSN <- setdiff(MD_diagnosed_sepsis$CSN, RN_diagnosed_sepsis$CSN); MD_RN_Discrepency_CSN # no patients fired by MD tool and missed by RN tool
-EPIC_RN_Discrepency_CSN <- setdiff(EPIC$CSN, RN_diagnosed_sepsis$CSN); MD_RN_Discrepency_CSN # no patients fired by MD tool and missed by RN tool
-EPIC_MD_Discrepency_CSN <- setdiff(EPIC$CSN, RN_diagnosed_sepsis$CSN); MD_RN_Discrepency_CSN # no patients fired by MD tool and missed by RN tool
-
-EPIC %>% filter(CSN %in% EPIC_RN_Discrepency_CSN) %>% select(MRN, CSN, Diagnosis)
-# No RN alert fired for 37 patients who had Sepsis
-EPIC %>% filter(CSN %in% EPIC_MD_Discrepency_CSN) %>% select(MRN, CSN, Diagnosis)
-# No RN alert fired for 40 patients who had Sepsis
-
-# Stats
-nrow(EPIC); nrow(RN_diagnosed_sepsis); nrow(MD_diagnosed_sepsis); nrow(EPIC_diagnosed_sepsis)
+length(intersect(RN_diagnosed_sepsis$CSN, MD_diagnosed_sepsis$CSN))
+RN_MD_Discrepency_CSN <- setdiff(RN_diagnosed_sepsis$CSN, MD_diagnosed_sepsis$CSN); length(RN_MD_Discrepency_CSN); RN_MD_Discrepency_CSN # 36 alerts fired by nurses tool and missed by MD tool
+MD_RN_Discrepency_CSN <- setdiff(MD_diagnosed_sepsis$CSN, RN_diagnosed_sepsis$CSN); length(MD_RN_Discrepency_CSN); MD_RN_Discrepency_CSN # 0 patients fired by MD tool and missed by RN tool
+EPIC_RN_Discrepency_CSN <- setdiff(EPIC_diagnosed_sepsis$CSN, RN_diagnosed_sepsis$CSN); length(EPIC_RN_Discrepency_CSN); # 77 patients detected by docs and missed by RN tool
+RN_EPIC_Discrepency_CSN <- setdiff(RN_diagnosed_sepsis$CSN, EPIC_diagnosed_sepsis$CSN); length(RN_EPIC_Discrepency_CSN); # 0 patients detected by RN tool and missed by docs
+EPIC_MD_Discrepency_CSN <- setdiff(EPIC_diagnosed_sepsis$CSN, MD_diagnosed_sepsis$CSN); length(EPIC_MD_Discrepency_CSN);  # 113 patients fired by MD tool and missed by RN tool
+MD_EPIC_Discrepency_CSN <- setdiff(MD_diagnosed_sepsis$CSN, EPIC_diagnosed_sepsis$CSN); length(MD_EPIC_Discrepency_CSN);  # 1 patients detected by MD tool and missed by docs
 
 
+
+
+incorrect.RN <- RN_reports %>% filter(!CSN %in% RN_diagnosed_sepsis$CSN); nrow(incorrect.RN)
+incorrect.MD <- MD_reports %>% filter(!CSN %in% MD_diagnosed_sepsis$CSN); nrow(incorrect.MD)
+
+length(intersect(incorrect.MD$CSN, incorrect.RN$CSN))
+length(setdiff(incorrect.MD$CSN, incorrect.RN$CSN))
+length(setdiff(incorrect.RN$CSN, incorrect.MD$CSN))
 
 # MD predictions
 MDSepsis_MD_Predictions <- generateStats(EPIC$MD_prediction, EPIC$MD_True_Sepsis); MDSepsis_MD_Predictions
-TrueSepsis_MD_Predictions <- generateStats(EPIC$MD_prediction, EPIC$True_Sepsis); TrueSepsis_MD_Predictions
-
+TrueSepsis_MD_Predictions <- round(generateStats(EPIC$MD_prediction, EPIC$True_Sepsis), 3); TrueSepsis_MD_Predictions
 
 # RN predictions
-RNSepsis_RN_Predictions <- generateStats(EPIC$RN_prediction, EPIC$RN_True_Sepsis); RNSepsis_RN_Predictions
-TrueSepsis_RN_Predictions <- generateStats(EPIC$RN_prediction, EPIC$True_Sepsis); TrueSepsis_RN_Predictions
+RNSepsis_RN_Predictions <- round(generateStats(EPIC$RN_prediction, EPIC$RN_True_Sepsis), 3); RNSepsis_RN_Predictions
+TrueSepsis_RN_Predictions <- round(generateStats(EPIC$RN_prediction, EPIC$True_Sepsis), 3); TrueSepsis_RN_Predictions
 
 
-# ============ 7. (Optional) Jitter Age ================= #
+# ============ 6. (Optional) Jitter Age ================= #
 # If you want to create some disturbance around age so not plotted as discrete (looks strange)
 # set.seed(0)
 # EPIC$Age.at.Visit.Disturbed <- EPIC$Age.at.Visit + rnorm(nrow(EPIC), mean = 0, sd = 0.2)
@@ -239,8 +311,8 @@ plot.data.long.no.FPs <- melt(plot.data.long.no.FPs, id="Month")
 
 
 # order correctly
-plot.data.long$Month <- factor(plot.data.long$Month, levels = month.abb)
-plot.data.long.no.FPs$Month <- factor(plot.data.long.no.FPs$Month, levels = month.abb)
+plot.data.long$Month <- factor(plot.data.long$Month, levels = plot.levels)
+plot.data.long.no.FPs$Month <- factor(plot.data.long.no.FPs$Month, levels = plot.levels)
 
 
 # plots
