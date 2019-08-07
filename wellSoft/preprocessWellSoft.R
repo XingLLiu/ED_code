@@ -429,7 +429,7 @@ preprocess <- function(data, date.columns=dateCols, Holidays=holidays,
   data$MinsToMDNameEntrd[data$MinsToMDNameEntrd < 0] <- NA  
   
   print("Processing Discharge Information")
-  data$Discharge_Time_With_Updates <- ifelse(!is.na(data$Updated_Discharge_Time_596), data$Updated_Discharge_Time_596, data$Discharge_Time_276)
+  data$Discharge_Time_With_Updates <- ifelse(data$Updated_Discharge_Time_596 != "", data$Updated_Discharge_Time_596, data$Discharge_Time_276)
   
   data$LengthOfStayInMinutes <- as.numeric(round(difftime(data$Discharge_Time_With_Updates, data$Arrival_Time_9, units="mins"), 1))
   data$LengthOfStayInMinutes[data$LengthOfStayInMinutes < 0] <- NA  
