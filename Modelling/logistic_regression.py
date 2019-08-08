@@ -32,7 +32,8 @@ if useTime == False:
     EPIC_enc = EPIC_enc.drop(['CC_Other', 'Care.Area_Hub'], axis = 1)
     y = EPIC_enc['Primary.Dx']
     X = EPIC_enc.drop('Primary.Dx', axis = 1)
-    XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=seed, stratify=y)
+    XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, 
+                                                                       random_state=seed, stratify=y)
 else:
     XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival)
 
@@ -47,7 +48,7 @@ XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
 print('Start fitting logistic regression...\n')
 lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l1',
                                         max_iter = 1000).fit(XTrain, yTrain)
-print('Fitting complete#n')
+print('Fitting complete\n')
 lrPred = lr.predict(XTest)
 roc_plot(yTest, lrPred, save_path = path + 'roc1.eps')
 
