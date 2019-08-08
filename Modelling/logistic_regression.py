@@ -20,13 +20,13 @@ except:
 
 # If split dataset by arrival time
 try:
-    useTime = bool(sys.argv[1])
+    useTime = bool(sys.argv[2])
 except:
     useTime = False
 
 # ----------------------------------------------------
 # SMOTE
-if useTime == False:
+if not useTime:
     # Stratified splitting
     # Separate input features and target
     EPIC_enc = EPIC_enc.drop(['CC_Other', 'Care.Area_Hub'], axis = 1)

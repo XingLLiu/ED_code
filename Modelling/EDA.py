@@ -102,7 +102,7 @@ ifTopLangs = [not language in topLangs for language in EPIC['Pref.Language'].val
 EPIC['Pref.Language'].loc[ ifTopLangs ] = 'Other'
 
 # CC: Keep top 19 + others
-topCC = EPIC['CC'].value_counts().index[:39]
+topCC = EPIC['CC'].value_counts().index[:49]
 ifTopCC = [not complaint in topCC for complaint in EPIC['CC'].values]
 EPIC['CC'].loc[ ifTopCC ] = 'Other'
 

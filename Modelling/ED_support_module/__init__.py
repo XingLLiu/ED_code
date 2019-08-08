@@ -78,7 +78,7 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True,
 
 
 # Full ROC curve for logistic regression
-def lr_roc_plot(yTest = None, proba = None, plot = True, title = None, n_pts = 51, save_path = None):
+def lr_roc_plot(yTest = None, proba = None, plot = True, title = ' ', n_pts = 51, save_path = None):
     '''
     Plot the roc curve of a trained logistic regression model.
     Input:  yTest = test set (pd.dataframe or series)
@@ -89,7 +89,7 @@ def lr_roc_plot(yTest = None, proba = None, plot = True, title = None, n_pts = 5
     threshold = np.linspace(0, 1, n_pts)
     scoreSorted = np.argsort(proba)
     for i in range(n_pts):
-        indicesWithPreds = scoreSorted[-int(np.ceil( threshold[i] * yTest.shape[0] )):] 
+        indicesWithPreds = scoreSorted[-int(np.ceil( threshold[i] * yTest.shape[0] )):]
         pred = yTest * 0
         pred.iloc[indicesWithPreds] = 1
         fpr, tpr, _ = sk.metrics.roc_curve(yTest, pred)
@@ -114,7 +114,7 @@ def lr_roc_plot(yTest = None, proba = None, plot = True, title = None, n_pts = 5
 
 
 def if_roc_plot(yTest = None, score = None, plot = True,
-                title = None, n_pts = 51, extended = False):
+                title = ' ', n_pts = 51, extended = False):
     '''
     Plot the roc curve of a trained isolation forest model.
     Input:  yTest = test set (pd.dataframe or series)
