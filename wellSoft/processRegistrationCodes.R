@@ -5,10 +5,12 @@
 #         - saves processed registration codes (processedRegistrationCodes.xlsx)
 #         - returns preprocessed data
 
+library(data.table)
 
 # ================== PREPROCESSING ================== # 
 
 processRegistrationCodes <- function(data, data.path) {
+  print("Processing Dates")
   data$VisitStartDate <- convertToDate(data$VisitStartDate)
   attr(data$VisitStartDate, "tzone") <- "EST"
   data$BirthDate <- convertToDate(data$BirthDate)
@@ -19,6 +21,7 @@ processRegistrationCodes <- function(data, data.path) {
   attr(data$EndOfVisit, "tzone") <- "EST"
   
   # correct_types
+  print("Correcting numeric types")
   data$LengthOfStayInMinutes <- as.numeric(as.character(data$LengthOfStayInMinutes))
   data$CTASScore <- as.numeric(as.character(data$CTASScore))
   data$Holiday <- apply(data.frame(data$Holiday), 1, function(x) gsub(" \\(STATUTORY\\)", "", x))
@@ -28,6 +31,7 @@ processRegistrationCodes <- function(data, data.path) {
                "CTASScore", "Acuity", "ReasonForVisit", "GeographyID", "Home", "InsuranceResidence",
                "InsuranceType", "ReasonForVisit")
   
+  print("Processing Factors")
   for (fac in factors) {
     print(fac)
     eval(parse(text=paste0("data$", fac, "<- as.factor(data$", fac, ")")))
@@ -57,9 +61,9 @@ processRegistrationCodes <- function(data, data.path) {
   }
 
   data <- data.frame(data %>% dplyr::filter(!DischargeDisposition %in% to.remove))
-  
-  write.xlsx(data, paste0(data.path, "processedRegistrationCodes.xlsx"))
-  
+  print(paste("Saving data to", data.path))
+  fwrite(x = data, paste0(data.path, "processedRegistrationCodes.csv"))
+
   return (data)
   
 }
