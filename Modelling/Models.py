@@ -46,7 +46,6 @@ roc_plot(yTest, lrPred)
 rfc = sk.ensemble.RandomForestClassifier(n_estimators = 10, max_depth = 20).fit(XTrain, yTrain)
 # predict on test set
 rfcPred = rfc.predict(XTest)
-
 roc_plot(yTest, rfcPred)
 
 

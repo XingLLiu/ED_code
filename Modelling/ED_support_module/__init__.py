@@ -67,7 +67,7 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True,
         plt.ylim([0, 1])
         plt.ylabel('True Positive Rate')
         plt.xlabel('False Positive Rate')
-        if not save_path == False:
+        if not save_path == None:
             plt.savefig(save_path, format='eps', dpi=1000)
         plt.show()
     if show_results:
@@ -78,7 +78,7 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True,
 
 
 # Full ROC curve for logistic regression
-def lr_roc_plot(yTest = None, proba = None, plot = True, title = None, n_pts = 51, save_path = False):
+def lr_roc_plot(yTest = None, proba = None, plot = True, title = None, n_pts = 51, save_path = None):
     '''
     Plot the roc curve of a trained logistic regression model.
     Input:  yTest = test set (pd.dataframe or series)
@@ -107,7 +107,7 @@ def lr_roc_plot(yTest = None, proba = None, plot = True, title = None, n_pts = 5
         plt.ylim([0, 1.01])
         plt.ylabel('True Positive Rate')
         plt.xlabel('False Positive Rate')
-        if not save_path == False:
+        if not save_path == None:
             plt.savefig(save_path, format='eps', dpi=1000)
         plt.show()
     return({'tpr':tprLst, 'fpr':fprLst})
@@ -282,5 +282,8 @@ def time_split(data, threshold = 201903):
     XTrain = train.drop(['Primary.Dx'], axis = 1)
     yTest = test['Primary.Dx']
     XTest = test.drop(['Primary.Dx'], axis = 1)
+    # Drop arrival date
+    xTrain = XTrain.drop(['Arrived'], axis = 1)
+    XTest = XTest.drop(['Arrived'], axis = 1)
     return(XTrain, XTest, yTrain, yTest)
 

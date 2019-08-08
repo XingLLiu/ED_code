@@ -1,6 +1,6 @@
 # ----------------------------------------------------
 from ED_support_module import *
-from EDA import EPIC, EPIC_enc, EPIC_CUI, numCols, catCols
+from EDA import EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival, numCols, catCols
 
 # ----------------------------------------------------
 # Path to save figures
@@ -18,12 +18,24 @@ except:
     seed = 27
 
 
+# If split dataset by arrival time
+try:
+    useTime = bool(sys.argv[1])
+except:
+    useTime = False
+
 # ----------------------------------------------------
 # SMOTE
-# Separate input features and target
-y = EPIC_enc['Primary.Dx']
-X = EPIC_enc.drop('Primary.Dx', axis = 1)
-XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=seed, stratify=y)
+if useTime == False:
+    # Stratified splitting
+    # Separate input features and target
+    EPIC_enc = EPIC_enc.drop(['CC_Other', 'Care.Area_Hub'], axis = 1)
+    y = EPIC_enc['Primary.Dx']
+    X = EPIC_enc.drop('Primary.Dx', axis = 1)
+    XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25, random_state=seed, stratify=y)
+else:
+    XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival)
+
 
 # Apply SMOTE
 smote = SMOTE(random_state = 27, sampling_strategy = 'auto')
@@ -35,6 +47,7 @@ XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
 print('Start fitting logistic regression...\n')
 lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l1',
                                         max_iter = 1000).fit(XTrain, yTrain)
+print('Fitting complete#n')
 lrPred = lr.predict(XTest)
 roc_plot(yTest, lrPred, save_path = path + 'roc1.eps')
 
@@ -63,8 +76,8 @@ impVals, impAll = mlxtend.evaluate.feature_importance_permutation(
                     predict_method = lr2.predict,
                     X = np.array(XTest),
                     y = np.array(yTest),
-                    metric = 'accuracy',
-                    num_rounds = 10,
+                    metric = sk.metrics.f1_score,
+                    num_rounds = 15,
                     seed = 27)
 
 std = np.std(impAll, axis=1)
@@ -75,7 +88,7 @@ _ = plt.title("Logistic regression feature importance via permutation importance
 _ = sns.barplot(y = XTest.columns[indices], x = impVals[indices],
                 xerr = std[indices])
 _ = plt.yticks(fontsize = 8)
-plt.savefig(path + 'feature_importance.eps', format='eps', dpi=1000)
+plt.savefig(path + 'feature_importance.eps', format='eps', dpi=800)
 plt.show()
 
 # Plot beta values
@@ -85,7 +98,7 @@ _ = plt.figure()
 _ = plt.title("Logistic regression values of coefficients.")
 _ = sns.barplot(y = XTest.columns[indices], x = np.squeeze(nonZeroCoeffs)[indices])
 _ = plt.yticks(fontsize = 8)
-plt.savefig(path + 'coeffs.eps', format='eps', dpi=1000)
+plt.savefig(path + 'coeffs.eps', format='eps', dpi=800)
 plt.show()
 
 

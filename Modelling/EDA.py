@@ -82,10 +82,10 @@ print('Dimension of data:', EPIC.shape)
 
 # Discard the following features in modelling
 colRem = ['First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',
-            'Day.of.Arrival', 'Arrival.Month', 'FSA', 'Discharge.Admit.Time', 'Name.Of.Walkin', 'Name.Of.Hospital',
-            'Admitting.Provider', 'Disch.Date.Time',
+            'Day.of.Arrival', 'Arrival.Month', 'FSA', 'Name.Of.Walkin', 'Name.Of.Hospital',
+            'Admitting.Provider', 'Disch.Date.Time', 'Discharge.Admit.Time',
             'Distance.To.Sick.Kids', 'Distance.To.Walkin', 'Distance.To.Hospital', 'Systolic',
-            'Size.Of.Treatment.Team', 'Resp']
+            'Pulse']
 # (Some) features obtained after triage
 colAT = ['Lab.Status', 'Rad.Status', 'ED.PIA.Threshold', 'Same.First.And.Last', 'Dispo', 'Size.Of.Treatment.Team',
          'Number.Of.Prescriptions', 'Length.Of.Stay.In.Minutes', 'Arrival.to.Room', 'Roomed']
@@ -97,18 +97,18 @@ EPIC =  EPIC.drop(colRem, axis = 1)
 ## Previous choice that produced good logistirc regression results:
 ## only changed Pref.Language and CC
 # Pref.Language: Keep top 4 languages + others
-topLangs = EPIC['Pref.Language'].value_counts().index[:9]
+topLangs = EPIC['Pref.Language'].value_counts().index[:4]
 ifTopLangs = [not language in topLangs for language in EPIC['Pref.Language'].values]
 EPIC['Pref.Language'].loc[ ifTopLangs ] = 'Other'
 
 # CC: Keep top 19 + others
-topCC = EPIC['CC'].value_counts().index[:24]
+topCC = EPIC['CC'].value_counts().index[:39]
 ifTopCC = [not complaint in topCC for complaint in EPIC['CC'].values]
 EPIC['CC'].loc[ ifTopCC ] = 'Other'
 
 # Arrival method: combine 'Unknown' and 'Other' and keep top 9 + others
 EPIC.loc[EPIC['Arrival.Method'] == 'Unknown', 'Arrival.Method'] = 'Other'
-topMethods = EPIC['Arrival.Method'].value_counts().index[:9]
+topMethods = EPIC['Arrival.Method'].value_counts().index[:14]
 ifTopMethods = [not method in topMethods for method in EPIC['Arrival.Method'].values]
 EPIC['Arrival.Method'].loc[ ifTopMethods ] = 'Other'
 
@@ -157,17 +157,18 @@ cond2 = (EPIC['Temp'] > 50) | (EPIC['Temp'] < 30)
 cond3 = (EPIC['Diastolic'] > 240)
 
 # # Resp > 300
-# cond4 = EPIC['Resp'] > 300
+cond4 = EPIC['Resp'] > 300
 
 # Pulse > 300
-cond5 = EPIC['Pulse'] > 300
+# cond5 = EPIC['Pulse'] > 300
 
 # Remove these outlisers
 # cond = cond1 | cond2 | cond3 | cond4 | cond5
-cond = cond1 | cond2 | cond3 | cond5
+cond = cond1 | cond2 | cond3 | cond4
 sepRmNum = EPIC.loc[cond]['Primary.Dx'].sum()
 EPIC = EPIC.loc[~cond]
 EPIC_CUI = EPIC_CUI.loc[~cond]
+EPIC_arrival = EPIC_arrival.loc[~cond]
 
 print( 'Removed {} obvious outliers from the dataset'.format( cond.sum() ) )
 print( '{} of these are Sepsis or related cases'.format(sepRmNum) )
