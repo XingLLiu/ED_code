@@ -26,6 +26,8 @@ except:
 
 # ----------------------------------------------------
 # SMOTE
+y = EPIC_enc['Primary.Dx']
+X = EPIC_enc.drop('Primary.Dx', axis = 1)
 if not useTime:
     # Stratified splitting
     # Separate input features and target

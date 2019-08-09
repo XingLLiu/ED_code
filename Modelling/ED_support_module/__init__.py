@@ -283,7 +283,7 @@ def time_split(data, threshold = 201903):
     yTest = test['Primary.Dx']
     XTest = test.drop(['Primary.Dx'], axis = 1)
     # Drop arrival date
-    xTrain = XTrain.drop(['Arrived'], axis = 1)
+    XTrain = XTrain.drop(['Arrived'], axis = 1)
     XTest = XTest.drop(['Arrived'], axis = 1)
     return(XTrain, XTest, yTrain, yTest)
 

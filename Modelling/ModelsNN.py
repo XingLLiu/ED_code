@@ -179,7 +179,7 @@ _ = sns.scatterplot(x = range(len(lossVec)), y = lossVec)
 plt.savefig(plot_path + 'losses.eps', format='eps', dpi=1000)
 plt.show()
 
-
+print(mode, weight, num_epochs, batch_size, learning_rate, input_size, num_classes)
 # Test the model
 transform = nn.Sigmoid()
 with torch.no_grad():
