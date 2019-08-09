@@ -236,5 +236,3 @@ roc_plot(yTest, vaePred)
 
 vaePred, threshold = vaePredict(klDivVec, testRL, batch_size, k = 0, percent = 0.1)
 roc_plot(yTest, vaePred)
-
-

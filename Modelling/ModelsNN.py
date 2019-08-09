@@ -2,7 +2,7 @@
 # Up to seven inputs:
 # 1. mode
 # 2. random seed
-# 3. train-test splitting method
+# 3. train-test splitting method (True/False)
 # 4. no. of epochs
 # 5. batch size
 # 6. learning rate
@@ -67,16 +67,18 @@ except:
 num_classes = 2
 hyper_params = sys.argv[4:]
 
-if len(hyper_params) == 4:
+if len(hyper_params) == 5:
     num_epochs = int(hyper_params[0])
     batch_size = int(hyper_params[1])
     learning_rate = float(hyper_params[2])
     weight = int(hyper_params[3])
+    drop_prob = float(hyper_params[4])
 else:
     num_epochs = 500
     batch_size = 128
     learning_rate = 1e-3
     weight = 1000
+    drop_prob = 0
 
 
 # ----------------------------------------------------
@@ -95,21 +97,33 @@ if not os.path.exists(plot_path):
     
 
 # ----------------------------------------------------
+# NN model
+class NeuralNet(nn.Module):
+    def __init__(self, input_size=61, num_classes=2, drop_prob=0):
+        super(NeuralNet, self).__init__()
+        self.fc = nn.Linear(input_size, num_classes)
+        self.dp_layer = nn.Dropout(drop_prob)
+    def forward(self, x):
+        h = self.dp_layer(x)
+        return self.fc(h)
+    
+
+# ----------------------------------------------------
 # Prepare taining set
 if mode not in ['a', 'b']:
     EPIC_enc, cuiCols = TFIDF(EPIC_CUI, EPIC_enc)
 
 
 # Split using stratified sampling or arrival time
-if  not useTime:
+if not useTime:
     # Stratified splitting
     # Separate input features and target
     y = EPIC_enc['Primary.Dx']
     X = EPIC_enc.drop('Primary.Dx', axis = 1)
     XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25,
-                                                                       random_state=seed, stratify=y)
+                                   random_state=seed, stratify=y)
 else:
-    XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival)
+    XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival, threshold = 201904)
 
 
 # Separate the numerical and categorical features
@@ -142,9 +156,9 @@ testLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yT
 
 
 # ----------------------------------------------------
-# Logistic regression model
+# Neural net model
 input_size = XTrain.shape[1]
-model = nn.Linear(input_size, num_classes)
+model = NeuralNet(input_size = input_size, drop_prob = drop_prob).to(device)
 
 # Loss and optimizer
 # nn.CrossEntropyLoss() computes softmax internally
@@ -153,7 +167,8 @@ optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 
 # Train the model
 total_step = len(trainLoader)
-lossVec = np.zeros( num_epochs * (total_step//100) )
+# lossVec = np.zeros( num_epochs * (total_step//100) )
+lossVec = np.zeros(num_epochs)
 for epoch in range(num_epochs):
     for i, x in enumerate(trainLoader):
         # Retrieve design matrix and labels
@@ -166,12 +181,15 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        if (i+1) % 100 == 0:
-            # Store losses
-            ind = epoch * (total_step//100) + (i + 1)//100 - 1
-            lossVec[ind] = loss
-            print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
-                   .format(epoch+1, num_epochs, i+1, total_step, loss.item()))
+        # if (i+1) % 100 == 0:
+        #     # Store losses
+        #     ind = epoch * (total_step//100) + (i + 1)//100 - 1
+        #     lossVec[ind] = loss
+        #     print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
+        #            .format(epoch+1, num_epochs, i+1, total_step, loss.item()))
+    
+    lossVec[epoch] = loss
+    print ('Epoch [{}/{}], Loss: {:.4f}'.format(epoch+1, num_epochs, loss.item()))
 
 
 # Plot losses
@@ -179,8 +197,10 @@ _ = sns.scatterplot(x = range(len(lossVec)), y = lossVec)
 plt.savefig(plot_path + 'losses.eps', format='eps', dpi=1000)
 plt.show()
 
-print(mode, weight, num_epochs, batch_size, learning_rate, input_size, num_classes)
+
+# ----------------------------------------------------
 # Test the model
+model.eval()
 transform = nn.Sigmoid()
 with torch.no_grad():
     correct = 0
@@ -196,9 +216,13 @@ with torch.no_grad():
         _, yPred = torch.max(outputs.data, 1)
 
 
+# Plot results        
 roc_plot(yTest, yPred, save_path = plot_path + 'roc1.eps')
-_ = lr_roc_plot(yTest, prob, save_path = plot_path + 'roc2.eps')
+nnRoc = lr_roc_plot(yTest, prob, save_path = plot_path + 'roc2.eps')
 
+nnTpr = nnRoc['tpr']
+nnFpr = nnRoc['fpr']
+print( '\nWith TNR:{}, TPR:{}'.format( round( 1 - nnFpr[5], 4), round(nnTpr[5], 4) ) )
 
 
 

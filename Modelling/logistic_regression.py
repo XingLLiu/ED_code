@@ -112,5 +112,4 @@ lrRoc = lr_roc_plot(yTest, lrProba, title = '(Logistic Regression)', n_pts = 101
                     save_path = path + 'roc.eps')
 lrTpr = lrRoc['tpr']
 lrFpr = lrRoc['fpr']
-lr_roc_auc = sk.metrics.auc(lrFpr, lrTpr)
 print( '\nWith TNR:{}, TPR:{}'.format( round( 1 - lrFpr[5], 4), round(lrTpr[5], 4) ) )

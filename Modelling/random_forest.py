@@ -74,8 +74,8 @@ if mode == 'normal':
     print('Start fitting random forest ...\n')
     # Fit random forest
     # rfc = sk.ensemble.RandomForestClassifier(n_estimators = 4000, max_depth = 5, max_features = 'auto', min_samples_split = 2).fit(XTrain, yTrain)  # no max feature: 0.75
-    # rfc = sk.ensemble.RandomForestClassifier(n_estimators = 200, max_depth = 50, max_features = 'auto', min_samples_split = 2).fit(XTrain, yTrain)
-    rfc = sk.ensemble.RandomForestClassifier(n_estimators = 4000, class_weight = {0:1, 1:weight}).fit(XTrain, yTrain)  # no max feature: 0.75
+    rfc = sk.ensemble.RandomForestClassifier(n_estimators = 4000, max_depth = 30, max_features = 'auto',
+                                             class_weight = {0:1, 1:2000}).fit(XTrain, yTrain)
     print('Complete\n')
     
     # predict on test set
