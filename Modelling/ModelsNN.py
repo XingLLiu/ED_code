@@ -101,11 +101,15 @@ if not os.path.exists(plot_path):
 class NeuralNet(nn.Module):
     def __init__(self, input_size=61, num_classes=2, drop_prob=0):
         super(NeuralNet, self).__init__()
-        self.fc = nn.Linear(input_size, num_classes)
+        self.fc1 = nn.Linear(input_size, input_size)
+        self.ac1 = nn.ReLU()
+        self.fc2 = nn.Linear(input_size, num_classes)
         self.dp_layer = nn.Dropout(drop_prob)
     def forward(self, x):
         h = self.dp_layer(x)
-        return self.fc(h)
+        h = self.fc1(h)
+        h = self.ac1(h)
+        return self.fc2(h)
     
 
 # ----------------------------------------------------
