@@ -1,10 +1,15 @@
 # ----------------------------------------------------
+# Up to two inputs:
+# 1. if clean note
+# 2. if test mode
+# ----------------------------------------------------
 from __future__ import absolute_import, division, print_function
 from ED_support_module import *                                
 sys.path.append("../ClinicalNotePreProcessing")
 from extract_dates_script import findDates
 import csv
 import logging
+from tqdm import tqdm, trange
 from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM, BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
 
@@ -21,6 +26,18 @@ processed_save_dir = save_dir + 'Processed_Notes/'
 
 # ----------------------------------------------------
 # Preliminary settings
+try:
+    CLEAN_NOTES = sys.argv[1]
+except:
+    CLEAN_NOTES = False
+
+
+try:
+    IF_TEST = sys.argv[2]
+except:
+    IF_TEST = False
+
+
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt = '%m/%d/%Y %H:%M:%S',
                     level = logging.INFO)
@@ -32,13 +49,13 @@ logger = logging.getLogger(__name__)
 BERT_MODEL = 'clinical_bert'
 
 # The name of the task to train.I'm going to name this 'yelp'.
-TASK_NAME = 'haha_task'
+TASK_NAME = 'epic_task'
 
 # The output directory where the fine-tuned model and checkpoints will be written.
-OUTPUT_DIR = save_dir + 'Saved_Checkpoints/' + f'{TASK_NAME}/'
+OUTPUT_DIR = save_dir + f'Saved_Checkpoints/{TASK_NAME}/'
 
 # The directory where the evaluation reports will be written to.
-REPORTS_DIR = save_dir + 'Reports/' + f'reports/{TASK_NAME}_evaluation_report/'
+REPORTS_DIR = save_dir + f'Reports/{TASK_NAME}_evaluation_report/'
 
 # This is where BERT will look for pre-trained models to load parameters from.
 CACHE_DIR = '/'.join(path.split('/')[:-3]) + '/ClinicalBert/pretrained_bert_tf/biobert_pretrain_output_all_notes_150000/'
@@ -48,8 +65,9 @@ CACHE_DIR = '/'.join(path.split('/')[:-3]) + '/ClinicalBert/pretrained_bert_tf/b
 MAX_SEQ_LENGTH = 128
 
 # Other model hyper-parameters
+WEIGHT = 1000
 TRAIN_BATCH_SIZE = 32 # 128
-EVAL_BATCH_SIZE = 128
+EVAL_BATCH_SIZE = 32
 LEARNING_RATE = 1e-3
 NUM_TRAIN_EPOCHS = 2
 RANDOM_SEED = 27
@@ -67,9 +85,6 @@ NUM_GPU = torch.cuda.device_count()
 
 # ----------------------------------------------------
 # Create folder to save evaluation reports if not exist
-# if os.path.exists(REPORTS_DIR) and os.listdir(REPORTS_DIR):
-#     REPORTS_DIR += f'/report_{len(os.listdir(REPORTS_DIR))}'
-#     os.makedirs(REPORTS_DIR)
 if not os.path.exists(REPORTS_DIR):
     os.makedirs(REPORTS_DIR)
 
@@ -104,7 +119,7 @@ EPIC = EPIC_original[['Primary.Dx'] + notesCols]
 # ----------------------------------------------------
 # Clean notes 
 
-# Copied from cleaning_script.py
+# Copied and modified from cleaning_script.py
 #a list of common abbreviations that do not have other potential meanings
 abbrevs = {'hrs':'hours', 'mins':'minutes',
            'S&S':'signs and symptoms', 
@@ -165,11 +180,11 @@ def clean_text(text):
     text = text.replace ("?", " possible ")
     text = text.replace ("~", " approximately ")
     text = text.replace ("(!)", " abnormal ")
-    text = text.replace("@", "at")
+    text = text.replace ("@", "at")
     #numeric ratios
     grp = re.findall ("(\d{1,1}) *\: *(\d{1,2}) *[^ap][^m][^a-zA-Z0-9]", text)
     for g in grp:
-        text = re.sub (g[0] + " *: *" + g[1], g[0] + " to " + g[1] + " ratio", text) 
+        text = re.sub (g[0] + " *: *" + g[1], g[0] + " to " + g[1] + " ratio", text)
 	#symbol removal
     text = text.replace ("["," ")
     text = text.replace ("]"," ")
@@ -179,6 +194,12 @@ def clean_text(text):
     text = text.replace ("|"," ")
     text = text.replace ("-"," ")
     text = text.replace ("_"," ")
+    # BERT special tokens
+    text = text.replace ('.', ' [SEP] ')
+    text = '[CLS] '+ text
+    if '[SEP]' not in text[-10:]:
+        text = text +' [SEP]'
+    text = re.sub("\[SEP\]\s+\[SEP\]", " [SEP] ", text)
     #extra spaces
     text = re.sub (" +", " ", text)
 	#extra periods
@@ -186,33 +207,37 @@ def clean_text(text):
     return text
 
 
-# # Loop over each file and write to a csv
-# for ii in range(EPIC.shape[0]):
-#     if ii % 1000 == 0:
-#         print('Iteration %i of %i' % (ii, EPIC.shape[0]))
-#     # Clean text
-#     for col in notesCols:
-#         EPIC[col][ii] = clean_text(EPIC[col][ii])
+if CLEAN_NOTES == True:
+    # Loop over each file and write to a csv
+    print("Start cleaning notes ...")
+    # Clean text
+    for col in notesCols:
+        print("Cleaning {}".format(col))
+        # EPIC.loc[ii, col] = clean_text(EPIC.loc[ii, col])
+        EPIC.loc[:, col] = list(map(clean_text, EPIC[col]))
+    # Save data
+    if len(notesCols) == 1:
+        EPIC.to_csv(raw_save_dir + 'EPIC_triage.csv', index=False)
+    else:
+        EPIC.to_csv(raw_save_dir + 'EPIC_all_notes.csv', index=False)
+    # Load data nonetheless to convert empty notes "" to nan
+    EPIC = pd.read_csv(raw_save_dir + 'EPIC_triage.csv')
+else:
+    # Load data
+    EPIC = pd.read_csv(raw_save_dir + 'EPIC_triage.csv')
 
-
-# Save data
-# EPIC.to_csv(raw_save_dir + 'EPIC_all_notes.csv', index=False)
-EPIC.to_csv(raw_save_dir + 'EPIC_triage.csv', index=False)
-
-# Load data
-EPIC = pd.read_csv(raw_save_dir + 'EPIC_triage.csv')
 
 # Fill in missing notes by CC
 for col in notesCols:
     ifNull = EPIC[col].isnull()
     print('Column:', col, '\nNo. of empty entries:', ifNull.sum())
-    EPIC[col][ifNull] = EPIC_original['CC'][ifNull]
+    EPIC.loc[ifNull, col][ifNull] = "[CLS] " + EPIC_original['CC'][ifNull] + " [SEP]"
     print('No. of empty entries after imputing by CC: {}'
           .format(EPIC[col].isnull().sum()))
     # Impute the remaining missing notes by 'none'
     if EPIC[col].isnull().sum() > 0:
         print('Impute the remaining missing notes by \'None.\' ')
-        EPIC[col][EPIC[col].isnull()] = 'None.'
+        EPIC[col][EPIC[col].isnull()] = '[CLS] None [SEP]'
 
 
 # ----------------------------------------------------
@@ -465,8 +490,7 @@ if "train_features.pkl" not in os.listdir(OUTPUT_DIR):
     print("No previously converted features. Converting now ...")
     trainFeatures = convert_examples_to_features(trainData, labelList, MAX_SEQ_LENGTH, tokenizer)
     # Save converted features
-    with open(OUTPUT_DIR + "train_features.pkl", "wb") as f:
-        pickle.dump(trainFeatures, f)
+    pickle.dump(trainFeatures, open(OUTPUT_DIR + "train_features.pkl", 'wb'))
     print("Complete and saved to {}".format(OUTPUT_DIR))
 else:
     print("Loading converted features ...")
@@ -520,10 +544,11 @@ train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAI
 global_step = 0
 nb_tr_steps = 0
 tr_loss = 0
-loss_vec = [0] * NUM_TRAIN_EPOCHS * len(train_dataloader)
+loss_vec = np.zeros(NUM_TRAIN_EPOCHS * len(train_dataloader))
 
-_ = model.train()
 prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
+loss_func = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT]))
+_ = model.train()
 _ = prediction_head.train()
 print("Start fine-tuning ...")
 for epoch in range(NUM_TRAIN_EPOCHS):
@@ -536,7 +561,6 @@ for epoch in range(NUM_TRAIN_EPOCHS):
         encoded_layers, pooled_output = model(input_ids, segment_ids, input_mask)
         logits = prediction_head(pooled_output)
         # Compute loss
-        loss_func = nn.CrossEntropyLoss()
         loss = loss_func(logits, label_ids)
         if NUM_GPU > 1:
             loss = loss.mean() # mean() to average on multi-gpu.
@@ -571,5 +595,121 @@ tokenizer.save_vocabulary(OUTPUT_DIR)
 
 
 # ----------------------------------------------------
+if ifTest == "test":
+    # Testing
+    # Set test set loaders
+    eval_examples = processor.get_dev_examples(processed_save_dir)
+    eval_features = convert_examples_to_features(
+        eval_examples, labelList, MAX_SEQ_LENGTH, tokenizer)
+
+    logger.info("***** Running evaluation *****")
+    logger.info("  Num examples = %d", len(eval_examples))
+    logger.info("  Batch size = %d", EVAL_BATCH_SIZE)
+
+    # Integrate data into required format
+    all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
+    all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
+    all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
+    all_label_ids = torch.tensor([f.label_id for f in eval_features], dtype=torch.long)
+    eval_data = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+
+    # Run prediction for full data
+    eval_sampler = torch.utils.data.SequentialSampler(eval_data)
+    EVAL_BATCH_SIZE = 32
+    eval_dataloader = torch.utils.data.DataLoader(eval_data, sampler=eval_sampler, batch_size=EVAL_BATCH_SIZE)
+
+    # Set up metrics
+    sigmoid_func = nn.Sigmoid()
+    _ = model.eval()
+    eval_loss, eval_accuracy = 0, 0
+    nb_eval_steps, nb_eval_examples = 0, 0
+    prob = np.zeros(len(eval_data))
+
+    for i, batch in enumerate(tqdm(eval_dataloader, desc="Evaluating")):
+        input_ids, input_mask, segment_ids, label_ids = batch
+        input_ids = input_ids.to(device)
+        input_mask = input_mask.to(device)
+        segment_ids = segment_ids.to(device)
+        label_ids = label_ids.to(device)
+        # Evaluate loss
+        with torch.no_grad():
+            tmp_eval_loss = model(input_ids, segment_ids, input_mask)
+            encoded_layers, pooled_output = model(input_ids, segment_ids, input_mask)
+            logits = prediction_head(pooled_output)
+            # Evaluation metric
+            logits = logits.detach().cpu().numpy()
+            logits = torch.from_numpy(logits[:, 1])
+            pred_prob = sigmoid_func(logits)
+            label_ids = label_ids.to('cpu').numpy()
+            # tmp_eval_accuracy = accuracy(logits, label_ids)
+        # Store predicted probabilities
+        begin_ind = EVAL_BATCH_SIZE * i
+        end_ind = np.min( [EVAL_BATCH_SIZE * (i + 1), len(eval_data)] )
+        prob[begin_ind:end_ind] = pred_prob
+        eval_loss += tmp_eval_loss.mean().item()
+        # eval_accuracy += tmp_eval_accuracy
+        nb_eval_examples += input_ids.size(0)
+        nb_eval_steps += 1
+        if (i + 1) % 100 == 0 :
+            print("Step: [{}/{}]".format(i+1, len(test_dataloader)))
+
+
+    # Save predicted probabilities
+    pickle.dump(prob, open(REPORTS_DIR + "predicted_probs.pkl", 'wb'))
+    print("Complete and saved to {}".format(REPORTS_DIR))
+
+
+
+
+
+    test_dataloader = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+    test_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAIN_BATCH_SIZE)
+
+    model.eval()
+    eval_loss = 0
+    nb_eval_steps = 0
+    preds = []
+
+    for input_ids, input_mask, segment_ids, label_ids in tqdm_notebook(eval_dataloader, desc="Evaluating"):
+        input_ids = input_ids.to(device)
+        input_mask = input_mask.to(device)
+        segment_ids = segment_ids.to(device)
+        label_ids = label_ids.to(device)
+
+        with torch.no_grad():
+            logits = model(input_ids, segment_ids, input_mask, labels=None)
+
+        # create eval loss and other metric required by the task
+        if OUTPUT_MODE == "classification":
+            loss_fct = CrossEntropyLoss()
+            tmp_eval_loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
+        elif OUTPUT_MODE == "regression":
+            loss_fct = MSELoss()
+            tmp_eval_loss = loss_fct(logits.view(-1), label_ids.view(-1))
+
+        eval_loss += tmp_eval_loss.mean().item()
+        nb_eval_steps += 1
+        if len(preds) == 0:
+            preds.append(logits.detach().cpu().numpy())
+        else:
+            preds[0] = np.append(
+                preds[0], logits.detach().cpu().numpy(), axis=0)
+
+    eval_loss = eval_loss / nb_eval_steps
+    preds = preds[0]
+    if OUTPUT_MODE == "classification":
+        preds = np.argmax(preds, axis=1)
+    elif OUTPUT_MODE == "regression":
+        preds = np.squeeze(preds)
+    result = compute_metrics(TASK_NAME, all_label_ids.numpy(), preds)
+
+    result['eval_loss'] = eval_loss
+
+    output_eval_file = os.path.join(REPORTS_DIR, "eval_results.txt")
+    with open(output_eval_file, "w") as writer:
+        logger.info("***** Eval results *****")
+        for key in (result.keys()):
+            logger.info("  %s = %s", key, str(result[key]))
+            writer.write("%s = %s\n" % (key, str(result[key])))
 
 

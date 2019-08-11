@@ -128,6 +128,7 @@ if not useTime:
                                    random_state=seed, stratify=y)
 else:
     XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival, threshold = 201904)
+    print("Train size: {}. Test size: {}".format(len(yTrain), len(yTest)))
 
 
 # Separate the numerical and categorical features
