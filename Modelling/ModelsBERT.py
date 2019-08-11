@@ -450,9 +450,6 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
                                 input_mask=input_mask,
                                 segment_ids=segment_ids,
                                 label_id=label_id))
-        print(input_ids)
-        if ex_index == 7: 
-            break
     print('Max Sequence Length: %d' %max_len)
     return features
 
