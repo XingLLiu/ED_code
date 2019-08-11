@@ -233,7 +233,7 @@ else:
 for col in notesCols:
     ifNull = EPIC[col].isnull()
     print('Column:', col, '\nNo. of empty entries:', ifNull.sum())
-    EPIC.loc[ifNull, col][ifNull] = "[CLS] " + EPIC_original['CC'][ifNull] + " [SEP]"
+    EPIC.loc[ifNull, col] = "[CLS] " + EPIC_original['CC'][ifNull] + " [SEP]"
     print('No. of empty entries after imputing by CC: {}'
           .format(EPIC[col].isnull().sum()))
     # Impute the remaining missing notes by 'none'
