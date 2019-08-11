@@ -41,7 +41,7 @@ OUTPUT_DIR = save_dir + 'Saved_Checkpoints/' + f'{TASK_NAME}/'
 REPORTS_DIR = save_dir + 'Reports/' + f'reports/{TASK_NAME}_evaluation_report/'
 
 # This is where BERT will look for pre-trained models to load parameters from.
-CACHE_DIR = '/'.join(path.split('/')[:-3]) + '/ClinicalBert/pretrained_bert_tfbiobert_pretrain_output_all_notes_150000/'
+CACHE_DIR = '/'.join(path.split('/')[:-3]) + '/ClinicalBert/pretrained_bert_tf/biobert_pretrain_output_all_notes_150000/'
 
 # The maximum total input sequence length after WordPiece tokenization.
 # Sequences longer than this will be truncated, and sequences shorter than this will be padded.
@@ -59,6 +59,9 @@ OUTPUT_MODE = 'classification'
 
 CONFIG_NAME = "bert_config.json"
 WEIGHTS_NAME = "pytorch_model.bin"
+
+# Use GPU if exists otherwise CPU
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # ----------------------------------------------------
@@ -178,7 +181,8 @@ def clean_text(text):
 #         EPIC[col][ii] = clean_text(EPIC[col][ii])
 
 
-# # Save data
+# Save data
+EPIC.to_csv(raw_save_dir + 'EPIC_all_notes.csv', index=False)
 # EPIC.to_csv(raw_save_dir + 'EPIC_triage.csv', index=False)
 
 # Load data
@@ -417,18 +421,94 @@ processor = BinaryClassificationProcessor()
 trainData = processor.get_train_examples(processed_save_dir)
 labelList = processor.get_labels()
 
-numTrainOptimizationSteps = int(
+num_train_optimization_steps = int(
     len(trainData) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
 
 # Load pretrained model tokenizer (vocabulary)
-tokenizer = BertTokenizer.from_pretrained('bert-base-cased', do_lower_case=False)
+tokenizer = BertTokenizer.from_pretrained(CACHE_DIR, do_lower_case=False)
 
 # labelMap = {label: i for i, label in enumerate(labelList)}
 # trainForProcessing = [(example, labelMap, MAX_SEQ_LENGTH, tokenizer, OUTPUT_MODE) for example in trainData]
 
+# Convert tokens to features
+trainFeatures = convert_examples_to_features(trainData, labelList, MAX_SEQ_LENGTH, tokenizer)
+
 
 # ----------------------------------------------------
-# Convert tokens to features
-trainFeatures = convert_examples_to_features(example, labelList, MAX_SEQ_LENGTH, tokenizer)
+# Set optimizer and data loader
+
+# Load model
+model = BertModel.from_pretrained(CACHE_DIR, cache_dir=CACHE_DIR)
+model.to(device)
+
+# Optimizers
+param_optimizer = list(model.named_parameters())
+no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+optimizer_grouped_parameters = [
+    {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+    {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+]
+
+optimizer = BertAdam(optimizer_grouped_parameters,
+                     lr=LEARNING_RATE,
+                     warmup=WARMUP_PROPORTION,
+                     t_total=num_train_optimization_steps)
+
+global_step = 0
+nb_tr_steps = 0
+tr_loss = 0
+
+# logger.info("***** Running training *****")
+# logger.info("  Num examples = %d", train_examples_len)
+# logger.info("  Batch size = %d", TRAIN_BATCH_SIZE)
+# logger.info("  Num steps = %d", num_train_optimization_steps)
+print("***** Running training *****")
+print("  Num examples = {}".format( len(trainData) ) )
+print("  Batch size = {}".format( TRAIN_BATCH_SIZE ) )
+print("  Num steps = {}".format( num_train_optimization_steps ) )
+
+all_input_ids = torch.tensor([f.input_ids for f in trainFeatures], dtype=torch.long)
+all_input_mask = torch.tensor([f.input_mask for f in trainFeatures], dtype=torch.long)
+all_segment_ids = torch.tensor([f.segment_ids for f in trainFeatures], dtype=torch.long)
+
+all_label_ids = torch.tensor([f.label_id for f in trainFeatures], dtype=torch.long)
+
+# Set up data loaders
+train_dataloader = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAIN_BATCH_SIZE)
+
+
+# ----------------------------------------------------
+# Fine tuning
+_ = model.train()
+for epoch in range(NUM_TRAIN_EPOCHS):
+    tr_loss = 0
+    nb_tr_examples, nb_tr_steps = 0, 0
+    for i, batch in enumerate(train_dataloader):
+        # Get batch
+        batch = tuple(t.to(device) for t in batch)
+        input_ids, input_mask, segment_ids, label_ids = batch
+        out = model(input_ids, segment_ids, input_mask)
+
+        # Compute loss
+        loss = CrossEntropyLoss()
+        loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
+
+        if GRADIENT_ACCUMULATION_STEPS > 1:
+            loss = loss / GRADIENT_ACCUMULATION_STEPS
+
+        loss.backward()
+        print("\r%f" % loss, end='')
+        
+        tr_loss += loss.item()
+        nb_tr_examples += input_ids.size(0)
+        nb_tr_steps += 1
+        if (step + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
+            optimizer.step()
+            optimizer.zero_grad()
+            global_step += 1
+
+
+
 
 
