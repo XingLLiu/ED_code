@@ -65,6 +65,22 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # ----------------------------------------------------
+# Create folder to save evaluation reports if not exist
+# if os.path.exists(REPORTS_DIR) and os.listdir(REPORTS_DIR):
+#     REPORTS_DIR += f'/report_{len(os.listdir(REPORTS_DIR))}'
+#     os.makedirs(REPORTS_DIR)
+if not os.path.exists(REPORTS_DIR):
+    os.makedirs(REPORTS_DIR)
+
+
+# Create folder to save fine-tuned model if not exist
+if os.path.exists(OUTPUT_DIR) and os.listdir(OUTPUT_DIR):
+    raise ValueError("Output directory ({}) already exists and is not empty.".format(OUTPUT_DIR))
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
+
+
+# ----------------------------------------------------
 # Prepare train and test sets
 # Load file
 EPIC_original = pd.read_csv(path, encoding = 'ISO-8859-1')
@@ -454,9 +470,6 @@ optimizer = BertAdam(optimizer_grouped_parameters,
                      warmup=WARMUP_PROPORTION,
                      t_total=num_train_optimization_steps)
 
-global_step = 0
-nb_tr_steps = 0
-tr_loss = 0
 
 # logger.info("***** Running training *****")
 # logger.info("  Num examples = %d", train_examples_len)
@@ -480,6 +493,10 @@ train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAI
 
 # ----------------------------------------------------
 # Fine tuning
+global_step = 0
+nb_tr_steps = 0
+tr_loss = 0
+
 _ = model.train()
 for epoch in range(NUM_TRAIN_EPOCHS):
     tr_loss = 0
@@ -489,26 +506,36 @@ for epoch in range(NUM_TRAIN_EPOCHS):
         batch = tuple(t.to(device) for t in batch)
         input_ids, input_mask, segment_ids, label_ids = batch
         out = model(input_ids, segment_ids, input_mask)
-
         # Compute loss
-        loss = CrossEntropyLoss()
-        loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
-
+        loss_func = CrossEntropyLoss()
+        loss = loss_func(out.view(-1, len(labelList)), label_ids.view(-1))
         if GRADIENT_ACCUMULATION_STEPS > 1:
             loss = loss / GRADIENT_ACCUMULATION_STEPS
-
         loss.backward()
-        print("\r%f" % loss, end='')
-        
+        print("Epoch: {}/{}, Loss: {:.4f}".format(epoch + 1, NUM_TRAIN_EPOCHS, loss))
         tr_loss += loss.item()
         nb_tr_examples += input_ids.size(0)
         nb_tr_steps += 1
         if (step + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
-            optimizer.step()
             optimizer.zero_grad()
+            optimizer.step()
             global_step += 1
 
 
 
+# ----------------------------------------------------
+# Save model
+model_to_save = model.module if hasattr(model, 'module') else model
+
+# Save using the predefined names so that one can load using `from_pretrained`
+output_model_file = os.path.join(OUTPUT_DIR, WEIGHTS_NAME)
+output_config_file = os.path.join(OUTPUT_DIR, CONFIG_NAME)
+
+torch.save(model_to_save.state_dict(), output_model_file)
+model_to_save.config.to_json_file(output_config_file)
+tokenizer.save_vocabulary(OUTPUT_DIR)
+
+
+# ----------------------------------------------------
 
 
