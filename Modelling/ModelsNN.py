@@ -7,6 +7,8 @@
 # 5. batch size
 # 6. learning rate
 # 7. class weight
+#
+# To run: python ModelsNN.py b 27 "True" 4000 128 1e-3 3000 0.1
 # ----------------------------------------------------
 # Command arguments: mode, no. of epochs, batch size, learning rate
 from ED_support_module import *                                

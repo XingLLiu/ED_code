@@ -1,7 +1,7 @@
 # ----------------------------------------------------
 # Up to two inputs:
 # 1. if clean note
-# 2. if test mode
+# 2. mode: train, test, train_test
 # ----------------------------------------------------
 from __future__ import absolute_import, division, print_function
 from ED_support_module import *                                
@@ -27,15 +27,15 @@ processed_save_dir = save_dir + 'Processed_Notes/'
 # ----------------------------------------------------
 # Preliminary settings
 try:
-    CLEAN_NOTES = sys.argv[1]
+    CLEAN_NOTES = bool(sys.argv[1])
 except:
     CLEAN_NOTES = False
 
 
 try:
-    IF_TEST = sys.argv[2]
+    MODE = sys.argv[2]
 except:
-    IF_TEST = False
+    MODE = "test"
 
 
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
@@ -69,7 +69,7 @@ WEIGHT = 1000
 TRAIN_BATCH_SIZE = 32 # 128
 EVAL_BATCH_SIZE = 32
 LEARNING_RATE = 1e-3
-NUM_TRAIN_EPOCHS = 2
+NUM_TRAIN_EPOCHS = 1
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
 WARMUP_PROPORTION = 0.1
@@ -181,6 +181,8 @@ def clean_text(text):
     text = text.replace ("~", " approximately ")
     text = text.replace ("(!)", " abnormal ")
     text = text.replace ("@", "at")
+    #switching abbreviations: pt or Pt for patient
+    text = re.sub ("(\spt\s)|(Pt\s)", " patient ", text)
     #numeric ratios
     grp = re.findall ("(\d{1,1}) *\: *(\d{1,2}) *[^ap][^m][^a-zA-Z0-9]", text)
     for g in grp:
@@ -414,7 +416,8 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
         # For classification tasks, the first vector (corresponding to [CLS]) is
         # used as as the "sentence vector". Note that this only makes sense because
         # the entire model is fine-tuned.
-        tokens = ["[CLS]"] + tokens_a + ["[SEP]"]
+        # tokens = ["[CLS]"] + tokens_a + ["[SEP]"]
+        tokens = tokens_a
         segment_ids = [0] * len(tokens)
         if tokens_b:
             tokens += tokens_b + ["[SEP]"]
@@ -447,6 +450,9 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
                                 input_mask=input_mask,
                                 segment_ids=segment_ids,
                                 label_id=label_id))
+        print(input_ids)
+        if ex_index == 7: 
+            break
     print('Max Sequence Length: %d' %max_len)
     return features
 
@@ -523,79 +529,81 @@ optimizer = BertAdam(optimizer_grouped_parameters,
 # logger.info("  Num examples = %d", train_examples_len)
 # logger.info("  Batch size = %d", TRAIN_BATCH_SIZE)
 # logger.info("  Num steps = %d", num_train_optimization_steps)
-print("***** Running training *****")
-print("  Num examples = {}".format( len(trainData) ) )
-print("  Batch size = {}".format( TRAIN_BATCH_SIZE ) )
-print("  Num steps = {}".format( num_train_optimization_steps ) )
+if MODE == "train" or MODE == "train_test":
+    print("***** Running training *****")
+    print("  Num examples = {}".format( len(trainData) ) )
+    print("  Batch size = {}".format( TRAIN_BATCH_SIZE ) )
+    print("  Num steps = {}".format( num_train_optimization_steps ) )
 
-all_input_ids = torch.tensor([f.input_ids for f in trainFeatures], dtype=torch.long)
-all_input_mask = torch.tensor([f.input_mask for f in trainFeatures], dtype=torch.long)
-all_segment_ids = torch.tensor([f.segment_ids for f in trainFeatures], dtype=torch.long)
+    all_input_ids = torch.tensor([f.input_ids for f in trainFeatures], dtype=torch.long)
+    all_input_mask = torch.tensor([f.input_mask for f in trainFeatures], dtype=torch.long)
+    all_segment_ids = torch.tensor([f.segment_ids for f in trainFeatures], dtype=torch.long)
 
-all_label_ids = torch.tensor([f.label_id for f in trainFeatures], dtype=torch.long)
+    all_label_ids = torch.tensor([f.label_id for f in trainFeatures], dtype=torch.long)
 
-# Set up data loaders
-train_dataloader = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
-train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAIN_BATCH_SIZE)
+    # Set up data loaders
+    train_dataloader = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+    train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAIN_BATCH_SIZE)
 
 
-# ----------------------------------------------------
-# Fine tuning
-global_step = 0
-nb_tr_steps = 0
-tr_loss = 0
-loss_vec = np.zeros(NUM_TRAIN_EPOCHS * len(train_dataloader))
-
-prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
-loss_func = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT]))
-_ = model.train()
-_ = prediction_head.train()
-print("Start fine-tuning ...")
-for epoch in range(NUM_TRAIN_EPOCHS):
+    # ----------------------------------------------------
+    # Fine tuning
+    global_step = 0
+    nb_tr_steps = 0
     tr_loss = 0
-    nb_tr_examples, nb_tr_steps = 0, 0
-    for i, batch in enumerate(train_dataloader):
-        # Get batch
-        batch = tuple(t.to(device) for t in batch)
-        input_ids, input_mask, segment_ids, label_ids = batch
-        encoded_layers, pooled_output = model(input_ids, segment_ids, input_mask)
-        logits = prediction_head(pooled_output)
-        # Compute loss
-        loss = loss_func(logits, label_ids)
-        if NUM_GPU > 1:
-            loss = loss.mean() # mean() to average on multi-gpu.
-        if GRADIENT_ACCUMULATION_STEPS > 1:
-            loss = loss / GRADIENT_ACCUMULATION_STEPS
-        loss.backward()
-        tr_loss += loss.item()
-        nb_tr_examples += input_ids.size(0)
-        nb_tr_steps += 1
-        loss_vec[epoch * len(train_dataloader) + i] = loss.item()
-        if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
-            optimizer.zero_grad()
-            optimizer.step()
-            global_step += 1
-        if (i + 1) % 100 == 0 :
-            print("Epoch: {}/{}, Step: [{}/{}], Loss: {:.4f}".
-                  format(epoch + 1, NUM_TRAIN_EPOCHS, i+1, len(train_dataloader), loss.item()))
+    loss_vec = np.zeros(NUM_TRAIN_EPOCHS * len(train_dataloader))
+
+    prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
+    loss_func = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT]))
+    _ = model.train()
+    _ = prediction_head.train()
+    print("Start fine-tuning ...")
+    for epoch in range(NUM_TRAIN_EPOCHS):
+        tr_loss = 0
+        nb_tr_examples, nb_tr_steps = 0, 0
+        for i, batch in enumerate(train_dataloader):
+            # Get batch
+            batch = tuple(t.to(device) for t in batch)
+            input_ids, input_mask, segment_ids, label_ids = batch
+            encoded_layers, pooled_output = model(input_ids, segment_ids, input_mask)
+            logits = prediction_head(pooled_output)
+            # Compute loss
+            loss = loss_func(logits, label_ids)
+            if NUM_GPU > 1:
+                loss = loss.mean() # mean() to average on multi-gpu.
+            if GRADIENT_ACCUMULATION_STEPS > 1:
+                loss = loss / GRADIENT_ACCUMULATION_STEPS
+            loss.backward()
+            tr_loss += loss.item()
+            nb_tr_examples += input_ids.size(0)
+            nb_tr_steps += 1
+            loss_vec[epoch * len(train_dataloader) + i] = loss.item()
+            if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
+                optimizer.zero_grad()
+                optimizer.step()
+                global_step += 1
+            if (i + 1) % 100 == 0 :
+                print("Epoch: {}/{}, Step: [{}/{}], Loss: {:.4f}".
+                    format(epoch + 1, NUM_TRAIN_EPOCHS, i+1, len(train_dataloader), loss.item()))
+
+
+    # ----------------------------------------------------
+    # Save model
+    model_to_save = model.module if hasattr(model, 'module') else model
+
+    # Save using the predefined names so that one can load using `from_pretrained`
+    output_model_file = os.path.join(OUTPUT_DIR, WEIGHTS_NAME)
+    output_config_file = os.path.join(OUTPUT_DIR, CONFIG_NAME)
+
+    torch.save(model_to_save.state_dict(), output_model_file)
+    model_to_save.config.to_json_file(output_config_file)
+    tokenizer.save_vocabulary(OUTPUT_DIR)
 
 
 
 # ----------------------------------------------------
-# Save model
-model_to_save = model.module if hasattr(model, 'module') else model
-
-# Save using the predefined names so that one can load using `from_pretrained`
-output_model_file = os.path.join(OUTPUT_DIR, WEIGHTS_NAME)
-output_config_file = os.path.join(OUTPUT_DIR, CONFIG_NAME)
-
-torch.save(model_to_save.state_dict(), output_model_file)
-model_to_save.config.to_json_file(output_config_file)
-tokenizer.save_vocabulary(OUTPUT_DIR)
-
-
 # ----------------------------------------------------
-if ifTest == "test":
+if MODE == "test" or MODE == "train_test":
     # Testing
     # Set test set loaders
     eval_examples = processor.get_dev_examples(processed_save_dir)
@@ -657,59 +665,5 @@ if ifTest == "test":
     # Save predicted probabilities
     pickle.dump(prob, open(REPORTS_DIR + "predicted_probs.pkl", 'wb'))
     print("Complete and saved to {}".format(REPORTS_DIR))
-
-
-
-
-
-    test_dataloader = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
-    test_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAIN_BATCH_SIZE)
-
-    model.eval()
-    eval_loss = 0
-    nb_eval_steps = 0
-    preds = []
-
-    for input_ids, input_mask, segment_ids, label_ids in tqdm_notebook(eval_dataloader, desc="Evaluating"):
-        input_ids = input_ids.to(device)
-        input_mask = input_mask.to(device)
-        segment_ids = segment_ids.to(device)
-        label_ids = label_ids.to(device)
-
-        with torch.no_grad():
-            logits = model(input_ids, segment_ids, input_mask, labels=None)
-
-        # create eval loss and other metric required by the task
-        if OUTPUT_MODE == "classification":
-            loss_fct = CrossEntropyLoss()
-            tmp_eval_loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
-        elif OUTPUT_MODE == "regression":
-            loss_fct = MSELoss()
-            tmp_eval_loss = loss_fct(logits.view(-1), label_ids.view(-1))
-
-        eval_loss += tmp_eval_loss.mean().item()
-        nb_eval_steps += 1
-        if len(preds) == 0:
-            preds.append(logits.detach().cpu().numpy())
-        else:
-            preds[0] = np.append(
-                preds[0], logits.detach().cpu().numpy(), axis=0)
-
-    eval_loss = eval_loss / nb_eval_steps
-    preds = preds[0]
-    if OUTPUT_MODE == "classification":
-        preds = np.argmax(preds, axis=1)
-    elif OUTPUT_MODE == "regression":
-        preds = np.squeeze(preds)
-    result = compute_metrics(TASK_NAME, all_label_ids.numpy(), preds)
-
-    result['eval_loss'] = eval_loss
-
-    output_eval_file = os.path.join(REPORTS_DIR, "eval_results.txt")
-    with open(output_eval_file, "w") as writer:
-        logger.info("***** Eval results *****")
-        for key in (result.keys()):
-            logger.info("  %s = %s", key, str(result[key]))
-            writer.write("%s = %s\n" % (key, str(result[key])))
 
 
