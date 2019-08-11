@@ -1,10 +1,10 @@
 # ----------------------------------------------------
+from __future__ import absolute_import, division, print_function
 from ED_support_module import *                                
 sys.path.append("../ClinicalNotePreProcessing")
 from extract_dates_script import findDates
 import csv
 import logging
-from __future__ import absolute_import, division, print_function
 from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM, BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
 
@@ -48,10 +48,10 @@ CACHE_DIR = '/'.join(path.split('/')[:-3]) + '/ClinicalBert/pretrained_bert_tf/b
 MAX_SEQ_LENGTH = 128
 
 # Other model hyper-parameters
-TRAIN_BATCH_SIZE = 128
+TRAIN_BATCH_SIZE = 32 # 128
 EVAL_BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
-NUM_TRAIN_EPOCHS = 10
+NUM_TRAIN_EPOCHS = 2
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
 WARMUP_PROPORTION = 0.1
@@ -62,6 +62,7 @@ WEIGHTS_NAME = "pytorch_model.bin"
 
 # Use GPU if exists otherwise CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+NUM_GPU = torch.cuda.device_count()
 
 
 # ----------------------------------------------------
@@ -74,8 +75,6 @@ if not os.path.exists(REPORTS_DIR):
 
 
 # Create folder to save fine-tuned model if not exist
-if os.path.exists(OUTPUT_DIR) and os.listdir(OUTPUT_DIR):
-    raise ValueError("Output directory ({}) already exists and is not empty.".format(OUTPUT_DIR))
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
 
@@ -188,18 +187,17 @@ def clean_text(text):
 
 
 # # Loop over each file and write to a csv
-# for col in notesCols:
-#     print('Cleaning', col)
-#     for ii in range(EPIC.shape[0]):
-#         if ii % 1000 == 0:
-#             print('Iteration %i of %i' % (ii, EPIC.shape[0]))
-#         # Clean text
+# for ii in range(EPIC.shape[0]):
+#     if ii % 1000 == 0:
+#         print('Iteration %i of %i' % (ii, EPIC.shape[0]))
+#     # Clean text
+#     for col in notesCols:
 #         EPIC[col][ii] = clean_text(EPIC[col][ii])
 
 
 # Save data
-EPIC.to_csv(raw_save_dir + 'EPIC_all_notes.csv', index=False)
-# EPIC.to_csv(raw_save_dir + 'EPIC_triage.csv', index=False)
+# EPIC.to_csv(raw_save_dir + 'EPIC_all_notes.csv', index=False)
+EPIC.to_csv(raw_save_dir + 'EPIC_triage.csv', index=False)
 
 # Load data
 EPIC = pd.read_csv(raw_save_dir + 'EPIC_triage.csv')
@@ -428,6 +426,22 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
     return features
 
 
+class NoteClassificationHead(nn.Module):
+    """
+    Head layer for prediction.
+    """
+    def __init__(self, hidden_size, dropout_prob=0.2, num_labels=2):
+        super(NoteClassificationHead, self).__init__()
+        self.num_labels = num_labels
+        self.dropout = nn.Dropout(dropout_prob)
+        self.fc = nn.Linear(hidden_size, num_labels)
+        nn.init.xavier_normal_(self.fc.weight)
+    def forward(self, pooled_output):
+        pooled_output = self.dropout(pooled_output)
+        logits = self.fc(pooled_output)
+        return logits
+
+
 # ----------------------------------------------------
 # Main method
 # ----------------------------------------------------
@@ -446,8 +460,18 @@ tokenizer = BertTokenizer.from_pretrained(CACHE_DIR, do_lower_case=False)
 # labelMap = {label: i for i, label in enumerate(labelList)}
 # trainForProcessing = [(example, labelMap, MAX_SEQ_LENGTH, tokenizer, OUTPUT_MODE) for example in trainData]
 
-# Convert tokens to features
-trainFeatures = convert_examples_to_features(trainData, labelList, MAX_SEQ_LENGTH, tokenizer)
+# Convert tokens to features. Load model if exists
+if "train_features.pkl" not in os.listdir(OUTPUT_DIR):
+    print("No previously converted features. Converting now ...")
+    trainFeatures = convert_examples_to_features(trainData, labelList, MAX_SEQ_LENGTH, tokenizer)
+    # Save converted features
+    with open(OUTPUT_DIR + "train_features.pkl", "wb") as f:
+        pickle.dump(trainFeatures, f)
+    print("Complete and saved to {}".format(OUTPUT_DIR))
+else:
+    print("Loading converted features ...")
+    trainFeatures = pickle.load(open(OUTPUT_DIR + "train_features.pkl", 'rb'))
+    print("Complete")
 
 
 # ----------------------------------------------------
@@ -455,7 +479,7 @@ trainFeatures = convert_examples_to_features(trainData, labelList, MAX_SEQ_LENGT
 
 # Load model
 model = BertModel.from_pretrained(CACHE_DIR, cache_dir=CACHE_DIR)
-model.to(device)
+_ = model.to(device)
 
 # Optimizers
 param_optimizer = list(model.named_parameters())
@@ -496,8 +520,12 @@ train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAI
 global_step = 0
 nb_tr_steps = 0
 tr_loss = 0
+loss_vec = [0] * NUM_TRAIN_EPOCHS * len(train_dataloader)
 
 _ = model.train()
+prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
+_ = prediction_head.train()
+print("Start fine-tuning ...")
 for epoch in range(NUM_TRAIN_EPOCHS):
     tr_loss = 0
     nb_tr_examples, nb_tr_steps = 0, 0
@@ -505,21 +533,27 @@ for epoch in range(NUM_TRAIN_EPOCHS):
         # Get batch
         batch = tuple(t.to(device) for t in batch)
         input_ids, input_mask, segment_ids, label_ids = batch
-        out = model(input_ids, segment_ids, input_mask)
+        encoded_layers, pooled_output = model(input_ids, segment_ids, input_mask)
+        logits = prediction_head(pooled_output)
         # Compute loss
-        loss_func = CrossEntropyLoss()
-        loss = loss_func(out.view(-1, len(labelList)), label_ids.view(-1))
+        loss_func = nn.CrossEntropyLoss()
+        loss = loss_func(logits, label_ids)
+        if NUM_GPU > 1:
+            loss = loss.mean() # mean() to average on multi-gpu.
         if GRADIENT_ACCUMULATION_STEPS > 1:
             loss = loss / GRADIENT_ACCUMULATION_STEPS
         loss.backward()
-        print("Epoch: {}/{}, Loss: {:.4f}".format(epoch + 1, NUM_TRAIN_EPOCHS, loss))
         tr_loss += loss.item()
         nb_tr_examples += input_ids.size(0)
         nb_tr_steps += 1
-        if (step + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
+        loss_vec[i] = loss.item()
+        if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
             optimizer.zero_grad()
             optimizer.step()
             global_step += 1
+        if (i + 1) % 100 == 0 :
+            print("Epoch: {}/{}, Step: [{}/{}], Loss: {:.4f}".
+                  format(epoch + 1, NUM_TRAIN_EPOCHS, i+1, len(train_dataloader), loss.item()))
 
 
 
