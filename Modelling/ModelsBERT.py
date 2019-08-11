@@ -546,7 +546,7 @@ for epoch in range(NUM_TRAIN_EPOCHS):
         tr_loss += loss.item()
         nb_tr_examples += input_ids.size(0)
         nb_tr_steps += 1
-        loss_vec[i] = loss.item()
+        loss_vec[epoch * len(train_dataloader) + i] = loss.item()
         if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
             optimizer.zero_grad()
             optimizer.step()
