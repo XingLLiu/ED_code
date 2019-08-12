@@ -253,6 +253,8 @@ else:
         print('Training for data before {} ...'.format(month))
         print('Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}].'
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ))
+        # Skip if no data in the month
+
         # Separate the numerical and categorical features
         if mode in ['c', 'e', 'f']:
             numCols = numCols + list(cuiCols)
@@ -319,6 +321,6 @@ else:
         # roc_plot(yTest, yPred, save_path = dynamic_plot_path + f'roc1_{month}.eps')
         nnRoc = lr_roc_plot(yTest, prob, save_path = dynamic_plot_path + f'roc2_{month}.eps', plot = False)
         pd.DataFrame(nnRoc).to_csv(dynamic_plot_path + f'summary_{month}.csv', index=False)
-        print('Completed prediction for {}'.format(month))
+        print('Completed prediction for {} \n'.format(month))
 
 

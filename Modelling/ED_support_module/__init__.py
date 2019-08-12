@@ -59,17 +59,18 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True,
     confMat = sk.metrics.confusion_matrix(yTest, pred)
     fpr, tpr, _ = sk.metrics.roc_curve(yTest, pred)
     roc_auc = sk.metrics.auc(fpr, tpr)
+    plt.title('Receiver Operating Characteristic')
+    plt.plot(fpr, tpr, 'b', label = 'AUC = %0.2f' % roc_auc)
+    plt.legend(loc = 'lower right')
+    plt.plot([0, 1], [0, 1],'r--')
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
+    if save_path != None:
+        plt.savefig(save_path, format='eps', dpi=1000)
+        plt.close()
     if plot == True:
-        plt.title('Receiver Operating Characteristic')
-        plt.plot(fpr, tpr, 'b', label = 'AUC = %0.2f' % roc_auc)
-        plt.legend(loc = 'lower right')
-        plt.plot([0, 1], [0, 1],'r--')
-        plt.xlim([0, 1])
-        plt.ylim([0, 1])
-        plt.ylabel('True Positive Rate')
-        plt.xlabel('False Positive Rate')
-        if not save_path == None:
-            plt.savefig(save_path, format='eps', dpi=1000)
         plt.show()
     if show_results:
         print(' precision: {} \n recall:    {} \n f1_score:  {} '.format(precision, recall, f1_score)) 
@@ -99,17 +100,18 @@ def lr_roc_plot(yTest = None, proba = None, plot = True, title = ' ', n_pts = 51
     fprLst[-1], tprLst[-1] = 1, 1
     fprLst[0], tprLst[0] = 0, 0
     roc_auc = sk.metrics.auc(fprLst, tprLst)
+    plt.title('Receiver Operating Characteristic ' + title)
+    plt.plot(fprLst, tprLst, 'b', label = 'AUC = %0.2f' % roc_auc)
+    plt.legend(loc = 'lower right')
+    plt.plot([0, 1], [0, 1],'r--')
+    plt.xlim([0, 1])
+    plt.ylim([0, 1.01])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
+    if not save_path == None:
+        plt.savefig(save_path, format='eps', dpi=1000)
+        plt.close()
     if plot == True:
-        plt.title('Receiver Operating Characteristic ' + title)
-        plt.plot(fprLst, tprLst, 'b', label = 'AUC = %0.2f' % roc_auc)
-        plt.legend(loc = 'lower right')
-        plt.plot([0, 1], [0, 1],'r--')
-        plt.xlim([0, 1])
-        plt.ylim([0, 1.01])
-        plt.ylabel('True Positive Rate')
-        plt.xlabel('False Positive Rate')
-        if not save_path == None:
-            plt.savefig(save_path, format='eps', dpi=1000)
         plt.show()
     return({'tpr':tprLst, 'fpr':fprLst})
 
@@ -278,11 +280,13 @@ def time_split(data, threshold = 201903, dynamic = False, pred_span = 1):
     else:
         # Make ending month to the format XX
         end_threshold = str( int(str(threshold)[-2:]) % 12 + pred_span ).zfill(2)
-        end_threshold = int( str(threshold)[:-2] + end_threshold )
-        selector = data['Arrived'] == end_threshold
-        if selector.sum() == 0:
-            raise ValueError('No data between {} and {}'.format(threshold, end_threshold))
-        test = data.loc[selector]
+        # Add one year if appropriate
+        if end_threshold == '01':
+            year = int(str(threshold)[:-2]) + 1
+        else:
+            year = int(str(threshold)[:-2])
+        end_threshold = int( str(year) + end_threshold )
+        test = data.loc[data['Arrived'] == end_threshold]
     yTrain = train['Primary.Dx']
     XTrain = train.drop(['Primary.Dx'], axis = 1)
     yTest = test['Primary.Dx']
