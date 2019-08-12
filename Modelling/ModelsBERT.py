@@ -601,35 +601,39 @@ if MODE == "train" or MODE == "train_test":
 # ----------------------------------------------------
 # ----------------------------------------------------
 if MODE == "test" or MODE == "train_test":
+    # Set path
+    # OUTPUT_DIR = save_dir + f'Saved_Checkpoints/{TASK_NAME}/'
+    BERT_MODEL = OUTPUT_DIR + f"{TASK_NAME}.tar.gz"
+    # Load fine-tuned model
+    tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR + 'vocab.txt', do_lower_case=False)
+    processor = BinaryClassificationProcessor()
     # Testing
     # Set test set loaders
     eval_examples = processor.get_dev_examples(processed_save_dir)
-    eval_features = convert_examples_to_features(
-        eval_examples, labelList, MAX_SEQ_LENGTH, tokenizer)
-
+    eval_features = convert_examples_to_features(eval_examples,
+                        labelList, MAX_SEQ_LENGTH, tokenizer)
     logger.info("***** Running evaluation *****")
     logger.info("  Num examples = %d", len(eval_examples))
     logger.info("  Batch size = %d", EVAL_BATCH_SIZE)
-
     # Integrate data into required format
     all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
     all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
     all_label_ids = torch.tensor([f.label_id for f in eval_features], dtype=torch.long)
     eval_data = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
-
     # Run prediction for full data
     eval_sampler = torch.utils.data.SequentialSampler(eval_data)
-    EVAL_BATCH_SIZE = 32
     eval_dataloader = torch.utils.data.DataLoader(eval_data, sampler=eval_sampler, batch_size=EVAL_BATCH_SIZE)
-
-    # Set up metrics
+    # Load pre-trained model (weights)
+    model = BertModel.from_pretrained(OUTPUT_DIR + f"{TASK_NAME}.tar.gz",cache_dir=OUTPUT_DIR)
+    _ = model.to(device)
+    # Final set up 
     sigmoid_func = nn.Sigmoid()
+    prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
     _ = model.eval()
+    prob = np.zeros(len(eval_data))
     eval_loss, eval_accuracy = 0, 0
     nb_eval_steps, nb_eval_examples = 0, 0
-    prob = np.zeros(len(eval_data))
-
     for i, batch in enumerate(tqdm(eval_dataloader, desc="Evaluating")):
         input_ids, input_mask, segment_ids, label_ids = batch
         input_ids = input_ids.to(device)
@@ -638,7 +642,6 @@ if MODE == "test" or MODE == "train_test":
         label_ids = label_ids.to(device)
         # Evaluate loss
         with torch.no_grad():
-            tmp_eval_loss = model(input_ids, segment_ids, input_mask)
             encoded_layers, pooled_output = model(input_ids, segment_ids, input_mask)
             logits = prediction_head(pooled_output)
             # Evaluation metric
@@ -646,15 +649,14 @@ if MODE == "test" or MODE == "train_test":
             logits = torch.from_numpy(logits[:, 1])
             pred_prob = sigmoid_func(logits)
             label_ids = label_ids.to('cpu').numpy()
-            # tmp_eval_accuracy = accuracy(logits, label_ids)
         # Store predicted probabilities
         begin_ind = EVAL_BATCH_SIZE * i
         end_ind = np.min( [EVAL_BATCH_SIZE * (i + 1), len(eval_data)] )
         prob[begin_ind:end_ind] = pred_prob
-        eval_loss += tmp_eval_loss.mean().item()
+        # eval_loss += tmp_eval_loss.mean().item()
         # eval_accuracy += tmp_eval_accuracy
-        nb_eval_examples += input_ids.size(0)
-        nb_eval_steps += 1
+        # nb_eval_examples += input_ids.size(0)
+        # nb_eval_steps += 1
         if (i + 1) % 100 == 0 :
             print("Step: [{}/{}]".format(i+1, len(test_dataloader)))
 
