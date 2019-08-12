@@ -43,8 +43,9 @@ calculateTimeLapse <- function(wellSoft, reg_codes, data.path) {
   
   num.returns <- num.returns %>% dplyr::arrange(desc(num.returns), 
                                                           PrimaryMedicalRecordNumber, Arrival_Time_9)
-  
-  single.visit.ids <- (num.returns %>% dplyr::filter(num.returns == 1))
+  sum(num.returns[!duplicated(num.returns$PrimaryMedicalRecordNumber),]$num.returns)
+  num.returns$num.returns <- num.returns$num.returns - 1
+  single.visit.ids <- (num.returns %>% dplyr::filter(num.returns == 0))
   single.visit.ids <- single.visit.ids$PrimaryMedicalRecordNumber
   
   
@@ -53,13 +54,13 @@ calculateTimeLapse <- function(wellSoft, reg_codes, data.path) {
   num.returns <- num.returns[!duplicated(num.returns$PrimaryMedicalRecordNumber),
                                        c("PrimaryMedicalRecordNumber", "num.returns")]
   
-  N.visits <- nrow(num.returns)
-  mean.visits <- mean(num.returns$num.returns); median.visits <- median(num.returns$num.returns)
-  unique.PMRN <- num.returns[order(-num.returns$num.returns),]$PrimaryMedicalRecordNumber
+  N.visits <- sum(num.returns$num.returns+1)
+  mean.visits <- mean(num.returns$num.returns+1); median.visits <- median(num.returns$num.returns+1)
+  unique.PMRN <- num.returns$PrimaryMedicalRecordNumber
   
   print(paste("There were", N.visits, "unique patients between", min(all_data$Arrival_Time_9, na.rm=T), "and", max(all_data$Arrival_Time_9, na.rm=T)))
-  print(paste("There were", nrow(all_data), "total visits"))
   print(paste("The average number of visits was", mean.visits))
+  print(paste("The median number of visits was", median.visits))
   
   
   
@@ -67,8 +68,10 @@ calculateTimeLapse <- function(wellSoft, reg_codes, data.path) {
   
   rel.ids <- unique.PMRN[!unique.PMRN %in% single.visit.ids]
   
+  stopifnot((length(rel.ids) + length(single.visit.ids)) == length(unique.PMRN))
+  
 
-  num.rows <- sum((num.returns %>% filter(PrimaryMedicalRecordNumber %in% rel.ids))$num.returns) - length(rel.ids)
+  num.rows <- sum(((num.returns %>% filter(PrimaryMedicalRecordNumber %in% rel.ids))$num.returns)+1) - length(rel.ids)
   
   time.lapse <- data.frame(matrix(ncol = 4, nrow = (num.rows)))
 
@@ -113,12 +116,12 @@ calculateTimeLapse <- function(wellSoft, reg_codes, data.path) {
   
 }
 
-#data.path <- "/home/lebo/mybigdata/data/"
-data.path <- "./data/wellSoft_DATA/"
-source(paste0(data.path, 'dischargeCategories.R'))
-library(data.table)
-library(dplyr)
 
-reg_codes <- fread(paste0(data.path, "processedRegistrationCodes.csv"))
-wellSoft <- fread(paste0(data.path, "cleaned_wellSoft.csv"))
-timeLapse <- calculateTimeLapse(wellSoft, reg_codes, data.path)
+# data.path <- "./data/wellSoft_DATA/"
+# source(paste0(data.path, 'dischargeCategories.R'))
+# library(data.table)
+# library(dplyr)
+# 
+# reg_codes <- fread(paste0(data.path, "processedRegistrationCodes.csv"))
+# wellSoft <- fread(paste0(data.path, "cleaned_wellSoft.csv"))
+# timeLapse <- calculateTimeLapse(wellSoft, reg_codes, data.path)
