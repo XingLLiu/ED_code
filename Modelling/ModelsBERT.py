@@ -502,31 +502,32 @@ else:
 
 
 # ----------------------------------------------------
-# Set optimizer and data loader
-
-# Load model
-model = BertModel.from_pretrained(CACHE_DIR, cache_dir=CACHE_DIR)
-_ = model.to(device)
-
-# Optimizers
-param_optimizer = list(model.named_parameters())
-no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-optimizer_grouped_parameters = [
-    {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-    {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-]
-
-optimizer = BertAdam(optimizer_grouped_parameters,
-                     lr=LEARNING_RATE,
-                     warmup=WARMUP_PROPORTION,
-                     t_total=num_train_optimization_steps)
-
-
-# logger.info("***** Running training *****")
-# logger.info("  Num examples = %d", train_examples_len)
-# logger.info("  Batch size = %d", TRAIN_BATCH_SIZE)
-# logger.info("  Num steps = %d", num_train_optimization_steps)
 if MODE == "train" or MODE == "train_test":
+    # Fine-tuning
+
+    # Set optimizer and data loader
+    # Load model
+    model = BertModel.from_pretrained(CACHE_DIR, cache_dir=CACHE_DIR)
+    _ = model.to(device)
+
+    # Optimizers
+    param_optimizer = list(model.named_parameters())
+    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+    optimizer_grouped_parameters = [
+        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+    ]
+
+    optimizer = BertAdam(optimizer_grouped_parameters,
+                        lr=LEARNING_RATE,
+                        warmup=WARMUP_PROPORTION,
+                        t_total=num_train_optimization_steps)
+
+
+    # logger.info("***** Running training *****")
+    # logger.info("  Num examples = %d", train_examples_len)
+    # logger.info("  Batch size = %d", TRAIN_BATCH_SIZE)
+    # logger.info("  Num steps = %d", num_train_optimization_steps)
     print("***** Running training *****")
     print("  Num examples = {}".format( len(trainData) ) )
     print("  Batch size = {}".format( TRAIN_BATCH_SIZE ) )
@@ -548,7 +549,7 @@ if MODE == "train" or MODE == "train_test":
     global_step = 0
     nb_tr_steps = 0
     tr_loss = 0
-    loss_vec = np.zeros(NUM_TRAIN_EPOCHS * len(train_dataloader))
+    loss_vec = np.zeros(NUM_TRAIN_EPOCHS * (len(train_dataloader) // 100))
 
     prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
     loss_func = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT]))
@@ -579,9 +580,10 @@ if MODE == "train" or MODE == "train_test":
                 optimizer.zero_grad()
                 optimizer.step()
                 global_step += 1
-            if (i + 1) % 100 == 0 :
-                print("Epoch: {}/{}, Step: [{}/{}], Loss: {:.4f}".
-                    format(epoch + 1, NUM_TRAIN_EPOCHS, i+1, len(train_dataloader), loss.item()))
+            if (i + 1) % 100 == 0:
+                loss_vec[epoch * len(train_dataloader) // 100 + i // 100] = loss.item()
+                # print("Epoch: {}/{}, Step: [{}/{}], Loss: {:.4f}".
+                #     format(epoch + 1, NUM_TRAIN_EPOCHS, i+1, len(train_dataloader), loss.item()))
 
 
     # ----------------------------------------------------
@@ -595,6 +597,8 @@ if MODE == "train" or MODE == "train_test":
     torch.save(model_to_save.state_dict(), output_model_file)
     model_to_save.config.to_json_file(output_config_file)
     tokenizer.save_vocabulary(OUTPUT_DIR)
+
+    pickle.dump(loss_vec, open(OUTPUT_DIR + "loss.pkl", 'wb'))
 
 
 
@@ -653,10 +657,7 @@ if MODE == "test" or MODE == "train_test":
         begin_ind = EVAL_BATCH_SIZE * i
         end_ind = np.min( [EVAL_BATCH_SIZE * (i + 1), len(eval_data)] )
         prob[begin_ind:end_ind] = pred_prob
-        # eval_loss += tmp_eval_loss.mean().item()
-        # eval_accuracy += tmp_eval_accuracy
-        # nb_eval_examples += input_ids.size(0)
-        # nb_eval_steps += 1
+
         if (i + 1) % 100 == 0 :
             print("Step: [{}/{}]".format(i+1, len(eval_dataloader)))
 
@@ -664,5 +665,7 @@ if MODE == "test" or MODE == "train_test":
     # Save predicted probabilities
     pickle.dump(prob, open(REPORTS_DIR + "predicted_probs.pkl", 'wb'))
     print("Complete and saved to {}".format(REPORTS_DIR))
+
+    roc = lr_roc_plot(yTest, prob, save_path = REPORTS_DIR + f'roc.eps')
 
 

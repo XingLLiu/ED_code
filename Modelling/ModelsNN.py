@@ -249,7 +249,7 @@ else:
                 201903, 201904, 201905]
     for month in timeSpan[2:]:
         # Construct train/test data
-        XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival, threshold = 201904, dynamic = True)
+        XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival, threshold = month, dynamic = True)
         print('Training for data before {} ...'.format(month))
         print('Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}].'
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ))
