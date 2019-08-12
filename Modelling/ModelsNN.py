@@ -315,12 +315,12 @@ else:
                 # Prediction
                 outputs = model(x)
                 # Probability of belonging to class 1
-                prob = transform(outputs)[:, 1]
-                _, yPred = torch.max(outputs.data, 1)
+                prob = transform(outputs)[:, 1].detach()
+        
         # Save results
-        # roc_plot(yTest, yPred, save_path = dynamic_plot_path + f'roc1_{month}.eps')
         nnRoc = lr_roc_plot(yTest, prob, save_path = dynamic_plot_path + f'roc2_{month}.eps', plot = False)
-        pd.DataFrame(nnRoc).to_csv(dynamic_plot_path + f'summary_{month}.csv', index=False)
+        summary = dynamic_summary(pd.DataFrame(nnRoc), yTest.sum(), len(yTest) - yTest.sum())
+        summary.to_csv(dynamic_plot_path + f'summary_{month}.csv', index=False)
         print('Completed prediction for {} \n'.format(month))
 
 

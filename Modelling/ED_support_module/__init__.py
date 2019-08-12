@@ -49,7 +49,7 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True,
              save_path = None):
     '''
     Plot the roc curve of a given test set and predictions
-    Input:  yTest = test set (pd.dataframe or series)
+    Input : yTest = test set (pd.dataframe or series)
             pred = predictions (pd.dataframe or seires)
     Output: ROC plot
     '''
@@ -73,7 +73,7 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True,
     if plot == True:
         plt.show()
     if show_results:
-        print(' precision: {} \n recall:    {} \n f1_score:  {} '.format(precision, recall, f1_score)) 
+        print(' precision: {} \n recall:    {} \n f1_score:  {} '.format(precision, recall, f1_score))
         print(' \nConfusion matrix:')
         print(confMat)
     return([precision, recall, f1_score, roc_auc])
@@ -113,7 +113,7 @@ def lr_roc_plot(yTest = None, proba = None, plot = True, title = ' ', n_pts = 51
         plt.close()
     if plot == True:
         plt.show()
-    return({'tpr':tprLst, 'fpr':fprLst})
+    return({'TPR':tprLst, 'FPR':fprLst})
 
 
 def if_roc_plot(yTest = None, score = None, plot = True,
@@ -153,7 +153,7 @@ def if_roc_plot(yTest = None, score = None, plot = True,
         _ = plt.ylabel('True Positive Rate')
         _ = plt.xlabel('False Positive Rate')
         plt.show()
-    return({'tpr':tprLst, 'fpr':fprLst})
+    return({'TPR':tprLst, 'FPR':fprLst})
 
 
 # Show various metrics
@@ -217,7 +217,9 @@ def TFIDF(EPIC_CUI, EPIC_enc):
             if cui in notes:
                 triageNotes[cui] += 1
     # Create TF-IDF dataframe
-    triageDf = pd.DataFrame(index = range(len(EPIC_CUI)), columns = range(len(triageNotes)), dtype = 'float')
+    triageDf = pd.DataFrame(index = range(len(EPIC_CUI)),
+                            columns = range(len(triageNotes)),
+                            dtype = 'float')
     triageDf.iloc[:, :] = 0
     triageDf.columns = triageNotes.keys()
     triageDf.index = EPIC_enc.index
@@ -244,7 +246,8 @@ def TFIDF(EPIC_CUI, EPIC_enc):
 
 
 # Prediction with VAE
-def vaePredict(loss_train = None, loss_test = None, batch_size = None, sample_size = 1000, k = 1, percent = 0.1):
+def vaePredict(loss_train = None, loss_test = None, batch_size = None, 
+               sample_size = 1000, k = 1, percent = 0.1):
     '''
     Make prediction based on the train loss and the test loss.
     Threshold is set to be mu + k * std, where mu and std are computed
@@ -295,4 +298,21 @@ def time_split(data, threshold = 201903, dynamic = False, pred_span = 1):
     XTrain = XTrain.drop(['Arrived'], axis = 1)
     XTest = XTest.drop(['Arrived'], axis = 1)
     return(XTrain, XTest, yTrain, yTest)
+
+
+# Save summary results for dynamic training/testing
+def dynamic_summary(summary, p_num, n_num):
+    '''
+    Return a dataframe with the TPR, FPR, TP, FN, FP, TN .
+    Input : summary = a dataframe with TPR and FPR (colnames: tpr, fpr, respectively.)
+            p_num = number of positives in the test set
+            n_num = number of negatives in the test set
+    '''
+    # Compute no. of TP and FN
+    summary['TP'] = (summary['TPR'] * p_num).round().astype('int')
+    summary['FN'] = p_num - summary['TP']
+    # Compute no. of FP and TN
+    summary['FP'] = (summary['FPR'] * n_num).round().astype('int')
+    summary['TN'] = n_num - summary['FP']
+    return(summary)
 

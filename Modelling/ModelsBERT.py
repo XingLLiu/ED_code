@@ -611,6 +611,7 @@ if MODE == "test" or MODE == "train_test":
     # Load fine-tuned model
     tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR + 'vocab.txt', do_lower_case=False)
     processor = BinaryClassificationProcessor()
+
     # Testing
     # Set test set loaders
     eval_examples = processor.get_dev_examples(processed_save_dir)
@@ -619,19 +620,23 @@ if MODE == "test" or MODE == "train_test":
     logger.info("***** Running evaluation *****")
     logger.info("  Num examples = %d", len(eval_examples))
     logger.info("  Batch size = %d", EVAL_BATCH_SIZE)
+
     # Integrate data into required format
     all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
     all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
     all_label_ids = torch.tensor([f.label_id for f in eval_features], dtype=torch.long)
     eval_data = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+
     # Run prediction for full data
     eval_sampler = torch.utils.data.SequentialSampler(eval_data)
     eval_dataloader = torch.utils.data.DataLoader(eval_data, sampler=eval_sampler, batch_size=EVAL_BATCH_SIZE)
+
     # Load pre-trained model (weights)
     model = BertModel.from_pretrained(OUTPUT_DIR + f"{TASK_NAME}.tar.gz",cache_dir=OUTPUT_DIR)
     _ = model.to(device)
-    # Final set up 
+
+    # Final setup
     sigmoid_func = nn.Sigmoid()
     prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
     _ = model.eval()
@@ -644,15 +649,18 @@ if MODE == "test" or MODE == "train_test":
         input_mask = input_mask.to(device)
         segment_ids = segment_ids.to(device)
         label_ids = label_ids.to(device)
+
         # Evaluate loss
         with torch.no_grad():
             encoded_layers, pooled_output = model(input_ids, segment_ids, input_mask)
             logits = prediction_head(pooled_output)
+            
             # Evaluation metric
             logits = logits.detach().cpu().numpy()
             logits = torch.from_numpy(logits[:, 1])
             pred_prob = sigmoid_func(logits)
             label_ids = label_ids.to('cpu').numpy()
+
         # Store predicted probabilities
         begin_ind = EVAL_BATCH_SIZE * i
         end_ind = np.min( [EVAL_BATCH_SIZE * (i + 1), len(eval_data)] )
