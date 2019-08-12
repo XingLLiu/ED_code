@@ -658,7 +658,7 @@ if MODE == "test" or MODE == "train_test":
         # nb_eval_examples += input_ids.size(0)
         # nb_eval_steps += 1
         if (i + 1) % 100 == 0 :
-            print("Step: [{}/{}]".format(i+1, len(test_dataloader)))
+            print("Step: [{}/{}]".format(i+1, len(eval_dataloader)))
 
 
     # Save predicted probabilities

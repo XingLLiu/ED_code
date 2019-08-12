@@ -21,6 +21,7 @@ import torchvision
 from torchvision import transforms
 import sys
 import datetime
+from tqdm import tqdm, trange
 
 
 plt.style.use('seaborn')
@@ -253,11 +254,6 @@ def vaePredict(loss_train = None, loss_test = None, batch_size = None, sample_si
             k = parameter for setting the threshold
     '''
     # Set threshold
-    # mu = (loss_train[-sample_size:] / batch_size).mean()
-    # std = np.sqrt( ( loss_train[-sample_size:] / batch_size ).var() )
-    # threshold = mu + k * std
-    ## Outlier if loss > threshold
-    # yPred = loss_test > threshold
     testLossSorted = np.sort(loss_test)
     threshold = testLossSorted[-int( np.ceil( percent * len(loss_test) ) )]
     yPred = loss_test > threshold
@@ -265,7 +261,7 @@ def vaePredict(loss_train = None, loss_test = None, batch_size = None, sample_si
 
 
 # Train-test split by arrival date
-def time_split(data, threshold = 201903):
+def time_split(data, threshold = 201903, dynamic = False, pred_span = 1):
     '''
     Sort data by the feature 'Arrived' and output train and test sets
     as specified by threshold.
@@ -277,7 +273,16 @@ def time_split(data, threshold = 201903):
     data = data.sort_values(by = ['Arrived'])
     # Split by threshold
     train = data.loc[data['Arrived'] <= threshold]
-    test = data.loc[data['Arrived'] > threshold]
+    if not dynamic:
+        test = data.loc[data['Arrived'] > threshold]
+    else:
+        # Make ending month to the format XX
+        end_threshold = str( int(str(threshold)[-2:]) % 12 + pred_span ).zfill(2)
+        end_threshold = int( str(threshold)[:-2] + end_threshold )
+        selector = data['Arrived'] == end_threshold
+        if selector.sum() == 0:
+            raise ValueError('No data between {} and {}'.format(threshold, end_threshold))
+        test = data.loc[selector]
     yTrain = train['Primary.Dx']
     XTrain = train.drop(['Primary.Dx'], axis = 1)
     yTest = test['Primary.Dx']
