@@ -139,8 +139,8 @@ ifSepsis = ifSepsis1 | ifSepsis2 | ifSepsis3
 
 # Convert into binary class
 # Note: patients only healthy w.r.t. Sepsis
-EPIC['Primary.Dx'][-ifSepsis] = 0
-EPIC['Primary.Dx'][ifSepsis] = 1
+EPIC.loc[-ifSepsis, 'Primary.Dx'] = 0
+EPIC.loc[ifSepsis, 'Primary.Dx'] = 1
 EPIC['Primary.Dx'] = EPIC['Primary.Dx'].astype('int')
 
 

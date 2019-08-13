@@ -2,17 +2,18 @@
 # Up to seven inputs:
 # 1. mode
 # 2. random seed
-# 3. train-test splitting method (True/False)
+# 3. dynamic train-test splitting (True/False)
 # 4. no. of epochs
 # 5. batch size
 # 6. learning rate
 # 7. class weight
+# 8. dropout probability
 #
 # To run: python ModelsNN.py b 27 "True" 4000 128 1e-3 3000 0.1
 # ----------------------------------------------------
 # Command arguments: mode, no. of epochs, batch size, learning rate
-from ED_support_module import *                                
-from EDA import EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival, numCols, catCols 
+from ED_support_module import *
+from EDA import EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival, numCols, catCols
 
 
 # ----------------------------------------------------
@@ -118,7 +119,7 @@ class NeuralNet(nn.Module):
         h = self.fc1(h)
         h = self.ac1(h)
         return self.fc2(h)
-    
+
 
 # ----------------------------------------------------
 # Prepare taining set
@@ -133,7 +134,9 @@ if not useTime:
     y = EPIC_enc['Primary.Dx']
     X = EPIC_enc.drop('Primary.Dx', axis = 1)
     XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25,
-                                   random_state=seed, stratify=y)
+                                    random_state=seed, stratify=y)
+    XTrain, XValid, yTrain, yValid = sk.model_selection.train_test_split(XTrain, yTrain, test_size=0.15,
+                                    random_state=seed, stratify=yTrain)
 else:
     XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival, threshold = 201904)
     print("Train size: {}. Test size: {}".format(len(yTrain), len(yTest)))
@@ -159,17 +162,19 @@ if mode in ['b', 'd', 'e', 'f']:
     XTrainNum.index, XTestNum.index = XTrain.index, XTest.index
 
 
-# Construct data loaders
-trainLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
-                                           batch_size = batch_size,
-                                           shuffle = False)
-testLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yTest], axis = 1)),
-                                           batch_size = len(yTest),
-                                           shuffle = False)
-
-
 # ----------------------------------------------------
 if not useTime:
+    # Construct data loaders
+    trainLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
+                                              batch_size = batch_size,
+                                              shuffle = False)
+    testLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yTest], axis = 1)),
+                                             batch_size = len(yTest),
+                                             shuffle = False)
+    validLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XValid, yValid], axis = 1)),
+                                             batch_size = len(yValid),
+                                             shuffle = False)
+
     # Neural net model
     input_size = XTrain.shape[1]
     model = NeuralNet(input_size = input_size, drop_prob = drop_prob).to(device)
@@ -180,10 +185,12 @@ if not useTime:
     optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 
     # Train the model
-    total_step = len(trainLoader)
+    # total_step = len(trainLoader)
     # lossVec = np.zeros( num_epochs * (total_step//100) )
-    lossVec = np.zeros(num_epochs)
+    trainLossVec = np.zeros(num_epochs)
+    validLossVec = np.zeros(num_epochs)
     for epoch in range(num_epochs):
+        model.train()
         for i, x in enumerate(trainLoader):
             # Retrieve design matrix and labels
             labels = x[:, -1].long()
@@ -198,17 +205,36 @@ if not useTime:
             # if (i+1) % 100 == 0:
             #     # Store losses
             #     ind = epoch * (total_step//100) + (i + 1)//100 - 1
-            #     lossVec[ind] = loss
+            #     trainLossVec[ind] = loss
             #     print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
             #            .format(epoch+1, num_epochs, i+1, total_step, loss.item()))
         
-        lossVec[epoch] = loss
+        model.eval()
+        transform = nn.Sigmoid()
+        with torch.no_grad():
+            correct = 0
+            total = 0
+            for x in validLoader:
+                # Retrieve design matrix and labels
+                labels = x[:, -1].long()
+                x = x[:, :(-1)].float()
+                # Prediction
+                outputs = model(x)
+                loss_valid = criterion(outputs, labels)
+                # Probability of belonging to class 1
+                prob = transform(outputs)[:, 1]
+                _, yPred = torch.max(outputs.data, 1)
+
+        trainLossVec[epoch] = loss.item()
+        validLossVec[epoch] = loss_valid.item()
         print ('Epoch [{}/{}], Loss: {:.4f}'.format(epoch+1, num_epochs, loss.item()))
 
 
     # Plot losses
-    _ = sns.scatterplot(x = range(len(lossVec)), y = lossVec)
-    plt.savefig(plot_path + 'losses.eps', format='eps', dpi=1000)
+    _ = sns.scatterplot(x = range(len(trainLossVec)), y = trainLossVec, label = 'Train')
+    _ = sns.scatterplot(x = range(len(validLossVec)), y = validLossVec, label = 'Validation')
+    _ = plt.legend()
+    plt.savefig(plot_path + 'train_valid_loss.eps', format='eps', dpi=1000)
     plt.show()
 
 
@@ -220,8 +246,7 @@ if not useTime:
         correct = 0
         total = 0
         for x in testLoader:
-            # Retrieve design matrix and labels
-            labels = x[:, -1].long()
+            # Retrieve design matrix
             x = x[:, :(-1)].float()
             # Prediction
             outputs = model(x)
@@ -234,8 +259,8 @@ if not useTime:
     roc_plot(yTest, yPred, save_path = plot_path + 'roc1.eps')
     nnRoc = lr_roc_plot(yTest, prob, save_path = plot_path + 'roc2.eps')
 
-    nnTpr = nnRoc['tpr']
-    nnFpr = nnRoc['fpr']
+    nnTpr = nnRoc['TPR']
+    nnFpr = nnRoc['FPR']
     print( '\nWith TNR:{}, TPR:{}'.format( round( 1 - nnFpr[5], 4), round(nnTpr[5], 4) ) )
 
 
@@ -244,10 +269,18 @@ if not useTime:
 else:
     print('Dynamically evaluate the model.')
 
+    # Construct data loaders
+    trainLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
+    batch_size = batch_size,
+    shuffle = False)
+    testLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yTest], axis = 1)),
+    batch_size = len(yTest),
+    shuffle = False)
+
     # Time span (3 months of data to up-to-date month - 1)
     timeSpan = [201807, 201808, 201809, 201810, 201811, 201812, 201901, 201902,
                 201903, 201904, 201905]
-    for month in timeSpan[2:]:
+    for j, month in enumerate(timeSpan[2:]):
         # Construct train/test data
         XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival, threshold = month, dynamic = True)
         print('Training for data before {} ...'.format(month))
@@ -263,7 +296,7 @@ else:
         # PCA on the numerical entries   # 27, 11  # Without PCA: 20, 18
         if mode in ['b', 'd', 'e', 'f']:
             if mode in ['f']:
-                # Sparse PCA 
+                # Sparse PCA
                 pca = sk.decomposition.SparsePCA(int(np.ceil(XTrainNum.shape[1]/2))).fit(XTrainNum)
             elif mode in ['b', 'd', 'e']:
                 pca = sk.decomposition.PCA(0.95).fit(XTrainNum)
@@ -272,11 +305,11 @@ else:
             XTrainNum.index, XTestNum.index = XTrain.index, XTest.index
         # Construct data loaders
         trainLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
-                                                    batch_size = batch_size,
-                                                    shuffle = False)
+                                                  batch_size = batch_size,
+                                                  shuffle = False)
         testLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yTest], axis = 1)),
-                                                    batch_size = len(yTest),
-                                                    shuffle = False)
+                                                 batch_size = len(yTest),
+                                                 shuffle = False)
         # Neural net model
         input_size = XTrain.shape[1]
         model = NeuralNet(input_size = input_size, drop_prob = drop_prob).to(device)
@@ -285,7 +318,6 @@ else:
         criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, weight]))
         optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
         # Train the model
-        total_step = len(trainLoader)
         lossVec = np.zeros(num_epochs)
         for epoch in trange(num_epochs):
             for i, x in enumerate(trainLoader):
@@ -316,11 +348,12 @@ else:
                 outputs = model(x)
                 # Probability of belonging to class 1
                 prob = transform(outputs)[:, 1].detach()
-        
+
         # Save results
-        nnRoc = lr_roc_plot(yTest, prob, save_path = dynamic_plot_path + f'roc2_{month}.eps', plot = False)
+        month_new = timeSpan[j + 1]
+        nnRoc = lr_roc_plot(yTest, prob, save_path = dynamic_plot_path + f'roc2_{month_new}.eps', plot = False)
         summary = dynamic_summary(pd.DataFrame(nnRoc), yTest.sum(), len(yTest) - yTest.sum())
-        summary.to_csv(dynamic_plot_path + f'summary_{month}.csv', index=False)
-        print('Completed prediction for {} \n'.format(month))
+        summary.to_csv(dynamic_plot_path + f'summary_{month_new}.csv', index=False)
+        print('Completed prediction for {} \n'.format(month_new))
 
 

@@ -4,7 +4,7 @@
 # 2. mode: train, test, train_test
 # ----------------------------------------------------
 from __future__ import absolute_import, division, print_function
-from ED_support_module import *                                
+from ED_support_module import *
 sys.path.append("../ClinicalNotePreProcessing")
 from extract_dates_script import findDates
 import csv
@@ -215,7 +215,6 @@ if CLEAN_NOTES == True:
     # Clean text
     for col in notesCols:
         print("Cleaning {}".format(col))
-        # EPIC.loc[ii, col] = clean_text(EPIC.loc[ii, col])
         EPIC.loc[:, col] = list(map(clean_text, EPIC[col]))
     # Save data
     if len(notesCols) == 1:
