@@ -69,7 +69,7 @@ WEIGHT = 1000
 TRAIN_BATCH_SIZE = 32 # 128
 EVAL_BATCH_SIZE = 32
 LEARNING_RATE = 1e-3
-NUM_TRAIN_EPOCHS = 3
+NUM_TRAIN_EPOCHS = 2
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
 WARMUP_PROPORTION = 0.1
@@ -518,10 +518,11 @@ if MODE == "train" or MODE == "train_test":
         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
 
-    optimizer = BertAdam(optimizer_grouped_parameters,
-                        lr=LEARNING_RATE,
-                        warmup=WARMUP_PROPORTION,
-                        t_total=num_train_optimization_steps)
+    # optimizer = BertAdam(optimizer_grouped_parameters,
+    #                     lr=LEARNING_RATE,
+    #                     warmup=WARMUP_PROPORTION,
+    #                     t_total=num_train_optimization_steps)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 
     # logger.info("***** Running training *****")
