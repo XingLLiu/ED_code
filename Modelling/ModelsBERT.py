@@ -69,7 +69,7 @@ WEIGHT = 1000
 TRAIN_BATCH_SIZE = 32 # 128
 EVAL_BATCH_SIZE = 32
 LEARNING_RATE = 1e-3
-NUM_TRAIN_EPOCHS = 3
+NUM_TRAIN_EPOCHS = 2
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
 WARMUP_PROPORTION = 0.1
@@ -517,10 +517,11 @@ if MODE == "train" or MODE == "train_test":
         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
 
-    optimizer = BertAdam(optimizer_grouped_parameters,
-                        lr=LEARNING_RATE,
-                        warmup=WARMUP_PROPORTION,
-                        t_total=num_train_optimization_steps)
+    # optimizer = BertAdam(optimizer_grouped_parameters,
+    #                     lr=LEARNING_RATE,
+    #                     warmup=WARMUP_PROPORTION,
+    #                     t_total=num_train_optimization_steps)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 
     # logger.info("***** Running training *****")
@@ -551,19 +552,22 @@ if MODE == "train" or MODE == "train_test":
     loss_vec = np.zeros(NUM_TRAIN_EPOCHS * (len(train_dataloader) // 10))
 
     prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
+    _ = prediction_head.to(device)
     loss_func = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT]))
+    _ = loss_func.to(device)
     _ = model.train()
     _ = prediction_head.train()
     print("Start fine-tuning ...")
     for epoch in range(NUM_TRAIN_EPOCHS):
         tr_loss = 0
         nb_tr_examples, nb_tr_steps = 0, 0
-        for i, batch in enumerate(train_dataloader):
+        for i, batch in enumerate(tqdm(train_dataloader)):
             # Get batch
             batch = tuple(t.to(device) for t in batch)
             input_ids, input_mask, segment_ids, label_ids = batch
             encoded_layers, pooled_output = model(input_ids, segment_ids, input_mask)
-            logits = prediction_head(pooled_output)
+            logits = prediction_head(pooled_output.to(device))
+            logits = logits.to(device)
             # Compute loss
             loss = loss_func(logits, label_ids)
             if NUM_GPU > 1:
@@ -574,7 +578,6 @@ if MODE == "train" or MODE == "train_test":
             tr_loss += loss.item()
             nb_tr_examples += input_ids.size(0)
             nb_tr_steps += 1
-            loss_vec[epoch * len(train_dataloader) + i] = loss.item()
             if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
                 optimizer.zero_grad()
                 optimizer.step()
@@ -605,7 +608,6 @@ if MODE == "train" or MODE == "train_test":
 # ----------------------------------------------------
 if MODE == "test" or MODE == "train_test":
     # Set path
-    # OUTPUT_DIR = save_dir + f'Saved_Checkpoints/{TASK_NAME}/'
     BERT_MODEL = OUTPUT_DIR + f"{TASK_NAME}.tar.gz"
     # Load fine-tuned model
     tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR + 'vocab.txt', do_lower_case=False)
@@ -633,12 +635,13 @@ if MODE == "test" or MODE == "train_test":
 
     # Load pre-trained model (weights)
     model = BertModel.from_pretrained(OUTPUT_DIR + f"{TASK_NAME}.tar.gz",cache_dir=OUTPUT_DIR)
+    prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
     _ = model.to(device)
+    _ = model.eval()
+    _ = prediction_head.to(device)
 
     # Final setup
     sigmoid_func = nn.Sigmoid()
-    prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
-    _ = model.eval()
     prob = np.zeros(len(eval_data))
     eval_loss, eval_accuracy = 0, 0
     nb_eval_steps, nb_eval_examples = 0, 0
@@ -652,6 +655,7 @@ if MODE == "test" or MODE == "train_test":
         # Evaluate loss
         with torch.no_grad():
             encoded_layers, pooled_output = model(input_ids, segment_ids, input_mask)
+            pooled_output = pooled_output.to(device)
             logits = prediction_head(pooled_output)
             
             # Evaluation metric
@@ -665,14 +669,11 @@ if MODE == "test" or MODE == "train_test":
         end_ind = np.min( [EVAL_BATCH_SIZE * (i + 1), len(eval_data)] )
         prob[begin_ind:end_ind] = pred_prob
 
-        if (i + 1) % 100 == 0 :
-            print("Step: [{}/{}]".format(i+1, len(eval_dataloader)))
-
 
     # Save predicted probabilities
     pickle.dump(prob, open(REPORTS_DIR + "predicted_probs.pkl", 'wb'))
     print("Complete and saved to {}".format(REPORTS_DIR))
 
-    roc = lr_roc_plot(yTest, prob, save_path = REPORTS_DIR + f'roc.eps')
+    roc = lr_roc_plot(yTest, prob, save_path = REPORTS_DIR + f'roc.eps', plot = False)
 
 
