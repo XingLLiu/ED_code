@@ -552,7 +552,9 @@ if MODE == "train" or MODE == "train_test":
     loss_vec = np.zeros(NUM_TRAIN_EPOCHS * (len(train_dataloader) // 10))
 
     prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
+    _ = prediction_head.to(device)
     loss_func = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT]))
+    _ = loss_func.to(device)
     _ = model.train()
     _ = prediction_head.train()
     print("Start fine-tuning ...")
@@ -564,7 +566,8 @@ if MODE == "train" or MODE == "train_test":
             batch = tuple(t.to(device) for t in batch)
             input_ids, input_mask, segment_ids, label_ids = batch
             encoded_layers, pooled_output = model(input_ids, segment_ids, input_mask)
-            logits = prediction_head(pooled_output)
+            logits = prediction_head(pooled_output.to(device))
+            logits = logits.to(device)
             # Compute loss
             loss = loss_func(logits, label_ids)
             if NUM_GPU > 1:
@@ -575,7 +578,6 @@ if MODE == "train" or MODE == "train_test":
             tr_loss += loss.item()
             nb_tr_examples += input_ids.size(0)
             nb_tr_steps += 1
-            loss_vec[epoch * len(train_dataloader) + i] = loss.item()
             if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
                 optimizer.zero_grad()
                 optimizer.step()
