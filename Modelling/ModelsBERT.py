@@ -549,7 +549,7 @@ if MODE == "train" or MODE == "train_test":
     global_step = 0
     nb_tr_steps = 0
     tr_loss = 0
-    loss_vec = np.zeros(NUM_TRAIN_EPOCHS * (len(train_dataloader) // 100))
+    loss_vec = np.zeros(NUM_TRAIN_EPOCHS * (len(train_dataloader) // 10))
 
     prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
     loss_func = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT]))
@@ -580,8 +580,8 @@ if MODE == "train" or MODE == "train_test":
                 optimizer.zero_grad()
                 optimizer.step()
                 global_step += 1
-            if (i + 1) % 100 == 0:
-                loss_vec[epoch * len(train_dataloader) // 100 + i // 100] = loss.item()
+            if (i + 1) % 10 == 0:
+                loss_vec[epoch * len(train_dataloader) // 10 + i // 10] = loss.item()
                 # print("Epoch: {}/{}, Step: [{}/{}], Loss: {:.4f}".
                 #     format(epoch + 1, NUM_TRAIN_EPOCHS, i+1, len(train_dataloader), loss.item()))
 
