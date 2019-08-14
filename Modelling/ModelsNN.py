@@ -17,6 +17,20 @@ from EDA import EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival, numCols, catCols
 
 
 # ----------------------------------------------------
+# Set arguments
+def setup_parser():
+    parser = argparse.ArgumentParser()
+
+    # Required arguments
+    parser.add_argument("--mode",
+                        default="a",
+                        type=str,
+                        required=True,
+                        help="The mode to be used.")
+    return parser
+    
+
+# ----------------------------------------------------
 # Choose preprocessing pipeline
 '''
 Choose mode:
@@ -128,18 +142,20 @@ if mode not in ['a', 'b']:
 
 
 # Split using stratified sampling or arrival time
-if not useTime:
-    # Stratified splitting
-    # Separate input features and target
-    y = EPIC_enc['Primary.Dx']
-    X = EPIC_enc.drop('Primary.Dx', axis = 1)
-    XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25,
-                                    random_state=seed, stratify=y)
-    XTrain, XValid, yTrain, yValid = sk.model_selection.train_test_split(XTrain, yTrain, test_size=0.15,
-                                    random_state=seed, stratify=yTrain)
-else:
-    XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival, threshold = 201904)
-    print("Train size: {}. Test size: {}".format(len(yTrain), len(yTest)))
+# if not useTime:
+
+# Stratified splitting
+# Separate input features and target
+y = EPIC_enc['Primary.Dx']
+X = EPIC_enc.drop('Primary.Dx', axis = 1)
+XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25,
+                                random_state=seed, stratify=y)
+XTrain, XValid, yTrain, yValid = sk.model_selection.train_test_split(XTrain, yTrain, test_size=0.15,
+                                random_state=seed, stratify=yTrain)
+
+# else:
+#     XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival, threshold = 201904)
+#     print("Train size: {}. Test size: {}".format(len(yTrain), len(yTest)))
 
 
 # Separate the numerical and categorical features
@@ -202,12 +218,6 @@ if not useTime:
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            # if (i+1) % 100 == 0:
-            #     # Store losses
-            #     ind = epoch * (total_step//100) + (i + 1)//100 - 1
-            #     trainLossVec[ind] = loss
-            #     print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
-            #            .format(epoch+1, num_epochs, i+1, total_step, loss.item()))
         
         model.eval()
         transform = nn.Sigmoid()
@@ -269,40 +279,39 @@ if not useTime:
 else:
     print('Dynamically evaluate the model.')
 
-    # Construct data loaders
-    trainLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
-    batch_size = batch_size,
-    shuffle = False)
-    testLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yTest], axis = 1)),
-    batch_size = len(yTest),
-    shuffle = False)
-
     # Time span (3 months of data to up-to-date month - 1)
     timeSpan = [201807, 201808, 201809, 201810, 201811, 201812, 201901, 201902,
-                201903, 201904, 201905]
+                201903, 201904, 201905, 201906]
     for j, month in enumerate(timeSpan[2:]):
         # Construct train/test data
+        if mode not in ['a', 'b']:
+            EPIC_enc, cuiCols = TFIDF(EPIC_CUI, EPIC_enc)
+            EPIC_arrival = pd.concat([EPIC_enc, EPIC_arrival['Arrived']], axis = 1)
+
         XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival, threshold = month, dynamic = True)
+
         print('Training for data before {} ...'.format(month))
         print('Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}].'
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ))
-        # Skip if no data in the month
 
         # Separate the numerical and categorical features
         if mode in ['c', 'e', 'f']:
             numCols = numCols + list(cuiCols)
         XTrainNum = XTrain[numCols]
         XTestNum = XTest[numCols]
-        # PCA on the numerical entries   # 27, 11  # Without PCA: 20, 18
+        # PCA on the numerical entries
         if mode in ['b', 'd', 'e', 'f']:
             if mode in ['f']:
                 # Sparse PCA
                 pca = sk.decomposition.SparsePCA(int(np.ceil(XTrainNum.shape[1]/2))).fit(XTrainNum)
             elif mode in ['b', 'd', 'e']:
                 pca = sk.decomposition.PCA(0.95).fit(XTrainNum)
+
+            # Transfered numerical columns
             XTrainNum = pd.DataFrame(pca.transform(XTrainNum))
             XTestNum = pd.DataFrame(pca.transform(XTestNum))
             XTrainNum.index, XTestNum.index = XTrain.index, XTest.index
+
         # Construct data loaders
         trainLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
                                                   batch_size = batch_size,
@@ -332,7 +341,7 @@ else:
                 loss.backward()
                 optimizer.step()
             lossVec[epoch] = loss
-        print("Training for data before {} completed.".format(month))
+        print("Training for data upto {} completed.".format(month))
         # ----------------------------------------------------
         # Test the model
         model.eval()
@@ -350,10 +359,10 @@ else:
                 prob = transform(outputs)[:, 1].detach()
 
         # Save results
-        month_new = timeSpan[j + 1]
-        nnRoc = lr_roc_plot(yTest, prob, save_path = dynamic_plot_path + f'roc2_{month_new}.eps', plot = False)
+        month_pred = timeSpan[j + 3]
+        nnRoc = lr_roc_plot(yTest, prob, save_path = dynamic_plot_path + f'roc2_{month_pred}.eps', plot = False)
         summary = dynamic_summary(pd.DataFrame(nnRoc), yTest.sum(), len(yTest) - yTest.sum())
-        summary.to_csv(dynamic_plot_path + f'summary_{month_new}.csv', index=False)
-        print('Completed prediction for {} \n'.format(month_new))
+        summary.to_csv(dynamic_plot_path + f'summary_{month_pred}.csv', index=False)
+        print('Completed prediction for {} \n'.format(month_pred))
 
 
