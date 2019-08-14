@@ -19,9 +19,9 @@ from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
 # ----------------------------------------------------
 # Directories for saving files
 path = '/home/xingliu/Documents/ED/data/EPIC_DATA/EPIC.csv'
-save_dir = '/'.join(path.split('/')[:-1]) + '/EPIC_for_Bert/'
-raw_save_dir = save_dir + 'Raw_Notes/'
-processed_save_dir = save_dir + 'Processed_Notes/'
+SAVE_DIR = '/'.join(path.split('/')[:-1]) + '/EPIC_for_Bert/'
+RAW_SAVE_DIR = SAVE_DIR + 'Raw_Notes/'
+PROCESSED_SAVE_DIR = SAVE_DIR + 'Processed_Notes/'
 
 
 # ----------------------------------------------------
@@ -52,20 +52,20 @@ BERT_MODEL = 'clinical_bert'
 TASK_NAME = 'epic_task'
 
 # The output directory where the fine-tuned model and checkpoints will be written.
-OUTPUT_DIR = save_dir + f'Saved_Checkpoints/{TASK_NAME}/'
+OUTPUT_DIR = SAVE_DIR + f'Saved_Checkpoints/{TASK_NAME}/'
 
 # The directory where the evaluation reports will be written to.
-REPORTS_DIR = save_dir + f'Reports/{TASK_NAME}_evaluation_report/'
+REPORTS_DIR = SAVE_DIR + f'Reports/{TASK_NAME}_evaluation_report/'
 
 # This is where BERT will look for pre-trained models to load parameters from.
 CACHE_DIR = '/'.join(path.split('/')[:-3]) + '/ClinicalBert/pretrained_bert_tf/biobert_pretrain_output_all_notes_150000/'
 
 # The maximum total input sequence length after WordPiece tokenization.
 # Sequences longer than this will be truncated, and sequences shorter than this will be padded.
-MAX_SEQ_LENGTH = 128
+MAX_SEQ_LENGTH = 512
 
 # Other model hyper-parameters
-WEIGHT = 1000
+WEIGHT = 2000
 TRAIN_BATCH_SIZE = 32 # 128
 EVAL_BATCH_SIZE = 32
 LEARNING_RATE = 1e-3
@@ -218,14 +218,14 @@ if CLEAN_NOTES == True:
         EPIC.loc[:, col] = list(map(clean_text, EPIC[col]))
     # Save data
     if len(notesCols) == 1:
-        EPIC.to_csv(raw_save_dir + 'EPIC_triage.csv', index=False)
+        EPIC.to_csv(RAW_SAVE_DIR + 'EPIC_triage.csv', index=False)
     else:
-        EPIC.to_csv(raw_save_dir + 'EPIC_all_notes.csv', index=False)
+        EPIC.to_csv(RAW_SAVE_DIR + 'EPIC_all_notes.csv', index=False)
     # Load data nonetheless to convert empty notes "" to nan
-    EPIC = pd.read_csv(raw_save_dir + 'EPIC_triage.csv')
+    EPIC = pd.read_csv(RAW_SAVE_DIR + 'EPIC_triage.csv')
 else:
     # Load data
-    EPIC = pd.read_csv(raw_save_dir + 'EPIC_triage.csv')
+    EPIC = pd.read_csv(RAW_SAVE_DIR + 'EPIC_triage.csv')
 
 
 # Fill in missing notes by CC
@@ -238,7 +238,7 @@ for col in notesCols:
     # Impute the remaining missing notes by 'none'
     if EPIC[col].isnull().sum() > 0:
         print('Impute the remaining missing notes by \'None.\' ')
-        EPIC[col][EPIC[col].isnull()] = '[CLS] None [SEP]'
+        EPIC.loc[EPIC[col].isnull(), col] = '[CLS] None [SEP]'
 
 
 # ----------------------------------------------------
@@ -259,15 +259,15 @@ trainBert = pd.DataFrame({
 })
 
 devBert = pd.DataFrame({
-    'id': range(XTest.shape[0]),
-    'label': yTest,
-    'alpha': ['a'] * XTest.shape[0],
-    'text': XTest['Note.Data_ED.Triage.Notes']
+            'id': range(XTest.shape[0]),
+            'label': yTest,
+            'alpha': ['a'] * XTest.shape[0],
+            'text': XTest['Note.Data_ED.Triage.Notes']
 })
 
 # Save data
-trainBert.to_csv(processed_save_dir + 'train.tsv', sep='\t', index=False, header=False)
-devBert.to_csv(processed_save_dir + 'dev.tsv', sep='\t', index=False, header=False)
+trainBert.to_csv(PROCESSED_SAVE_DIR + 'train.tsv', sep='\t', index=False, header=False)
+devBert.to_csv(PROCESSED_SAVE_DIR + 'dev.tsv', sep='\t', index=False, header=False)
 
 
 # ----------------------------------------------------
@@ -475,7 +475,7 @@ class NoteClassificationHead(nn.Module):
 # Prepare for fine-tuning
 # Load data
 processor = BinaryClassificationProcessor()
-trainData = processor.get_train_examples(processed_save_dir)
+trainData = processor.get_train_examples(PROCESSED_SAVE_DIR)
 labelList = processor.get_labels()
 
 num_train_optimization_steps = int(
@@ -590,7 +590,7 @@ if MODE == "train" or MODE == "train_test":
 
     # ----------------------------------------------------
     # Save model
-    model_to_save = model.module if hasattr(model, 'module') else model
+    model_to_save = model.module if hasattr(model, "module") else model
 
     # Save using the predefined names so that one can load using `from_pretrained`
     output_model_file = os.path.join(OUTPUT_DIR, WEIGHTS_NAME)
@@ -600,7 +600,12 @@ if MODE == "train" or MODE == "train_test":
     model_to_save.config.to_json_file(output_config_file)
     tokenizer.save_vocabulary(OUTPUT_DIR)
 
-    pickle.dump(loss_vec, open(OUTPUT_DIR + "loss.pkl", 'wb'))
+    # Save loss vector
+    pickle.dump(loss_vec, open(REPORTS_DIR + "loss.pkl", 'wb'))
+    # Save loss curve
+    _ = sns.scatterplot(x=range(len(loss_vec)), y=loss_vec)
+    _ = plt.title("Clinical BERT Train Loss")
+    plt.savefig(REPORTS_DIR + "train_loss.eps", format="eps", dpi=1000)
 
 
 
@@ -615,7 +620,7 @@ if MODE == "test" or MODE == "train_test":
 
     # Testing
     # Set test set loaders
-    eval_examples = processor.get_dev_examples(processed_save_dir)
+    eval_examples = processor.get_dev_examples(PROCESSED_SAVE_DIR)
     eval_features = convert_examples_to_features(eval_examples,
                         labelList, MAX_SEQ_LENGTH, tokenizer)
     logger.info("***** Running evaluation *****")
