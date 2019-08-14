@@ -457,15 +457,15 @@ class NoteClassificationHead(nn.Module):
     """
     Head layer for prediction.
     """
-    def __init__(self, hidden_size, dropout_prob=0.2, num_labels=2):
+    def __init__(self, hidden_size, dropout_prob=0.4, num_labels=2):
         super(NoteClassificationHead, self).__init__()
         self.num_labels = num_labels
         self.dropout = nn.Dropout(dropout_prob)
-        self.fc = nn.Linear(hidden_size, num_labels)
-        nn.init.xavier_normal_(self.fc.weight)
+        self.classifier = nn.Linear(hidden_size, num_labels)
+        nn.init.xavier_normal_(self.classifier.weight)
     def forward(self, pooled_output):
         pooled_output = self.dropout(pooled_output)
-        logits = self.fc(pooled_output)
+        logits = self.classifier(pooled_output)
         return logits
 
 
@@ -507,6 +507,9 @@ if MODE == "train" or MODE == "train_test":
     # Set optimizer and data loader
     # Load model
     model = BertModel.from_pretrained(CACHE_DIR, cache_dir=CACHE_DIR)
+    # Update weights of all embedding layers
+    for p in model.embeddings.parameters():
+        p.requires_grad = True
     _ = model.to(device)
 
     # Optimizers

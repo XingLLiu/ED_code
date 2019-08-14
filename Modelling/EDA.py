@@ -65,7 +65,7 @@ EPIC.columns = colNames
 # Print error warning if there is empty colname remaining
 for name in colNames:
     if len(colNames) == 0:
-        print('Empty name warning! Column name assignment may be wrong!')
+        print('Empty column name warning! Column name assignment may be wrong!')
 
 
 # Change 'Disch.Date.Time' and 'Roomed' to categorical
@@ -99,18 +99,18 @@ EPIC =  EPIC.drop(colRem, axis = 1)
 # Pref.Language: Keep top 4 languages + others
 topLangs = EPIC['Pref.Language'].value_counts().index[:4]
 ifTopLangs = [not language in topLangs for language in EPIC['Pref.Language'].values]
-EPIC['Pref.Language'].loc[ ifTopLangs ] = 'Other'
+EPIC['Pref.Language'].loc[ ifTopLangs ] = 'Others'
 
 # CC: Keep top 19 + others
 topCC = EPIC['CC'].value_counts().index[:49]
 ifTopCC = [not complaint in topCC for complaint in EPIC['CC'].values]
-EPIC['CC'].loc[ ifTopCC ] = 'Other'
+EPIC['CC'].loc[ ifTopCC ] = 'Others'
 
-# Arrival method: combine 'Unknown' and 'Other' and keep top 9 + others
-EPIC.loc[EPIC['Arrival.Method'] == 'Unknown', 'Arrival.Method'] = 'Other'
+# Arrival method: combine 'Unknown' and 'Others' and keep top 9 + others
+EPIC.loc[EPIC['Arrival.Method'] == 'Unknown', 'Arrival.Method'] = 'Others'
 topMethods = EPIC['Arrival.Method'].value_counts().index[:14]
 ifTopMethods = [not method in topMethods for method in EPIC['Arrival.Method'].values]
-EPIC['Arrival.Method'].loc[ ifTopMethods ] = 'Other'
+EPIC['Arrival.Method'].loc[ ifTopMethods ] = 'Others'
 
 # # log transform arrival to room. -inf in the transformed feature means 0 waiting time
 # waitingTime = np.log(EPIC['Arrival.to.Room'] + 1)
