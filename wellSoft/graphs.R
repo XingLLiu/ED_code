@@ -7,7 +7,7 @@ library(openxlsx)
 library(gridExtra)
 library(lemon)
 source('http://www.sthda.com/upload/rquery_wordcloud.r')
-library(tm)
+
 
 
 ## Creates plots of interesting patterns in the data
@@ -21,6 +21,8 @@ library(tm)
 #   5. PRESENTING COMPLAINT
 #   6. EXAMINE DIFFERENCES BETWEEN CALCULATED LENGTH OF STAY AND REG LENGTH OF STAY
 #   7. DIFFERENCES BETWEEN SEXES COMING TO ED
+#      - WITH ALL WELLSOFT DATA
+#      - WITH ONLY RETURN VISITS
 #       7.1 TEST SIGNIFICANCE
 #       7.2 LANGUAGE AND SEX PLOTS
 #   8. TOP LANGUAGES AND TOP DIAGNOSES
@@ -59,6 +61,12 @@ attr(reg_codes$StartOfVisit, "tzone") <- "EST"
 reg_codes$EndOfVisit <- convertToDateTime(reg_codes$EndOfVisit)
 attr(reg_codes$EndOfVisit, "tzone") <- "EST"
 
+willReturn$WillReturn <- as.factor(willReturn$WillReturn)
+
+wellSoft.returns <- merge(x=wellSoft,
+                          y=willReturn)
+
+dim(wellSoft.returns)
 
 # ================== 2. REG CODES MRN ==================
 
@@ -202,21 +210,59 @@ ggplot(stend.wellSoft, aes(x=CalculatedLengthOfStayWellSoft, y=LengthOfStayInMin
 
 # ================== 7. DIFFERENCES BETWEEN SEXES COMING TO ED ==================
 
+sexLangData <- function(data, willReturn=FALSE) {
+  
+  if (willReturn) {
+    sexlang <- data[,c("Year", "Sex_41", "Language_56", "DaysOld", "WillReturn")]
+    dim(sexlang); head(sexlang)
+    print("Process sexlang")
+    sexlang <- sexlang[!is.na(sexlang$DaysOld),];dim(sexlang)
+    sexlang <- sexlang[sexlang$Sex_41 !="" & sexlang$Sex_41 !="U", ]
+    sexlang$AgeGroup <- ifelse(sexlang$DaysOld >= (365*2), "Over Two", "Under Two")
+    
+    sexlang$WillReturnGroup <- ifelse(sexlang$WillReturn ==1, "Will Return", "Will Not Return")
+    
+    sexlang <- sexlang %>% filter(Sex_41 %in% c("M", "F"))
+    under.2.male <- sum(sexlang$Sex_41=="M" & sexlang$AgeGroup=="Under Two")/sum(sexlang$AgeGroup=="Under Two")
+    over.2.male <- sum(sexlang$Sex_41=="M" & sexlang$AgeGroup=="Over Two")/sum(sexlang$AgeGroup=="Over Two")
+    
+    sexlang$AvgPropMaleOverUner2 <- ifelse(sexlang$AgeGroup=="Under Two", 
+                                  under.2.male,
+                                  over.2.male)
+    
+    will.return.male <- sum(sexlang$Sex_41=="M" & sexlang$WillReturnGroup=="Will Return")/sum(sexlang$WillReturnGroup=="Will Return")
+    will.not.return.male <- sum(sexlang$Sex_41=="M" & sexlang$WillReturnGroup=="Will Not Return")/sum(sexlang$WillReturnGroup=="Will Not Return")
+    
+    
+    sexlang$AvgPropMaleWillReturn <- ifelse(sexlang$WillReturnGroup=="Will Return", 
+                                            will.return.male,
+                                            will.not.return.male)
+  } else {
+    sexlang <- data[,c("Year", "Sex_41", "Language_56", "DaysOld")]
+    dim(sexlang); head(sexlang)
+    print("Process sexlang")
+    sexlang <- sexlang[!is.na(sexlang$DaysOld),];dim(sexlang)
+    sexlang <- sexlang[sexlang$Sex_41 !="" & sexlang$Sex_41 !="U", ]
+    sexlang$AgeGroup <- ifelse(sexlang$DaysOld >= (365*2), "Over Two", "Under Two")
+    
+    sexlang <- sexlang %>% filter(Sex_41 %in% c("M", "F"))
+    under.2.male <- sum(sexlang$Sex_41=="M" & sexlang$AgeGroup=="Under Two")/sum(sexlang$AgeGroup=="Under Two")
+    over.2.male <- sum(sexlang$Sex_41=="M" & sexlang$AgeGroup=="Over Two")/sum(sexlang$AgeGroup=="Over Two")
+    
+    sexlang$AvgPropMale <- ifelse(sexlang$AgeGroup=="Under Two", 
+                                  under.2.male,
+                                  over.2.male)
+    
+  }
 
-sexlang <- wellSoft[,c("Year", "Sex_41", "Language_56", "DaysOld")]
-dim(sexlang); head(sexlang)
-print("Process sexlang")
-sexlang <- sexlang[!is.na(sexlang$DaysOld),];dim(sexlang)
-sexlang <- sexlang[sexlang$Sex_41 !="" & sexlang$Sex_41 !="U", ]
-sexlang$AgeGroup <- ifelse(sexlang$DaysOld >= (365*2), "Over Two", "Under Two")
+  
+  return(sexlang)
+  
+}
 
-sexlang <- sexlang %>% filter(Sex_41 %in% c("M", "F"))
-under.2.male <- sum(sexlang$Sex_41=="M" & sexlang$AgeGroup=="Under Two")/sum(sexlang$AgeGroup=="Under Two")
-over.2.male <- sum(sexlang$Sex_41=="M" & sexlang$AgeGroup=="Over Two")/sum(sexlang$AgeGroup=="Over Two")
+sexlang <- sexLangData(wellSoft); head(sexlang)
+sexlang.returns <- sexLangData(wellSoft.returns, TRUE); head(sexlang.returns)
 
-sexlang$AvgPropMale <- ifelse(sexlang$AgeGroup=="Under Two", 
-                              under.2.male,
-                              over.2.male)
 
 ggplot(data=sexlang, aes(x=Year, fill=Sex_41)) + 
   geom_bar(position = "dodge") + 
@@ -233,6 +279,25 @@ ggplot(data=sexlang, aes(x=Year)) +
   geom_text(aes(0,AvgPropMale,label = round(AvgPropMale, 4)*100, vjust = -1)) + 
   facet_wrap(~AgeGroup) + 
   ggtitle("Percentage of Males vs Females April 2008 - May 2018") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  scale_y_continuous(labels = scales::percent_format())
+
+
+ggplot(data=sexlang.returns, aes(x=Year, fill=Sex_41)) + 
+  geom_bar(position = "dodge") + 
+  theme_bw() + 
+  facet_wrap(~WillReturnGroup, scales = "free") + 
+  ggtitle("Number of Males vs Females for Return Visits April 2008 - May 2018") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+
+ggplot(data=sexlang.returns, aes(x=Year)) + 
+  geom_bar(aes(fill=Sex_41), position = "fill") + 
+  theme_bw() + 
+  geom_hline(aes(yintercept=AvgPropMaleWillReturn)) + 
+  geom_text(aes("2008",AvgPropMaleWillReturn,label = round(AvgPropMaleWillReturn, 4)*100, vjust = -1)) + 
+  facet_wrap(~WillReturnGroup) + 
+  ggtitle("Percentage of Males vs Females for Return Visits April 2008 - May 2018") + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
   scale_y_continuous(labels = scales::percent_format())
   
@@ -357,7 +422,10 @@ plotCols <- function(data, colnames, max.percent, flag, dim.ncol, dim.nrow, othe
     print(paste("Column", i,":", col))
     
     x <- data[,c(col, "Year"), with=FALSE]
-    #x[x==""] <- NA
+    if (!col %in% c('Arrival_Time_9', 'Age_Dob_40', "Discharge_Time_276")) {
+      x[x==""] <- NA
+    }
+    
     x <- x[complete.cases(x),]
     tab.data <- melt(table(x$Year)); 
     tab.data$Var1 <- factor(tab.data$Var1, levels=years)
@@ -533,6 +601,10 @@ plotCols(wellSoft[,c(dateCols, "Year"), with=FALSE], dateCols, max.percent.diffe
          "Date", 3, 3)
 plotCols(wellSoft[,c(otherCols, "Year"), with=FALSE], otherCols, max.percent.difference,
          "Other", 3, 3)
+
+all.cols <- union(dateCols, otherCols)
+plotCols(wellSoft[,c(all.cols, "Year"), with=FALSE], otherCols, max.percent.difference,
+         "All", 3, 3)
 
 useful.sd <- 3
 
