@@ -6,8 +6,8 @@ source('cleanWellSoft.R')
 source('preprocessWellSoft.R')
 source('timeLapse.R')
 source('calculateReturnVisits.R')
-
-data.path <- "/home/lebo/mybigdata/data/"
+source('rollingDates.R')
+source("helper_functions.R")
 
 library(xlsx)
 library(stringi)
@@ -20,8 +20,24 @@ library(bizdays)
 library(openxlsx)
 library(stringr)
 library(zoo)
+library(CombMSC)
+library(randomForest)
+library(AUC)
+library(data.table)
+library(dplyr)
+library(Amelia)
+require(MLmetrics)
+library(DMwR)
+library(yardstick)
+library(e1071)
+library(caret)
+library(glmnet)
+library(rpart)
+library(nnet)
 
 
+
+data.path <- "./data/wellSoft_DATA/"
 
 # ========================================================================
 # All Steps:
@@ -36,9 +52,12 @@ library(zoo)
 #   A. Time lapse 
 #   B. Return visits
 #
-# 3. LOAD CLEANED DATA
+# ** LOAD CLEANED DATA
+# -- can load all prior data sets here: cleaned_wellsoft, reg_codes, all_data, timeLapse, willReturn
 #
-# 4. PREPROCESS WELLSOFT DATA
+# 3. PREPROCESS WELLSOFT DATA (not run all the way through)
+#
+# 4. RUN MODELS (not tested with new preprocess script)
 
 
 # ==================  1. PREPROCESS DATA  ==================
@@ -69,7 +88,7 @@ all_data <- fread(paste0(data.path, "all_data.csv"))
 willReturn <- calculateReturnVisits(all_data, timeLapse, diff.days, data.path)
 
 
-##  ==========    3. (OR) LOAD CLEANED DATA   ==========
+##  ==========    (OR) LOAD CLEANED DATA   ==========
 
 wellSoft <- fread(paste0(data.path, "cleaned_wellSoft.csv"))
 reg_codes <- fread(paste0(data.path, "processedRegistrationCodes.csv"))
@@ -83,10 +102,34 @@ willReturn <- fread(paste0(data.path, "willReturn.csv"))
 wellSoft <- preprocessWellSoft(wellSoft, file.path)
 
 
-# ==================  2. CREATE TRAIN/TEST SPLITS  ==================
+# ==================  4. RUN MODELS  ==================
+
+factors <- read.csv(paste0(file.path, "factors.csv")); factors <- as.character(factors$x)
+numerics <- read.csv(paste0(file.path, "numerics.csv")); numerics <- as.character(numerics$x)
+
+#preprocessed <- fread(inputFile, integer64 = "numeric", na.strings = c('""', "", "NA", "NULL", " "))
+
+
+# ALL MODELS ::"LR", "glmnet", "tree", "CVRF", "SVM", "NB", "CVNN"
+
+
+models.to.run <- c("LR")#, "glmnet", "tree", "CVRF", "SVM", "NB", "CVNN")
 
 
 
+for (model in models.to.run) {
+  
+  print(paste("Running",model, "on 2 years of rolling data"))
+  p.2 <- runModels(preprocessed, 2, 60, factors, models.to.run)
+  
+  print(paste("Running", model, "on 3 years of rolling data"))
+  p.3 <- runModels(preprocessed, 3, 60, factors, models.to.run)
+  
+}
+
+
+p.2.aucs <- plotStatsGraph(as.numeric(unlist(p.2[2])), as.numeric(unlist(p.2[3])),
+                           2008, 2018, 1); p.2.aucs
 
 # ==================  (EXTRA) CREATE PLOTS   ==================
 source("graphs.R")
