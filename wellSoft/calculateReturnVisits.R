@@ -169,6 +169,24 @@ calculateReturnVisits <- function(all_data, time.lapse, diff.days, data.path) {
   index.ids.no.return.within.72.index.admit <- retrieveIndexVisitData(no.return.within.72, all.data, admitted.labels)
   index.ids.no.return.within.72.index.left <- retrieveIndexVisitData(no.return.within.72, all.data, left.labels)
   
+  final.return.visits <- returned.within.72 %>%
+    group_by(PrimaryMedicalRecordNumber) %>%
+    filter(row_number()==n())
+  
+  final.return.visits <- final.return.visits %>% filter(!RegistrationNumberVisit2 %in% no.return.within.72)
+  final.return.visit.ids <- final.return.visits$RegistrationNumberVisit2
+  length(final.return.visit.ids)
+  length(intersect(final.return.visit.ids, single.visit.ids.all))
+  length(intersect(final.return.visit.ids, index.ids.return.within.72.index.sent.home))
+  length(intersect(final.return.visit.ids, index.ids.return.within.72.index.admit))
+  length(intersect(final.return.visit.ids, index.ids.return.within.72.index.left))
+  length(intersect(final.return.visit.ids, no.return.within.72$RegistrationNumberVisit1))
+  length(intersect(final.return.visit.ids, no.return.within.72$RegistrationNumberVisit2))
+  
+  head(no.return.within.72 %>% filter(RegistrationNumberVisit1 %in% final.return.visit.ids))
+  
+  index.ids.final.return.visit.sent.home <- 
+  
   ## ======================     TOTAL PATIENT VISITS   ==========================
   
   print("Stats by Total Patient Visits")
@@ -203,7 +221,8 @@ calculateReturnVisits <- function(all_data, time.lapse, diff.days, data.path) {
   print(paste("Of those who did not return within 72h,", nrow(index.ids.no.return.within.72.index.admit), "were admitted at their index visit"))
   print(paste("Of those who did not return within 72h,", nrow(index.ids.no.return.within.72.index.left), "left before being seen at their index visit"))
   
-
+  print(paste("There were", x, "final visits that resulted in no returns"))
+  
   ## ======================     UNIQUE PATIENTS   ==========================
   
   print("Stats by Unique Patients")
