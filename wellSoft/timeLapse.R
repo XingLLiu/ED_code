@@ -16,10 +16,12 @@
 # ================== CALCULATE NUMBER OF VISITS PER PERSON ================== # 
 calculateTimeLapse <- function(wellSoft, reg_codes, data.path) {
   print("Merging data")
+
   all_data <- merge(x=wellSoft, 
                     y=reg_codes[,c("PrimaryMedicalRecordNumber", "DischargeDisposition", "RegistrationNumber")],
                     by.x=c("Pt_Accnt_5"),
                     by.y=c("RegistrationNumber"))
+  all_data <- all_data[!duplicated(all_data$Pt_Accnt_5),]
   fwrite(all_data, paste0(data.path, "all_data.csv"))
   print(paste("Lost", nrow(wellSoft) - nrow(all_data), "when merging wellSoft and registration codes"))
   
