@@ -26,22 +26,77 @@ PROCESSED_SAVE_DIR = SAVE_DIR + 'Processed_Notes/'
 
 # ----------------------------------------------------
 # Preliminary settings
-try:
-    CLEAN_NOTES = bool(sys.argv[1])
-except:
-    CLEAN_NOTES = False
+# try:
+#     CLEAN_NOTES = bool(sys.argv[1])
+# except:
+#     CLEAN_NOTES = False
 
 
-try:
-    MODE = sys.argv[2]
-except:
-    MODE = "test"
+# try:
+#     MODE = sys.argv[2]
+# except:
+#     MODE = "test"
+
+# Arguments
+def setup_parser():
+    parser = argparse.ArgumentParser()
+
+    # Required arguments
+    parser.add_argument("--clean_notes",
+                        default=False,
+                        help="True if clean the notes. False if load cleaned notes.")
+    parser.add_argument("--mode",
+                        default="test",
+                        type=str,
+                        help="train for fine-tuning. test for evaluation. train/test for both.")
+    parser.add_argument("--bert_model",
+                        default="clinical_bert",
+                        type=str,
+                        help="Which BERT model to run.")
+    parser.add_argument("--task_name",
+                        default="epic_task",
+                        type=str,
+                        required=True,
+                        help="Customized task name.")
+    parser.add_argument("--path",
+                        type=str,
+                        default=None,
+                        required=True,
+                        help="Directory of the raw EPIC data.")
+    parser.add_argument("--max_seq_length",
+                        default=256,
+                        type=int,
+                        help="Maximum length of a text sequence.")
+    parser.add_argument("--weight",
+                        default=1500,
+                        type=int,
+                        help="Weight for the minority class."
+                        )
+    parser.add_argument("--train_batch_size",
+                        default=32,
+                        type=int,
+                        help="Batch size during fine-tuning.")
+    parser.add_argument("--eval_batch_size",
+                        default=32,
+                        type=int,
+                        help="Batch size during testing.")
+    parser.add_argument("--learning_rate",
+                        default=1e-3,
+                        type=float,
+                        help="Learning rate during fine-tuning.")
+    parser.add_argument
+    return parser
 
 
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt = '%m/%d/%Y %H:%M:%S',
                     level = logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Parser arguements
+parser = setup_parser()
+args = parser.parse_args()
+print(args.clean_notes, args.mode)
 
 # Bert pre-trained model selected in the list: bert-base-uncased, 
 # bert-large-uncased, bert-base-cased, bert-large-cased, bert-base-multilingual-uncased,
@@ -65,7 +120,7 @@ CACHE_DIR = '/'.join(path.split('/')[:-3]) + '/ClinicalBert/pretrained_bert_tf/b
 MAX_SEQ_LENGTH = 512
 
 # Other model hyper-parameters
-WEIGHT = 2000
+WEIGHT = 1000
 TRAIN_BATCH_SIZE = 32 # 128
 EVAL_BATCH_SIZE = 32
 LEARNING_RATE = 1e-3
@@ -209,7 +264,7 @@ def clean_text(text):
     return text
 
 
-if CLEAN_NOTES == True:
+if args.clean_notes == True:
     # Loop over each file and write to a csv
     print("Start cleaning notes ...")
     # Clean text
@@ -501,7 +556,7 @@ else:
 
 
 # ----------------------------------------------------
-if MODE == "train" or MODE == "train_test":
+if args.mode == "train" or args.mode == "train_test":
     # Fine-tuning
 
     # Set optimizer and data loader
@@ -614,7 +669,7 @@ if MODE == "train" or MODE == "train_test":
 
 # ----------------------------------------------------
 # ----------------------------------------------------
-if MODE == "test" or MODE == "train_test":
+if args.mode == "test" or args.mode == "train_test":
     # Set path
     BERT_MODEL = OUTPUT_DIR + f"{TASK_NAME}.tar.gz"
     # Load fine-tuned model

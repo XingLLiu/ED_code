@@ -9,7 +9,11 @@ ls $OUTPUT_DIR
 
 # Fine-tune and save model
 echo "$(tput setaf 1)Start fine-tuning Clinical BERT ...$(tput sgr 0)"
-python ModelsBERT.py "True" "train"
+python ModelsBERT.py \
+--clean_notes=True \
+--mode train \
+--path=$/home/xingliu/Documents/ED/data/EPIC_DATA/EPIC.csv \
+--task_name=epic_task
 echo "$(tput setaf 1)Complete.\n$(tput sgr 0)"
 
 # Compress the fine-tuned model
@@ -21,7 +25,11 @@ echo "$(tput setaf 1)Complete.\n$(tput sgr 0)"
 
 # Test the model
 echo "$(tput setaf 1)Start testing the model ...$(tput sgr 0)"
-python ModelsBERT.py "" "test"
+python ModelsBERT.py \
+--clean_notes=False \
+--mode test \
+--path=$/home/xingliu/Documents/ED/data/EPIC_DATA/EPIC.csv \
+--task_name=epic_task
 echo "$(tput setaf 1)Complete.\n$(tput sgr 0)"
 
 
