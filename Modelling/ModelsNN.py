@@ -10,6 +10,7 @@
 # 8. dropout probability
 #
 # To run: python ModelsNN.py b 27 "True" 4000 128 1e-3 3000 0.1
+#         python ModelsNN.py b 27 "" 50000 256 1e-3 15 0.1
 # ----------------------------------------------------
 # Command arguments: mode, no. of epochs, batch size, learning rate
 from ED_support_module import *
@@ -89,12 +90,14 @@ if len(hyper_params) == 5:
     batch_size = int(hyper_params[1])
     learning_rate = float(hyper_params[2])
     weight = int(hyper_params[3])
-    drop_prob = float(hyper_params[4])
+    sample_weight = int(hyper_params[4])
+    drop_prob = float(hyper_params[5])
 else:
     num_epochs = 500
     batch_size = 128
     learning_rate = 1e-3
     weight = 1000
+
     drop_prob = 0
 
 
@@ -180,16 +183,29 @@ if mode in ['b', 'd', 'e', 'f']:
 
 # ----------------------------------------------------
 if not useTime:
+    print("Train and test with stratified sampling...")
+
+    # Construct weight vectors
+    train_weights = np.array(sample_weight * yTrain + 1 - yTrain)
+    trainSampler = torch.utils.data.sampler.WeightedRandomSampler(train_weights, batch_size)
+
+    test_weights = np.array(weight * yTest + 1 - yTest)
+    testSampler = torch.utils.data.sampler.WeightedRandomSampler(test_weights, batch_size)
+
+    valid_weights = np.array(weight * yValid + 1 - yValid)
+    validSampler = torch.utils.data.sampler.WeightedRandomSampler(valid_weights, batch_size)
+
     # Construct data loaders
     trainLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
-                                              batch_size = batch_size,
-                                              shuffle = False)
+                                                batch_size = batch_size,
+                                                shuffle = False,
+                                                sampler = trainSampler)
     testLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yTest], axis = 1)),
-                                             batch_size = len(yTest),
-                                             shuffle = False)
+                                                batch_size = len(yTest),
+                                                shuffle = False)
     validLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XValid, yValid], axis = 1)),
-                                             batch_size = len(yValid),
-                                             shuffle = False)
+                                                batch_size = len(yValid),
+                                                shuffle = False)
 
     # Neural net model
     input_size = XTrain.shape[1]
@@ -205,7 +221,7 @@ if not useTime:
     # lossVec = np.zeros( num_epochs * (total_step//100) )
     trainLossVec = np.zeros(num_epochs)
     validLossVec = np.zeros(num_epochs)
-    for epoch in range(num_epochs):
+    for epoch in trange(num_epochs):
         model.train()
         for i, x in enumerate(trainLoader):
             # Retrieve design matrix and labels
@@ -218,7 +234,7 @@ if not useTime:
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        
+
         model.eval()
         transform = nn.Sigmoid()
         with torch.no_grad():
@@ -237,7 +253,7 @@ if not useTime:
 
         trainLossVec[epoch] = loss.item()
         validLossVec[epoch] = loss_valid.item()
-        print ('Epoch [{}/{}], Loss: {:.4f}'.format(epoch+1, num_epochs, loss.item()))
+        # print ('Epoch [{}/{}], Loss: {:.4f}'.format(epoch+1, num_epochs, loss.item()))
 
 
     # Plot losses
