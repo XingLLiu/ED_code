@@ -26,7 +26,7 @@ echo "$(tput setaf 1)Complete.\n$(tput sgr 0)"
 # Test the model
 echo "$(tput setaf 1)Start testing the model ...$(tput sgr 0)"
 python ModelsBERT.py \
---clean_notes=False \
+--clean_notes False \
 --mode test \
 --path=$/home/xingliu/Documents/ED/data/EPIC_DATA/EPIC.csv \
 --task_name=epic_task

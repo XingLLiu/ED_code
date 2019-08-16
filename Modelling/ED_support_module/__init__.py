@@ -109,7 +109,7 @@ def lr_roc_plot(yTest = None, proba = None, plot = True, title = ' ', n_pts = 51
     plt.ylim([0, 1.01])
     plt.ylabel('True Positive Rate')
     plt.xlabel('False Positive Rate')
-    if not save_path == None:
+    if save_path != None:
         plt.savefig(save_path, format='eps', dpi=1000)
         plt.close()
     if plot == True:
@@ -270,7 +270,8 @@ def vaePredict(loss_train = None, loss_test = None, batch_size = None,
 def time_split(data, threshold = 201903, dynamic = False, pred_span = 1):
     '''
     Sort data by the feature 'Arrived' and output train and test sets
-    as specified by threshold.
+    as specified by threshold. This can be seen as a special version
+    of sk.model_selection.train_test_split.
     Input : data = EPIC dataset with feature 'Arrived'
             threshold = time of the train/test split
     Output: XTrain, XTest, yTrain, yTest
@@ -316,4 +317,36 @@ def dynamic_summary(summary, p_num, n_num):
     summary['FP'] = (summary['FPR'] * n_num).round().astype('int')
     summary['TN'] = n_num - summary['FP']
     return(summary)
+
+
+# # Dynamic prediction ROC
+# def dynamic_roc():
+# # Create a directory if not exists
+# plot_path = '/'.join(os.getcwd().split('/')[:3]) + '/Pictures/neural_net/'
+# dynamic_plot_path = plot_path + 'dynamic/'
+
+# # Create subplot
+# for i, month in enumerate(timeSpan[1:-2]):
+#     csv_name = dynamic_plot_path + f'summary_{month}.csv'
+#     summary = pd.read_csv(csv_name)
+#     _ = plt.subplot(3, 3, i + 1)
+#     # ROC plot
+#     tpr = summary['TPR']
+#     fpr = summary['FPR']
+#     roc_auc = sk.metrics.auc(fpr, tpr)
+#     month_pred = timeSpan[i + 3]
+#     _ = plt.title(f'ROC {month_pred}')
+#     _ = plt.plot(fpr, tpr, 'b', label = 'AUC = %0.2f' % roc_auc)
+#     _ = plt.legend(loc = 'lower right')
+#     _ = plt.plot([0, 1], [0, 1],'r--')
+#     _ = plt.xlim([0, 1])
+#     _ = plt.ylim([0, 1])
+#     _ = plt.ylabel('True Positive Rate')
+#     _ = plt.xlabel('False Positive Rate')
+
+
+# plt.tight_layout()
+# plt.savefig(dynamic_plot_path + 'aggregate_roc.eps', format='eps', dpi=1000)
+# plt.show()
+
 

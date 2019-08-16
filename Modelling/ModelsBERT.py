@@ -19,24 +19,12 @@ from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
 # ----------------------------------------------------
 # Directories for saving files
 path = '/home/xingliu/Documents/ED/data/EPIC_DATA/EPIC.csv'
-SAVE_DIR = '/'.join(path.split('/')[:-1]) + '/EPIC_for_Bert/'
+SAVE_DIR = '/'.join(path.split('/')[:-1]) + '/EPIC_with_Bert/'
 RAW_SAVE_DIR = SAVE_DIR + 'Raw_Notes/'
 PROCESSED_SAVE_DIR = SAVE_DIR + 'Processed_Notes/'
 
 
 # ----------------------------------------------------
-# Preliminary settings
-# try:
-#     CLEAN_NOTES = bool(sys.argv[1])
-# except:
-#     CLEAN_NOTES = False
-
-
-# try:
-#     MODE = sys.argv[2]
-# except:
-#     MODE = "test"
-
 # Arguments
 def setup_parser():
     parser = argparse.ArgumentParser()
@@ -88,6 +76,9 @@ def setup_parser():
     return parser
 
 
+# ----------------------------------------------------
+# Preliminary settings
+
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt = '%m/%d/%Y %H:%M:%S',
                     level = logging.INFO)
@@ -96,7 +87,6 @@ logger = logging.getLogger(__name__)
 # Parser arguements
 parser = setup_parser()
 args = parser.parse_args()
-print(args.clean_notes, args.mode)
 
 # Bert pre-trained model selected in the list: bert-base-uncased, 
 # bert-large-uncased, bert-base-cased, bert-large-cased, bert-base-multilingual-uncased,
@@ -120,11 +110,11 @@ CACHE_DIR = '/'.join(path.split('/')[:-3]) + '/ClinicalBert/pretrained_bert_tf/b
 MAX_SEQ_LENGTH = 512
 
 # Other model hyper-parameters
-WEIGHT = 1000
-TRAIN_BATCH_SIZE = 32 # 128
-EVAL_BATCH_SIZE = 32
+WEIGHT = 3000
+TRAIN_BATCH_SIZE = 40 # 128
+EVAL_BATCH_SIZE = 40
 LEARNING_RATE = 1e-3
-NUM_TRAIN_EPOCHS = 2
+NUM_TRAIN_EPOCHS = 12
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
 WARMUP_PROPORTION = 0.1
@@ -132,6 +122,7 @@ OUTPUT_MODE = 'classification'
 
 CONFIG_NAME = "bert_config.json"
 WEIGHTS_NAME = "pytorch_model.bin"
+PREDICTION_HEAD_NAME = "prediction_head.bin"
 
 # Use GPU if exists otherwise CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -297,11 +288,13 @@ for col in notesCols:
 
 
 # ----------------------------------------------------
-# Train-test split
+# Train-test-validation split
 y = EPIC['Primary.Dx']
 X = EPIC.drop('Primary.Dx', axis = 1)
 XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25,
                                random_state=RANDOM_SEED, stratify=y)
+# XTrain, XValid, yTrain, yValid = sk.model_selection.train_test_split(XTrain, yTrain, test_size=0.15,
+#                                 random_state=RANDOM_SEED, stratify=yTrain)
 
 
 
@@ -320,9 +313,17 @@ devBert = pd.DataFrame({
             'text': XTest['Note.Data_ED.Triage.Notes']
 })
 
+# validBert = pd.DataFrame({
+#             'id': range(XValid.shape[0]),
+#             'label': yValid,
+#             'alpha': ['a'] * XValid.shape[0],
+#             'text': XValid['Note.Data_ED.Triage.Notes']
+# })
+
 # Save data
 trainBert.to_csv(PROCESSED_SAVE_DIR + 'train.tsv', sep='\t', index=False, header=False)
 devBert.to_csv(PROCESSED_SAVE_DIR + 'dev.tsv', sep='\t', index=False, header=False)
+# validBert.to_csv(PROCESSED_SAVE_DIR + 'valid.tsv', sep='\t', index=False, header=False)
 
 
 # ----------------------------------------------------
@@ -524,6 +525,27 @@ class NoteClassificationHead(nn.Module):
         return logits
 
 
+# class NoteClassificationHead(nn.Module):
+#     """
+#     Head layer for prediction.
+#     """
+#     def __init__(self, device, model, hidden_size, dropout_prob=0.4, num_labels=2):
+#         super(NoteClassificationHead, self).__init__()
+#         self.device = device
+#         self.model = model
+#         self.num_labels = num_labels
+#         self.dropout = nn.Dropout(dropout_prob)
+#         self.classifier = nn.Linear(hidden_size, num_labels)
+#         # nn.init.xavier_normal_(self.classifier.weight)
+#     def forward(self, input_ids, segment_ids, input_mask):
+#         _, pooled_output = model(input_ids, segment_ids, input_mask)
+#         pooled_output = self.dropout(pooled_output.to(self.device))
+#         logits = self.classifier(pooled_output)
+#         return logits
+
+
+
+
 # ----------------------------------------------------
 # Main method
 # ----------------------------------------------------
@@ -561,25 +583,28 @@ if args.mode == "train" or args.mode == "train_test":
 
     # Set optimizer and data loader
     # Load model
-    model = BertModel.from_pretrained(CACHE_DIR, cache_dir=CACHE_DIR)
+    model = BertModel.from_pretrained(CACHE_DIR, cache_dir=CACHE_DIR).to(device)
     # Update weights of all embedding layers
-    for p in model.embeddings.parameters():
+    # for p in model.embeddings.parameters():
+    #     p.requires_grad = True
+
+    for p in model.parameters():
         p.requires_grad = True
-    _ = model.to(device)
+
 
     # Optimizers
-    param_optimizer = list(model.named_parameters())
-    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-    optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-    ]
+    # param_optimizer = list(model.named_parameters())
+    # no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+    # optimizer_grouped_parameters = [
+    #     {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+    #     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+    # ]
 
     # optimizer = BertAdam(optimizer_grouped_parameters,
     #                     lr=LEARNING_RATE,
     #                     warmup=WARMUP_PROPORTION,
     #                     t_total=num_train_optimization_steps)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 
     # logger.info("***** Running training *****")
@@ -597,9 +622,14 @@ if args.mode == "train" or args.mode == "train_test":
 
     all_label_ids = torch.tensor([f.label_id for f in trainFeatures], dtype=torch.long)
 
+    # Set up weight vector
+    train_weights = np.array(WEIGHT * yTrain + 1 - yTrain)
+
     # Set up data loaders
     train_dataloader = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
-    train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAIN_BATCH_SIZE)
+    train_sampler = torch.utils.data.sampler.RandomSampler(train_dataloader)
+    train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAIN_BATCH_SIZE,
+                                                    sampler=train_sampler)
 
 
     # ----------------------------------------------------
@@ -610,11 +640,14 @@ if args.mode == "train" or args.mode == "train_test":
     loss_vec = np.zeros(NUM_TRAIN_EPOCHS * (len(train_dataloader) // 10))
 
     prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
+    # prediction_head = NoteClassificationHead(device, model, hidden_size=model.config.hidden_size)
     _ = prediction_head.to(device)
-    loss_func = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT]))
-    _ = loss_func.to(device)
+    # optimizer = torch.optim.Adam(prediction_head.parameters(), lr=LEARNING_RATE)
+    optimizer = torch.optim.Adam(list(model.parameters()) + list(prediction_head.parameters()), lr=LEARNING_RATE)
+    loss_func = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT])).to(device)
     _ = model.train()
     _ = prediction_head.train()
+
     print("Start fine-tuning ...")
     for epoch in range(NUM_TRAIN_EPOCHS):
         tr_loss = 0
@@ -623,47 +656,68 @@ if args.mode == "train" or args.mode == "train_test":
             # Get batch
             batch = tuple(t.to(device) for t in batch)
             input_ids, input_mask, segment_ids, label_ids = batch
-            encoded_layers, pooled_output = model(input_ids, segment_ids, input_mask)
-            logits = prediction_head(pooled_output.to(device))
-            logits = logits.to(device)
+            _, pooled_output = model(input_ids, segment_ids, input_mask)
+            logits = prediction_head(pooled_output.to(device)).to(device)
+            # logits = prediction_head(input_ids, segment_ids, input_mask)
+            # logits = logits.to(device)
+
+            # if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
+            #     optimizer.zero_grad()
+                # optimizer.step()
+                # global_step += 1
+
             # Compute loss
             loss = loss_func(logits, label_ids)
-            if NUM_GPU > 1:
-                loss = loss.mean() # mean() to average on multi-gpu.
-            if GRADIENT_ACCUMULATION_STEPS > 1:
-                loss = loss / GRADIENT_ACCUMULATION_STEPS
-            loss.backward()
-            tr_loss += loss.item()
-            nb_tr_examples += input_ids.size(0)
-            nb_tr_steps += 1
             if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
                 optimizer.zero_grad()
+
+            if NUM_GPU > 1:
+                loss = loss.mean() # mean() to average on multi-gpu.
+
+            if GRADIENT_ACCUMULATION_STEPS > 1:
+                loss = loss / GRADIENT_ACCUMULATION_STEPS
+
+            loss.backward()
+
+            if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
                 optimizer.step()
-                global_step += 1
+
             if (i + 1) % 10 == 0:
-                loss_vec[epoch * len(train_dataloader) // 10 + i // 10] = loss.item()
+                loss_vec[epoch * (len(train_dataloader) // 10) + i // 10] = loss.item()
                 # print("Epoch: {}/{}, Step: [{}/{}], Loss: {:.4f}".
                 #     format(epoch + 1, NUM_TRAIN_EPOCHS, i+1, len(train_dataloader), loss.item()))
+            # ifEqual = torch.any(torch.eq(tuned_params1[-1], tuned_params2[-1]))
+            # if ifEqual == 0:
+            #     print("{} not equal!".format(i))
+
 
 
     # ----------------------------------------------------
     # Save model
     model_to_save = model.module if hasattr(model, "module") else model
+    layer_to_save = prediction_head.module if hasattr(prediction_head, "module") else prediction_head
 
     # Save using the predefined names so that one can load using `from_pretrained`
     output_model_file = os.path.join(OUTPUT_DIR, WEIGHTS_NAME)
     output_config_file = os.path.join(OUTPUT_DIR, CONFIG_NAME)
+    output_classification_file = os.path.join(OUTPUT_DIR, PREDICTION_HEAD_NAME)
 
     torch.save(model_to_save.state_dict(), output_model_file)
     model_to_save.config.to_json_file(output_config_file)
     tokenizer.save_vocabulary(OUTPUT_DIR)
 
+    # save weights of the final classification layer
+    torch.save(layer_to_save.state_dict(), output_classification_file)
+
     # Save loss vector
     pickle.dump(loss_vec, open(REPORTS_DIR + "loss.pkl", 'wb'))
-    # Save loss curve
+
+    # Save loss plot
     _ = sns.scatterplot(x=range(len(loss_vec)), y=loss_vec)
     _ = plt.title("Clinical BERT Train Loss")
     plt.savefig(REPORTS_DIR + "train_loss.eps", format="eps", dpi=1000)
+
+    print(model_to_save.state_dict(), layer_to_save.state_dict())
 
 
 
@@ -696,18 +750,25 @@ if args.mode == "test" or args.mode == "train_test":
     eval_sampler = torch.utils.data.SequentialSampler(eval_data)
     eval_dataloader = torch.utils.data.DataLoader(eval_data, sampler=eval_sampler, batch_size=EVAL_BATCH_SIZE)
 
-    # Load pre-trained model (weights)
+    # Load fine-tuned model (weights)
     model = BertModel.from_pretrained(OUTPUT_DIR + f"{TASK_NAME}.tar.gz",cache_dir=OUTPUT_DIR)
-    prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
+    model.load_state_dict( torch.load(OUTPUT_DIR + WEIGHTS_NAME) )
     _ = model.to(device)
     _ = model.eval()
+    print("fine-tuned:", model.state_dict())
+
+    prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
+    prediction_head.load_state_dict( torch.load(OUTPUT_DIR + PREDICTION_HEAD_NAME) )
+    _ = prediction_head.eval()
     _ = prediction_head.to(device)
+    print("fine-tuned pred_head:", prediction_head.state_dict())
 
     # Final setup
     sigmoid_func = nn.Sigmoid()
     prob = np.zeros(len(eval_data))
-    eval_loss, eval_accuracy = 0, 0
-    nb_eval_steps, nb_eval_examples = 0, 0
+    # eval_loss, eval_accuracy = 0, 0
+    # nb_eval_steps, nb_eval_examples = 0, 0
+
     for i, batch in enumerate(tqdm(eval_dataloader, desc="Evaluating")):
         input_ids, input_mask, segment_ids, label_ids = batch
         input_ids = input_ids.to(device)
@@ -717,7 +778,7 @@ if args.mode == "test" or args.mode == "train_test":
 
         # Evaluate loss
         with torch.no_grad():
-            encoded_layers, pooled_output = model(input_ids, segment_ids, input_mask)
+            _, pooled_output = model(input_ids, segment_ids, input_mask)
             pooled_output = pooled_output.to(device)
             logits = prediction_head(pooled_output)
             
@@ -729,7 +790,7 @@ if args.mode == "test" or args.mode == "train_test":
 
         # Store predicted probabilities
         begin_ind = EVAL_BATCH_SIZE * i
-        end_ind = np.min( [EVAL_BATCH_SIZE * (i + 1), len(eval_data)] )
+        end_ind = np.min( [ EVAL_BATCH_SIZE * (i + 1), len(eval_data) ] )
         prob[begin_ind:end_ind] = pred_prob
 
 
@@ -737,6 +798,6 @@ if args.mode == "test" or args.mode == "train_test":
     pickle.dump(prob, open(REPORTS_DIR + "predicted_probs.pkl", 'wb'))
     print("Complete and saved to {}".format(REPORTS_DIR))
 
-    roc = lr_roc_plot(yTest, prob, save_path = REPORTS_DIR + f'roc.eps', plot = False)
+    roc = lr_roc_plot(yTest, prob, save_path = REPORTS_DIR + f'roc.eps', plot = True)
 
 
