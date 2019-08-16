@@ -9,8 +9,8 @@
 # 7. class weight
 # 8. dropout probability
 #
-# To run: python ModelsNN.py b 27 "True" 4000 128 1e-3 3000 0.1
-#         python ModelsNN.py b 27 "" 50000 256 1e-3 15 0.1
+# To run: python ModelsNN.py b 27 "True" 4000 128 1e-3 3000 1 0.1
+#         python ModelsNN.py b 27 "" 50000 256 1e-3 1500 15 0.1
 # ----------------------------------------------------
 # Command arguments: mode, no. of epochs, batch size, learning rate
 from ED_support_module import *
@@ -97,7 +97,7 @@ else:
     batch_size = 128
     learning_rate = 1e-3
     weight = 1000
-
+    sample_weight = 1
     drop_prob = 0
 
 
