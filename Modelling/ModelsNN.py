@@ -11,6 +11,7 @@
 #
 # To run: python ModelsNN.py b 27 "True" 4000 128 1e-3 3000 1 0.1
 #         python ModelsNN.py b 27 "" 50000 256 1e-3 1500 15 0.1
+#         Need to use mode c to achieve good TPR!
 # ----------------------------------------------------
 # Command arguments: mode, no. of epochs, batch size, learning rate
 from ED_support_module import *
