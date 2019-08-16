@@ -85,7 +85,7 @@ except:
 num_classes = 2
 hyper_params = sys.argv[4:]
 
-if len(hyper_params) == 5:
+if len(hyper_params) == 6:
     num_epochs = int(hyper_params[0])
     batch_size = int(hyper_params[1])
     learning_rate = float(hyper_params[2])
