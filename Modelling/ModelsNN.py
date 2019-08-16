@@ -306,7 +306,7 @@ else:
 
         XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival, threshold = month, dynamic = True)
 
-        print('Training for data before {} ...'.format(month))
+        print('Training for data up to {} ...'.format(month))
         print('Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}].'
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ))
 
@@ -357,7 +357,7 @@ else:
                 loss.backward()
                 optimizer.step()
             lossVec[epoch] = loss
-        print("Training for data upto {} completed.".format(month))
+        print("Training for data up to {} completed.".format(month))
         # ----------------------------------------------------
         # Test the model
         model.eval()
