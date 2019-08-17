@@ -225,7 +225,7 @@ class EPICPreprocess:
         return EPIC_arrival
     
     
-    def TFIDF(self, EPIC, cui):
+    def TFIDF(self, cui, EPIC):
         '''
         Compute the TF-IDF of the CUIs in cui and append to EPIC.
         Input : cui: dataframe of the triage notes CUIs. Must contain column Triage.Notes
@@ -317,36 +317,55 @@ class EPICPreprocess:
 
 
 
-def stratified_split(EPIC_enc, mode, EPIC_CUI=None, valid=False):
+def stratified_split(EPIC_enc, num_cols, mode, test_size,
+                     EPIC_CUI=None, valid=False, valid_size=None, pca_components=None, seed=None):
+    '''
+    Input : num_cols = [list or pd.Index] names of numerical cols to be transformed.
+            cui_cols = [list or pd.Index] names of CUI cols to be transformed if
+                       EPIC_CUI is not None.
+            mode = [str] must be one of the following:
+                            a -- No PCA, no TF-IDF
+                            b -- PCA, no TF-IDF
+                            c -- No PCA, TF-IDF
+                            d -- PCA, but not on TF-IDF
+                            e -- PCA, TF-IDF
+                            f -- Sparse PCA, TF-IDF
+    '''
+    keep_cols = [col for col in EPIC_enc.columns if col not in num_cols]
     # Prepare taining set
     if mode not in ['a', 'b']:
-        EPIC_enc, cuiCols = TFIDF(EPIC_CUI, EPIC_enc)
+        try:
+            EPIC_enc, cui_cols = TFIDF(EPIC_CUI, EPIC_enc)
+        except:
+            raise ValueError("EPIC_CUI must be given when including TF-IDF")
     # Separate input features and target
     y = EPIC_enc['Primary.Dx']
     X = EPIC_enc.drop('Primary.Dx', axis = 1)
     # Prepare train and test sets
-    XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25,
+    XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=test_size,
                                     random_state=seed, stratify=y)
     if valid:
         # Prepare validation set
-        XTrain, XValid, yTrain, yValid = sk.model_selection.train_test_split(XTrain, yTrain, test_size=0.15,
+        XTrain, XValid, yTrain, yValid = sk.model_selection.train_test_split(XTrain, yTrain, test_size=valid_size,
                                         random_state=seed, stratify=yTrain)
-    # Separate the numerical and categorical features
+    # Separate the numerical features
     if mode in ['c', 'e', 'f']:
-        numCols = numCols + list(cuiCols)
+        num_cols = num_cols + list(cui_cols)
     # Extract the numerical columns to be transformed
-    XTrainNum = XTrain[numCols]
-    XTestNum = XTest[numCols]
+    XTrainNum = XTrain[num_cols]
+    XTestNum = XTest[num_cols]
     if valid:
-        XValidNum = XValid[numCols]
+        XValidNum = XValid[num_cols]
     # PCA on the numerical entries   # 27, 11  # Without PCA: 20, 18
     if mode in ['b', 'd', 'e', 'f']:
         if mode in ['f']:
+            if type(pca_components) != float:
+                raise ValueError("pca_components is of type {} but must be float for Sparse PCA.".format(type(pca_components)))
             # Sparse PCA 
             pca = sk.decomposition.SparsePCA(int(np.ceil(XTrainNum.shape[1]/2))).fit(XTrainNum)
-        elif mode in ['b', 'd', 'e']:
+        else:
             # Usual PCA
-            pca = sk.decomposition.PCA(0.95).fit(XTrainNum)
+            pca = sk.decomposition.PCA(pca_components).fit(XTrainNum)
         XTrainNum = pd.DataFrame( pca.transform( XTrainNum ) )
         XTestNum = pd.DataFrame( pca.transform( XTestNum ) )
         XTrainNum.index = XTrain.index
@@ -354,12 +373,22 @@ def stratified_split(EPIC_enc, mode, EPIC_CUI=None, valid=False):
         if valid:
             # Transform validation set
             XValidNum = pd.DataFrame( pca.transform( XValidNum ) )
-            XValidNum.index = XValidNum
-    XTrain[numCols] = XTrainNum
-    XTest[numCols] = XTest[numCols]
+            XValidNum.index = XValidNum.index
+    # Assign the transformed values back
+    XTrain = pd.concat( [ XTrain[keep_cols], XTrainNum ], axis=1 )
+    XTest = pd.concat( [ XTest[keep_cols], XTestNum ], axis=1 )
+    # XTrain.loc[:, num_cols] = XTrainNum.values()
+    # XTest.loc[:, num_cols] = XTestNum.values()
     if valid:
-        XValid[numCols] = XValid[numCols]
+        # XValid.loc[:, num_cols] = XValid[num_cols].values()
+        XValid = pd.concat( [ XValid[keep_cols], XValidNum ], axis=1 )
         return XTrain, XTest, XValid, yTrain, yTest, yValid
     else:
         return XTrain, XTest, yTrain, yTest
+
+
+
+
+XTrain2, XTest2, XValid2, yTrain2, yTest2, yValid2 = stratified_split(EPIC_enc, numCols, "e", test_size=0.25, EPIC_CUI=EPIC_CUI,
+                                                                      valid=True, valid_size=0.15, seed=27, pca_components=0.95)
 
