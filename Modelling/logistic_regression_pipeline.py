@@ -1,4 +1,5 @@
 from ED_support_module import *
+from ED_support_module import EPICPreprocess
 # from EDA import EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival, numCols, catCols
 
 
@@ -91,26 +92,38 @@ def setup_parser():
 
 
 # Parser arguements
-parser = setup_parser()
-args = parser.parse_args()
+# parser = setup_parser()
+# args = parser.parse_args()
 
 
 
 # ----------------------------------------------------
 # Path to save figures
-path = '/'.join(os.getcwd().split('/')[:3]) + '/Pictures/logistic_regression/'
+fig_path = "/".join(os.getcwd().split("/")[:3]) + "/Pictures/logistic_regression/"
+data_path = "/home/xingliu/Documents/ED/data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+
 
 # Create folder if not already exist
-if not os.path.exists(path):
-    os.makedirs(path)
+if not os.path.exists(fig_path):
+    os.makedirs(fig_path)
 
 
 # ----------------------------------------------------
+# Further preprocessing
+preprocessor = EPICPreprocess.Preprocess(data_path)
+EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival = preprocessor.streamline()
 
-
-
+# Get numerical columns (for transformation)
+num_cols = preprocessor.which_numerical(EPIC)
+num_cols.remove("Primary.Dx")
+num_cols.remove("Will.Return")
 
 # ----------------------------------------------------
+XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival, num_cols, "a", time_threshold=201902, test_size=None,
+                                       EPIC_CUI=EPIC_CUI, seed=27)
+
+
+
 XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival, dynamic=True)
 
 print('Start fitting logistic regression...\n')
