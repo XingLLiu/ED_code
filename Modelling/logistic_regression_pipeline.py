@@ -1,5 +1,6 @@
 from ED_support_module import *
 from ED_support_module import EPICPreprocess
+from ED_support_module import Evaluation
 
 # ----------------------------------------------------
 class DoubleLogisticRegression(sk.linear_model.LogisticRegression):
@@ -125,37 +126,53 @@ time_span = EPIC_arrival['Arrived'].unique().tolist()
 
 # ----------------------------------------------------
 # 2. One-month ahead prediction
-logger.info('Dynamically evaluate the model ...')
+logger.info("Dynamically evaluate the model ...")
 
 
-for j, month in enumerate(time_span[2:-1]):
+for j, time in enumerate(time_span[2:-1]):
+    # Month to be predicted
+    time_pred = time_span[j + 3]
     # Create folder if not already exist
-    dynamic_path = fig_path + "dynamic/" + f"{month}/"
+    dynamic_path = fig_path + "dynamic/" + f"{time_pred}/"
     if not os.path.exists(dynamic_path):
         os.makedirs(dynamic_path)
-
     # Prepare train/test sets
-    XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival, num_cols, "a", time_threshold=month, test_size=None,
+    XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival, num_cols, "a", time_threshold=time, test_size=None,
                                         EPIC_CUI=EPIC_CUI, seed=27)
-
-    # ========= 2.a. Train model ========
+    logger.info("Training for data up to {} ...".format(time))
+    logger.info( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
+                .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+    # ========= 2.a. Model =========
     # Apply SMOTE
     smote = SMOTE(random_state = 27, sampling_strategy = 'auto')
     col_names = XTrain.columns
     XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
     XTrain = pd.DataFrame(XTrain, columns=col_names)
-
     # Fit logistic regression
-    lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l1',
+    model = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
                                         max_iter = 1000).fit(XTrain, yTrain)
     # Re-fit after removing features of zero coefficients
-    lr_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2', max_iter = 1000)
-    logistic_regressor = DoubleLogisticRegression(lr, XTrain, yTrain)
-    lr_new = logistic_regressor.double_fits(lr_new, XTrain, yTrain)
+    model_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2', max_iter = 1000)
+    double_logistic_regressor = DoubleLogisticRegression(model, XTrain, yTrain)
+    model_new = double_logistic_regressor.double_fits(model_new, XTrain, yTrain)
     # Remove features in test set
-    XTest = logistic_regressor.remove_zero_coeffs(XTest)
+    XTest = double_logistic_regressor.remove_zero_coeffs(XTest)
+    pred_new = model_new.predict_proba(XTest)[:, 1]
+    # ========= 2.b. Evaluation =========
+    evaluator = Evaluation.Evaluation(yTest, pred_new)
+    # Save ROC plot
+    _ = evaluator.roc_plot(plot=False, title="LR", save_path=dynamic_path + f"roc_{time_pred}")
+    # Save summary
+    summary_data = evaluator.summary()
+    summary_data.to_csv(dynamic_path + f'summary_{time_pred}.csv', index=False)
 
-    lr_pred_new = lr_new.predict(XTest)    
+
+# ========= 2.c. Summary plots =========
+summary_plot_path = fig_path + "dynamic/"
+evaluator.roc_subplot(summary_plot_path, summary_plot_path, time_span, [3, 3])
+
+
+
 
 
 # ----------------------------------------------------
@@ -166,8 +183,8 @@ lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l1',
 print('Fitting complete\n')
 
 # Save results
-lr_pred = lr.predict(XTest)
-_ = lr_roc_plot(yTest, lr_pred, save_path = fig_path + 'roc_fit1.eps')
+pred = lr.predict(XTest)
+_ = lr_roc_plot(yTest, pred, save_path = fig_path + 'roc_fit1.eps')
 
 # ----------------------------------------------------
 # Re-fit after removing features of zero coefficients
@@ -179,8 +196,8 @@ lr_new = logistic_regressor.double_fits(lr_new, XTrain, yTrain)
 
 XTest = logistic_regressor.remove_zero_coeffs(XTest)
 
-lr_pred_new = lr_new.predict(XTest)
-_ = lr_roc_plot(yTest, lr_pred_new, save_path = fig_path + 'roc_fit2.eps')
+pred_new = lr_new.predict(XTest)
+_ = lr_roc_plot(yTest, pred_new, save_path = fig_path + 'roc_fit2.eps')
 
 
 
