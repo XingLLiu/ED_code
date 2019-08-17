@@ -267,7 +267,7 @@ def vaePredict(loss_train = None, loss_test = None, batch_size = None,
 
 
 # Train-test split by arrival date
-def time_split(data, threshold = 201903, dynamic = False, pred_span = 1):
+def time_split(data, threshold = 201903, dynamic = True, pred_span = 1):
     '''
     Sort data by the feature 'Arrived' and output train and test sets
     as specified by threshold. This can be seen as a special version

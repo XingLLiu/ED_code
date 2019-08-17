@@ -37,7 +37,6 @@ class EPICPreprocess:
         return EPIC, EPIC_CUI, EPIC_arrival
 
 
-
     def CleanColNames(self, EPIC):
         '''
         Takes in EPIC and the same dataset with the
@@ -226,6 +225,55 @@ class EPICPreprocess:
         return EPIC_arrival
     
     
+    def TFIDF(self, EPIC, cui):
+        '''
+        Compute the TF-IDF of the CUIs in cui and append to EPIC.
+        Input : cui: dataframe of the triage notes CUIs. Must contain column Triage.Notes
+                EPIC: dataframe to which the TF-IDFs are appended. Must have Primary.Dx.
+        Output: EPIC: dataframe with the TF-IDFs appended.
+                cuiCols: Column names of the CUIs
+        '''
+        # Find all Sepsis
+        ifSepsis = EPIC['Primary.Dx'] == 1
+        CUISepsis = EPIC.iloc[ifSepsis.values]
+        # Get all unique CUIs
+        triageNotes = {}
+        for i in CUISepsis.index:
+            cuiLst = [cui for cui in CUISepsis.loc[i, 'Triage.Notes']]
+            for cui in cuiLst:
+                if cui not in triageNotes.keys():
+                    triageNotes[cui] = 0
+        # For each unique CUI, count the number of documents that contains it
+        for notes in EPIC['Triage.Notes']:
+            for cui in triageNotes.keys():
+                if cui in notes:
+                    triageNotes[cui] += 1
+        # Create TF-IDF dataframe
+        triageDf = pd.DataFrame(index = range(len(EPIC)),
+                                columns = range(len(triageNotes)),
+                                dtype = 'float')
+        triageDf.iloc[:, :] = 0
+        triageDf.columns = triageNotes.keys()
+        triageDf.index = EPIC.index
+        # Compute TF and IDF
+        corpusLen = len(EPIC)
+        for i in triageDf.index:
+            notes = EPIC.loc[i, 'Triage.Notes']
+            for cui in notes:
+                # Compute TF-IDF if cui is in vocab
+                if cui in triageNotes.keys():
+                    # TF 
+                    tf = sum([term == cui for term in notes]) / len(notes)
+                    # IDF 
+                    idf = np.log( corpusLen / triageNotes[cui] )
+                    # Store TF-IDF
+                    triageDf.loc[i, cui] = tf * idf
+        # Append to EPIC
+        cuiCols = triageDf.columns
+        EPIC = pd.concat([EPIC, triageDf], axis = 1, sort = False)
+        return EPIC, cuiCols
+
+
     def streamline(self):
         # Load data
         EPIC = pd.read_csv(self.path, encoding = 'ISO-8859-1')
@@ -258,3 +306,60 @@ class EPICPreprocess:
 
 
     
+
+
+
+
+
+
+
+
+
+
+
+def stratified_split(EPIC_enc, mode, EPIC_CUI=None, valid=False):
+    # Prepare taining set
+    if mode not in ['a', 'b']:
+        EPIC_enc, cuiCols = TFIDF(EPIC_CUI, EPIC_enc)
+    # Separate input features and target
+    y = EPIC_enc['Primary.Dx']
+    X = EPIC_enc.drop('Primary.Dx', axis = 1)
+    # Prepare train and test sets
+    XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25,
+                                    random_state=seed, stratify=y)
+    if valid:
+        # Prepare validation set
+        XTrain, XValid, yTrain, yValid = sk.model_selection.train_test_split(XTrain, yTrain, test_size=0.15,
+                                        random_state=seed, stratify=yTrain)
+    # Separate the numerical and categorical features
+    if mode in ['c', 'e', 'f']:
+        numCols = numCols + list(cuiCols)
+    # Extract the numerical columns to be transformed
+    XTrainNum = XTrain[numCols]
+    XTestNum = XTest[numCols]
+    if valid:
+        XValidNum = XValid[numCols]
+    # PCA on the numerical entries   # 27, 11  # Without PCA: 20, 18
+    if mode in ['b', 'd', 'e', 'f']:
+        if mode in ['f']:
+            # Sparse PCA 
+            pca = sk.decomposition.SparsePCA(int(np.ceil(XTrainNum.shape[1]/2))).fit(XTrainNum)
+        elif mode in ['b', 'd', 'e']:
+            # Usual PCA
+            pca = sk.decomposition.PCA(0.95).fit(XTrainNum)
+        XTrainNum = pd.DataFrame( pca.transform( XTrainNum ) )
+        XTestNum = pd.DataFrame( pca.transform( XTestNum ) )
+        XTrainNum.index = XTrain.index
+        XTestNum.index = XTest.index
+        if valid:
+            # Transform validation set
+            XValidNum = pd.DataFrame( pca.transform( XValidNum ) )
+            XValidNum.index = XValidNum
+    XTrain[numCols] = XTrainNum
+    XTest[numCols] = XTest[numCols]
+    if valid:
+        XValid[numCols] = XValid[numCols]
+        return XTrain, XTest, XValid, yTrain, yTest, yValid
+    else:
+        return XTrain, XTest, yTrain, yTest
+

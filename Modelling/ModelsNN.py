@@ -98,7 +98,7 @@ else:
     batch_size = 128
     learning_rate = 1e-3
     weight = 1000
-    sample_weight = 1
+    sample_weight = 15
     drop_prob = 0
 
 
@@ -176,6 +176,7 @@ if mode in ['b', 'd', 'e', 'f']:
         # Sparse PCA 
         pca = sk.decomposition.SparsePCA(int(np.ceil(XTrainNum.shape[1]/2))).fit(XTrainNum)
     elif mode in ['b', 'd', 'e']:
+        # Usual PCA
         pca = sk.decomposition.PCA(0.95).fit(XTrainNum)
     XTrainNum = pd.DataFrame(pca.transform(XTrainNum))
     XTestNum = pd.DataFrame(pca.transform(XTestNum))
@@ -299,7 +300,7 @@ else:
     # Time span (3 months of data to up-to-date month - 1)
     timeSpan = [201807, 201808, 201809, 201810, 201811, 201812, 201901, 201902,
                 201903, 201904, 201905, 201906]
-    for j, month in enumerate(timeSpan[2:]):
+    for j, month in enumerate(timeSpan[2:-2]):
         # Construct train/test data
         if mode not in ['a', 'b']:
             EPIC_enc, cuiCols = TFIDF(EPIC_CUI, EPIC_enc)
@@ -346,6 +347,17 @@ else:
         # Train the model
         lossVec = np.zeros(num_epochs)
         for epoch in trange(num_epochs):
+
+
+            train_weights = np.array(sample_weight * yTrain + 1 - yTrain)
+            train_sampler = torch.utils.data.sampler.WeightedRandomSampler( train_weights, len(XTrain) )
+            trainLoader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
+                                                      batch_size = batch_size,
+                                                      shuffle = False,
+                                                      sampler = train_sampler)
+
+
+
             for i, x in enumerate(trainLoader):
                 # Retrieve design matrix and labels
                 labels = x[:, -1].long()
