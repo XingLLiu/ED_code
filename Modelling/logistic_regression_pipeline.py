@@ -1,26 +1,5 @@
 from ED_support_module import *
-from EDA import EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival, numCols, catCols
-
-
-# ----------------------------------------------------
-class TrainTestSplit:
-    '''
-    Subclassing sklearn.model_selection.
-    '''
-    def __init__(self, mode):
-        self.mode = mode
-    def StratifiedSplit(self, EPIC, test_size, response, random_state=None):
-        '''
-
-        '''
-        y = EPIC[response]
-        X = EPIC.drop('Primary.Dx', axis = 1)
-        XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=test_size,
-                                        random_state=random_state, stratify=y)
-        XTrain, XValid, yTrain, yValid = sk.model_selection.train_test_split(XTrain, yTrain, test_size=0.15,
-                                        random_state=random_state, stratify=yTrain)
-
-
+# from EDA import EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival, numCols, catCols
 
 
 
@@ -126,11 +105,12 @@ if not os.path.exists(path):
     os.makedirs(path)
 
 
+# ----------------------------------------------------
+
+
+
 
 # ----------------------------------------------------
-y = EPIC_enc['Primary.Dx']
-X = EPIC_enc.drop('Primary.Dx', axis = 1)
-
 XTrain, XTest, yTrain, yTest = time_split(EPIC_arrival, dynamic=True)
 
 print('Start fitting logistic regression...\n')

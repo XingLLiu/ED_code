@@ -319,6 +319,82 @@ def dynamic_summary(summary, p_num, n_num):
     return(summary)
 
 
+# Split EPIC_enc into train/test/(valid)
+def stratified_split(EPIC_enc, num_cols, mode, test_size,
+                     EPIC_CUI=None, valid_size=None, pca_components=None, seed=None):
+    '''
+    Split EPIC_enc into train/test/(valid) with/without PCA/Sparse PCA (see 'mode'). This can be
+    used as a substitute of sklearn.model_selection.TrainTestSplit.
+    Input : num_cols = [list or pd.Index] names of numerical cols to be transformed.
+            cui_cols = [list or pd.Index] names of CUI cols to be transformed if
+                       EPIC_CUI is not None.
+            valid_size = [float] proportion of train set to be split into valid set. None if
+                          no validation is required.
+            mode = [str] must be one of the following:
+                            a -- No PCA, no TF-IDF
+                            b -- PCA, no TF-IDF
+                            c -- No PCA, TF-IDF
+                            d -- PCA, but not on TF-IDF
+                            e -- PCA, TF-IDF
+                            f -- Sparse PCA, TF-IDF
+    Output: XTrain, XTest, (XValid), yTrain, yTest, (yValid)
+    '''
+    # Prepare taining set
+    if mode not in ['a', 'b']:
+        try:
+            EPIC_enc, cui_cols = TFIDF(EPIC_CUI, EPIC_enc)
+            EPIC_arrival = pd.concat([EPIC_enc, EPIC_arrival['Arrived']], axis = 1)
+        except:
+            raise ValueError("EPIC_CUI must be given when including TF-IDF")
+    # Separate input features and target
+    y = EPIC_enc['Primary.Dx']
+    X = EPIC_enc.drop('Primary.Dx', axis = 1)
+    # Prepare train and test sets
+    XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=test_size,
+                                    random_state=seed, stratify=y)
+    if valid_size != None:
+        # Prepare validation set
+        XTrain, XValid, yTrain, yValid = sk.model_selection.train_test_split(XTrain, yTrain, test_size=valid_size,
+                                        random_state=seed, stratify=yTrain)
+    # Separate the numerical features
+    if mode in ['c', 'e', 'f']:
+        num_cols = num_cols + list(cui_cols)
+    # Extract the numerical columns to be transformed
+    XTrainNum = XTrain[num_cols]
+    XTestNum = XTest[num_cols]
+    if valid_size != None:
+        XValidNum = XValid[num_cols]
+    # PCA on the numerical entries   # 27, 11  # Without PCA: 20, 18
+    if mode in ['b', 'd', 'e', 'f']:
+        if mode in ['f']:
+            if type(pca_components) != float:
+                raise ValueError("pca_components is of type {} but must be float for Sparse PCA.".format(type(pca_components)))
+            # Sparse PCA 
+            pca = sk.decomposition.SparsePCA(int(np.ceil(XTrainNum.shape[1]/2))).fit(XTrainNum)
+        else:
+            # Usual PCA
+            pca = sk.decomposition.PCA(pca_components).fit(XTrainNum)
+        # Assign the transformed values back
+        XTrainNum = pd.DataFrame( pca.transform( XTrainNum ) )
+        XTestNum = pd.DataFrame( pca.transform( XTestNum ) )
+        XTrainNum.index = XTrain.index
+        XTestNum.index = XTest.index
+        if valid_size != None:
+            # Transform validation set
+            XValidNum = pd.DataFrame( pca.transform( XValidNum ) )
+            XValidNum.index = XValidNum.index
+    # Assign the transformed values back
+    keep_cols = [col for col in X.columns if col not in num_cols]
+    XTrain = pd.concat( [ XTrain[keep_cols], XTrainNum ], axis=1 )
+    XTest = pd.concat( [ XTest[keep_cols], XTestNum ], axis=1 )
+    if valid_size != None:
+        XValid = pd.concat( [ XValid[keep_cols], XValidNum ], axis=1 )
+        return XTrain, XTest, XValid, yTrain, yTest, yValid
+    else:
+        return XTrain, XTest, yTrain, yTest
+
+
+
 # # Dynamic prediction ROC
 # def dynamic_roc():
 # # Create a directory if not exists

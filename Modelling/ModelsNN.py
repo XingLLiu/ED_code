@@ -297,10 +297,11 @@ if not useTime:
 else:
     print('Dynamically evaluate the model.')
 
-    # Time span (3 months of data to up-to-date month - 1)
-    timeSpan = [201807, 201808, 201809, 201810, 201811, 201812, 201901, 201902,
-                201903, 201904, 201905, 201906]
-    for j, month in enumerate(timeSpan[2:-2]):
+    # Time span
+    timeSpan = EPIC_arrival['Arrived'].unique().tolist()
+
+    # 3 months of data to up-to-date month - 1
+    for j, month in enumerate(timeSpan[2:-1]):
         # Construct train/test data
         if mode not in ['a', 'b']:
             EPIC_enc, cuiCols = TFIDF(EPIC_CUI, EPIC_enc)
