@@ -161,10 +161,10 @@ for j, time in enumerate(time_span[2:-1]):
     # ========= 2.b. Evaluation =========
     evaluator = Evaluation.Evaluation(yTest, pred_new)
     # Save ROC plot
-    _ = evaluator.roc_plot(plot=False, title="LR", save_path=dynamic_path + f"roc_{time_pred}")
+    _ = evaluator.roc_plot(plot = False, title = "LR", save_path = dynamic_path + f"roc_{time_pred}")
     # Save summary
     summary_data = evaluator.summary()
-    summary_data.to_csv(dynamic_path + f'summary_{time_pred}.csv', index=False)
+    summary_data.to_csv(dynamic_path + f"summary_{time_pred}.csv", index = False)
 
 
 # ========= 2.c. Summary plots =========
@@ -173,6 +173,8 @@ summary_plot_path = fig_path + "dynamic/"
 evaluator.roc_subplot(summary_plot_path, time_span, [3, 3])
 # Aggregate ROC
 aggregate_summary = evaluator.roc_aggregate(summary_plot_path, time_span)
+# Save aggregate summary
+aggregate_summary.to_csv(summary_plot_path + "aggregate_summary.csv", index = False)
 
 
 

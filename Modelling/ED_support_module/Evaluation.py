@@ -114,8 +114,9 @@ class Evaluation:
             else:
                 summary = pd.read_csv(csv_name) + summary
         # Compute aggregate TPR and FPR
-        tpr = summary['TP'] / (summary['TP'] + summary['FN'])
-        fpr = summary['FP'] / (summary['TN'] + summary['FP'])
+        # Adding a regularization term for numerical stability
+        tpr = summary['TP'] / (summary['TP'] + summary['FN'] + 1e-8)
+        fpr = summary['FP'] / (summary['TN'] + summary['FP'] + 1e-8)
         roc_auc = sk.metrics.auc(fpr, tpr)
         # Plot ROC
         _ = plt.title('One-month Ahead Aggregate ROC')

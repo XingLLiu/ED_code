@@ -301,7 +301,7 @@ else:
     timeSpan = EPIC_arrival['Arrived'].unique().tolist()
 
     # 3 months of data to up-to-date month - 1
-    for j, month in enumerate(timeSpan[2:-1]):
+    for j, month in enumerate(timeSpan[8:-1]):
         # Construct train/test data
         if mode not in ['a', 'b']:
             EPIC_enc, cuiCols = TFIDF(EPIC_CUI, EPIC_enc)
