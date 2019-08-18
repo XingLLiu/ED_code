@@ -169,35 +169,36 @@ for j, time in enumerate(time_span[2:-1]):
 
 # ========= 2.c. Summary plots =========
 summary_plot_path = fig_path + "dynamic/"
-evaluator.roc_subplot(summary_plot_path, summary_plot_path, time_span, [3, 3])
+# Subplots of ROCs
+evaluator.roc_subplot(summary_plot_path, time_span, [3, 3])
+# Aggregate ROC
+aggregate_summary = evaluator.roc_aggregate(summary_plot_path, time_span)
 
 
 
+# # ----------------------------------------------------
+# # Fit logistic regression
+# print('Start fitting logistic regression...\n')
+# lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l1',
+#                                         max_iter = 1000).fit(XTrain, yTrain)
+# print('Fitting complete\n')
 
+# # Save results
+# pred = lr.predict(XTest)
+# _ = lr_roc_plot(yTest, pred, save_path = fig_path + 'roc_fit1.eps')
 
-# ----------------------------------------------------
-# Fit logistic regression
-print('Start fitting logistic regression...\n')
-lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l1',
-                                        max_iter = 1000).fit(XTrain, yTrain)
-print('Fitting complete\n')
+# # ----------------------------------------------------
+# # Re-fit after removing features of zero coefficients
 
-# Save results
-pred = lr.predict(XTest)
-_ = lr_roc_plot(yTest, pred, save_path = fig_path + 'roc_fit1.eps')
+# # Refit
+# lr_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2', max_iter = 1000)
+# logistic_regressor = DoubleLogisticRegression(lr, XTrain, yTrain)
+# lr_new = logistic_regressor.double_fits(lr_new, XTrain, yTrain)
 
-# ----------------------------------------------------
-# Re-fit after removing features of zero coefficients
+# XTest = logistic_regressor.remove_zero_coeffs(XTest)
 
-# Refit
-lr_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2', max_iter = 1000)
-logistic_regressor = DoubleLogisticRegression(lr, XTrain, yTrain)
-lr_new = logistic_regressor.double_fits(lr_new, XTrain, yTrain)
-
-XTest = logistic_regressor.remove_zero_coeffs(XTest)
-
-pred_new = lr_new.predict(XTest)
-_ = lr_roc_plot(yTest, pred_new, save_path = fig_path + 'roc_fit2.eps')
+# pred_new = lr_new.predict(XTest)
+# _ = lr_roc_plot(yTest, pred_new, save_path = fig_path + 'roc_fit2.eps')
 
 
 

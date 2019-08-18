@@ -60,22 +60,23 @@ class Evaluation:
         summary['FP'] = (summary['FPR'] * n_num).round().astype('int')
         summary['TN'] = n_num - summary['FP']
         return(summary)
-    def roc_subplot(self, data_path, save_path, time_span, dim, eps=False):
+    def roc_subplot(self, data_path, time_span, dim, eps=False, save_path=None):
         '''
         ROC subplot of all months.
-        Input : data_path = [str] Path to the folder containing subfolders of data of 
+        Input : data_path = [str] Path to the folder containing subfolders of data of
                             each month. Data must contain "TPR" and "FPR"
                 save_path = [str] path to save figure. Equals data_path by default.
                 time_span = [list of int] time span of the data in the form YYYYMM.
                 dim = [list] list of 2 integers indicating the dimension of
                       subplot.
         '''
+        if save_path is None:
+            save_path = data_path
         for i, time in enumerate(time_span[3:]):
             # Load data
             try:
                 csv_name = data_path + f'{time}/summary_{time}.csv'
                 summary = pd.read_csv(csv_name)
-                print("{}".format(time))
             except:
                 Warning(f"Error in loading data for {time}! Check if it exists or contains columns \'TPR\', \'FPR\'.")
                 continue
@@ -88,16 +89,57 @@ class Evaluation:
             _ = plt.title(f'ROC {month_pred}')
             _ = plt.plot(fpr, tpr, 'b', label = 'AUC = %0.2f' % roc_auc)
             _ = plt.legend(loc = 'lower right')
-            _ = plt.plot([0, 1], [0, 1],'r--')
+            _ = plt.plot([0, 1], [0, 1.01],'r--')
             _ = plt.xlim([0, 1])
-            _ = plt.ylim([0, 1])
+            _ = plt.ylim([0, 1.01])
             _ = plt.ylabel('True Positive Rate')
             _ = plt.xlabel('False Positive Rate')
         plt.tight_layout()
+        if eps:
+            plt.savefig(save_path + 'full_roc.eps', format='eps', dpi=1000)
+        else:
+            plt.savefig(save_path + 'full_roc.png')
+        plt.close()
+    def roc_aggregate(self, data_path, time_span, eps=False, save_path=None):
+        '''
+        Plot aggregate ROC (overall FPR vs. TPR)
+        '''
+        if save_path is None:
+            save_path = data_path
+        for i, time in enumerate(time_span[3:]):
+            # Load and make aggregate data
+            csv_name = data_path + f'{time}/summary_{time}.csv'
+            if i == 0:
+                summary = pd.read_csv(csv_name)
+            else:
+                summary = pd.read_csv(csv_name) + summary
+        # Compute aggregate TPR and FPR
+        tpr = summary['TP'] / (summary['TP'] + summary['FN'])
+        fpr = summary['FP'] / (summary['TN'] + summary['FP'])
+        roc_auc = sk.metrics.auc(fpr, tpr)
+        # Plot ROC
+        _ = plt.title('One-month Ahead Aggregate ROC')
+        _ = plt.plot(fpr, tpr, 'b', label = 'AUC = %0.3f' % roc_auc)
+        _ = plt.legend(loc = 'lower right')
+        _ = plt.plot([0, 1], [0, 1],'r--')
+        _ = plt.xlim([0, 1])
+        _ = plt.ylim([0, 1.01])
+        _ = plt.ylabel('True Positive Rate')
+        _ = plt.xlabel('False Positive Rate')
         if eps:
             plt.savefig(save_path + 'aggregate_roc.eps', format='eps', dpi=1000)
         else:
             plt.savefig(save_path + 'aggregate_roc.png')
         plt.close()
+        summary['TPR'] = tpr
+        summary['FPR'] = fpr
+        return summary
+    
+    
+    # def load_data(self, data_path):
+    #     '''
+    #     Data loader for this specific class. For developer's use.
+    #     '''
+
 
 
