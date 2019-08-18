@@ -1,6 +1,11 @@
 from ED_support_module import *
 
 class Evaluation:
+    '''
+    Class for plotting and summarizing ROC for each month and on aggregate.
+    Input : y_test = [list or Series] real response values.
+            pred_prob = [list or Series] predicted probability of class 1.
+    '''
     def __init__(self, y_test, pred_prob):
         self.pred_prob = pred_prob
         self.y_test = y_test
