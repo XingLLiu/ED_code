@@ -425,6 +425,51 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
                                cui_cols=cui_cols, valid_size=valid_size, pca_components=pca_components, seed=seed)
 
 
+# Given FPR, find the corresponding predicted response
+def threshold_predict(pred_prob, y_data, fpr=0.05):
+    '''
+    Predict y values by controling the false positive rate.
+    Input : pred_prob = predicted scores. Higher for class 1.
+    '''
+    # Initialization
+    num_fp = int( np.round( len( y_data ) * fpr ) )
+    y_data = pd.Series(y_data)
+    fprLst, tprLst = [], []
+    threshold = np.linspace(0, 1, 501)
+    score_sorted = np.argsort(pred_prob)
+    # Find threshold
+    for i in range(len(threshold)):
+        indices_with_preds = score_sorted[-int(np.ceil( threshold[i] * y_data.shape[0] )):]
+        y_pred = y_data * 0
+        y_pred.iloc[indices_with_preds] = 1
+        current_fpr = false_positive_rate(y_data, y_pred)
+        # Stop if the current FPR is just over the desired fpr
+        if current_fpr < fpr and i > 0:
+            break
+    # Return the predicted response vector
+    if i == len(threshold):
+        Warning("All thresholds give a FPR lower than the given value. Make sure it is from 0 to 1.")
+    return y_pred
+
+
+# Helper function for threshold_predict. For developer's use
+def false_positive_rate(y_data, y_pred):
+    true_positive = ( (y_pred == 1) & (y_data == 1) ).sum()
+    positive = y_data.sum()
+    if positive != 0:
+        fpr = 1 - true_positive / positive
+    else:
+        fpr = 0
+        Warning("No positives detected. Filled in by 0 for FPR instead.")
+    return fpr
+
+
+# Compute TPR
+def true_positive_rate(y_data, y_pred):
+    fpr = false_positive_rate(y_data, y_pred)
+    return 1 - fpr
+
+
 
 # def time_time_split(EPIC_enc, num_cols, mode,
 #                     EPIC_CUI=None, valid_size=None, pca_components=None, seed=None,

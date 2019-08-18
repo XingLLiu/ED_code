@@ -2,69 +2,24 @@ from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
 
+
 # ----------------------------------------------------
-class DoubleLogisticRegression(sk.linear_model.LogisticRegression):
-    def __init__(self, lr, XTrain, yTrain):
-        '''
-        Input : X = [DataFrame] design matrix.
-                y = [DataFrame] response.
-        '''
-        super().__init__()
-        self.X = XTrain
-        self.y = yTrain
-        self.lr = lr
-        self.colNames = self.X.columns
-    def which_zero(self):
-        '''
-        Check which coefficients of the LR model are zero.
-        Input : lr = [object] logistic regression model.
-        Output: coeffsRm = [list] names of the columns to be reomved
-        '''
-        # Find zero coefficients
-        ifZero = (self.lr.coef_ == 0).reshape(-1)
-        coeffsRm = [ self.colNames[i] for i in range(self.X.shape[1]) if ifZero[i] ]
-        return coeffsRm
-    def remove_zero_coeffs(self, data):
-        '''
-        Remove the features whose coefficients are zero.
-        '''
-        # Get names of columns to be kept
-        notZero = (self.lr.coef_ != 0).reshape(-1)
-        whichKeep = pd.Series( range( len( notZero ) ) )
-        whichKeep = whichKeep.loc[notZero]
-        # Remove the features 
-        data = data.iloc[:, whichKeep].copy()
-        return data
-    # def double_fits(self, XTrain, yTrain, penalty, max_iter=None):
-    #     '''
-    #     Fit the logistic regression with l1 penalty and refit
-    #     after removing all features with zero coefficients.
-    #     Input : model: [object] fitted logistic regression model.
-    #             penalty: [str] penalty to be used for the refitting.
-    #             max_iter: [int] maximum no. of iterations.
-    #     Output: lr_new: [object] refitted logistic regression model.
-    #     '''
-    #     lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = penalty,
-    #                                             max_iter = max_iter).fit(XTrain, yTrain)
-    #     XTrain = self.remove_zero_coeffs(XTrain)
-    #     lr_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = penalty,
-    #                                                 max_iter = max_iter).fit(XTrain, yTrain)
-    #     return lr_new
-    def double_fits(self, lr_new, XTrain, yTrain):
-        '''
-        Fit the logistic regression with l1 penalty and refit
-        after removing all features with zero coefficients.
-        Input : model: [object] instantiated logistic regression model.
-                penalty: [str] penalty to be used for the refitting.
-                max_iter: [int] maximum no. of iterations.
-        Output: lr_new: [object] refitted logistic regression model.
-        '''
-        XTrain = self.remove_zero_coeffs(XTrain)
-        lr_new_fitted = lr_new.fit(XTrain, yTrain)
-        return lr_new_fitted
-
-
-
+# Supporting functions and classes
+def add_method(y_true, fpr):
+    '''
+    Add method to RandomForestClassifier for evaluating feature importance.
+    Evaluation metric would be the TPR corresponding to the given FPR.
+    Input : y_true = [list or Series] true response values.
+            fpr = [float] threshold false positive rate.
+    '''
+    def rf_threshold_predict(self, x_data, y_true=y_true, fpr=fpr):
+        # Predicted probability
+        pred_prob = self.predict_proba(x_data)[:, 1]
+        # Predicted response vector
+        y_pred = threshold_predict(pred_prob, y_true, fpr)
+        return y_pred
+    
+    sk.ensemble.RandomForestClassifier.threshold_predict = rf_threshold_predict
 
 
 # ----------------------------------------------------
@@ -75,6 +30,8 @@ N_ESTIMATORS = 4000
 MAX_DEPTH = 30
 MAX_FEATURES = "auto"
 CLASS_WEIGHT = 500
+MODE = "a"
+FPR_THRESHOLD = 0.1
 
 
 # Arguments
@@ -142,8 +99,8 @@ for j, time in enumerate(time_span[2:-1]):
     if not os.path.exists(DYNAMIC_PATH):
         os.makedirs(DYNAMIC_PATH)
     # Prepare train/test sets
-    XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival, num_cols, "a", time_threshold=time, test_size=None,
-                                        EPIC_CUI=EPIC_CUI, seed=RANDOM_SEED)
+    XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival, num_cols, MODE, time_threshold=time, test_size=None,
+                                           EPIC_CUI=EPIC_CUI, seed=RANDOM_SEED)
     print("Training for data up to {} ...".format(time))
     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
@@ -159,7 +116,7 @@ for j, time in enumerate(time_span[2:-1]):
                                             class_weight = {0:1, 1:CLASS_WEIGHT}).fit(XTrain, yTrain)
     # Prediction
     pred = model.predict_proba(XTest)[:, 1]
-    # ========= 2.a.ii. Plot Feature importances by Gini impurity =========
+    # ========= 2.a.ii. Feature importances by Gini impurity =========
     # Get importance scores
     importance_vals = model.feature_importances_
     std = np.std( [tree.feature_importances_ for tree in model.estimators_] , axis=0 )
@@ -171,6 +128,20 @@ for j, time in enumerate(time_span[2:-1]):
     _ = plt.yticks(fontsize = 4)
     plt.savefig(DYNAMIC_PATH + f"feature_imp_by_gini_{time_pred}.eps", format = 'eps', dpi = 800)
     plt.close()
+    # ========= 2.a.iii. Feature importance by permutation test =========
+    # Add method for feature importance evaluation
+    add_method(y_true = yTest, fpr = FPR_THRESHOLD)
+    # Permutation test
+    imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
+                            predict_method = model.threshold_predict,
+                            X = np.array(XTest),
+                            y = np.array(yTest),
+                            metric = true_positive_rate,
+                            num_rounds = 10,
+                            seed = RANDOM_SEED)
+    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    # Save feature importance plot
+    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
     # ========= 2.b. Evaluation =========
     evaluator = Evaluation.Evaluation(yTest, pred)
     # Save ROC plot
@@ -178,18 +149,6 @@ for j, time in enumerate(time_span[2:-1]):
     # Save summary
     summary_data = evaluator.summary()
     summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
-    # ========= 2.c. Feature importance =========
-    # Permutation test
-    imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
-                            predict_method = model.predict,
-                            X = np.array(XTest),
-                            y = np.array(yTest),
-                            metric = sk.metrics.f1_score,
-                            num_rounds = 15,
-                            seed = RANDOM_SEED)
-    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    # Save feature importance plot
-    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
     # ========= End of iteration =========
     print("Completed evaluation for {}.\n".format(time_pred))
 
