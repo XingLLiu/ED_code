@@ -68,11 +68,20 @@ class DoubleLogisticRegression(sk.linear_model.LogisticRegression):
 
 
 # ----------------------------------------------------
-# 0. Preliminary settings
-logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
-                    datefmt = '%m/%d/%Y %H:%M:%S',
-                    level = logging.INFO)
-logger = logging.getLogger(__name__)
+# ========= 0. Preliminary seetings =========
+RANDOM_SEED = 27
+
+# # Set logger
+# logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
+#                     datefmt = '%m/%d/%Y %H:%M:%S',
+#                     level = logging.INFO)
+# console = logging.StreamHandler()
+# console.setLevel(logging.INFO)
+# formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+# console.setFormatter(formatter)
+# logging.getLogger("").addHandler(console)
+# logger = logging.getLogger("Activity")
+
 
 # Arguments
 def setup_parser():
@@ -112,7 +121,7 @@ if not os.path.exists(fig_path):
 
 
 # ----------------------------------------------------
-# 1. Further preprocessing
+# ========= 1. Further preprocessing =========
 preprocessor = EPICPreprocess.Preprocess(data_path)
 EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival = preprocessor.streamline()
 
@@ -124,10 +133,12 @@ num_cols.remove("Will.Return")
 # Get time span
 time_span = EPIC_arrival['Arrived'].unique().tolist()
 
-# ----------------------------------------------------
-# 2. One-month ahead prediction
-logger.info("Dynamically evaluate the model ...")
 
+# ----------------------------------------------------
+# ========= 2.a. One-month ahead prediction =========
+print("====================================")
+print("Dynamically evaluate the model ...\n")
+quit()
 
 for j, time in enumerate(time_span[2:-1]):
     # Month to be predicted
@@ -138,13 +149,13 @@ for j, time in enumerate(time_span[2:-1]):
         os.makedirs(dynamic_path)
     # Prepare train/test sets
     XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival, num_cols, "a", time_threshold=time, test_size=None,
-                                        EPIC_CUI=EPIC_CUI, seed=27)
-    logger.info("Training for data up to {} ...".format(time))
-    logger.info( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
+                                        EPIC_CUI=EPIC_CUI, seed=RANDOM_SEED)
+    print("Training for data up to {} ...".format(time))
+    print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
-    # ========= 2.a. Model =========
+    # ========= 2.a.i. Model =========
     # Apply SMOTE
-    smote = SMOTE(random_state = 27, sampling_strategy = 'auto')
+    smote = SMOTE(random_state = RANDOM_SEED, sampling_strategy = 'auto')
     col_names = XTrain.columns
     XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
     XTrain = pd.DataFrame(XTrain, columns=col_names)
@@ -158,6 +169,16 @@ for j, time in enumerate(time_span[2:-1]):
     # Remove features in test set
     XTest = double_logistic_regressor.remove_zero_coeffs(XTest)
     pred_new = model_new.predict_proba(XTest)[:, 1]
+    # ========= 2.a.ii. Plot beta values =========
+    # Plot the features whose coefficients are the top 50 largest in magnitude
+    non_zero_coeffs = model_new.coef_[model_new.coef_ != 0]
+    indices = np.argsort(abs(non_zero_coeffs))[::-1][:50]
+    _ = plt.figure()
+    _ = plt.title("Logistic Regression Coefficients Values")
+    _ = sns.barplot(y = XTest.columns[indices], x = np.squeeze(non_zero_coeffs)[indices])
+    _ = plt.yticks(fontsize = 4)
+    plt.savefig(dynamic_path + f"coeffs_{time_pred}.eps", format = 'eps', dpi = 800)
+    plt.close()
     # ========= 2.b. Evaluation =========
     evaluator = Evaluation.Evaluation(yTest, pred_new)
     # Save ROC plot
@@ -165,9 +186,26 @@ for j, time in enumerate(time_span[2:-1]):
     # Save summary
     summary_data = evaluator.summary()
     summary_data.to_csv(dynamic_path + f"summary_{time_pred}.csv", index = False)
+    # ========= 2.c. Feature importance =========
+    # Permutation test
+    imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
+                    predict_method = model_new.predict,
+                    X = np.array(XTest),
+                    y = np.array(yTest),
+                    metric = sk.metrics.f1_score,
+                    num_rounds = 15,
+                    seed = RANDOM_SEED)
+    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, "LR")
+    # Save feature importance plot
+    fi_evaluator.FI_plot(save_path = dynamic_path, y_fontsize = 4, eps = True)
+    # ========= End of iteration =========
+    print("Completed evaluation for {}.\n".format(time_pred))
+
 
 
 # ========= 2.c. Summary plots =========
+print("Saving summary plots ...")
+
 summary_plot_path = fig_path + "dynamic/"
 # Subplots of ROCs
 evaluator.roc_subplot(summary_plot_path, time_span, [3, 3])
@@ -176,35 +214,5 @@ aggregate_summary = evaluator.roc_aggregate(summary_plot_path, time_span)
 # Save aggregate summary
 aggregate_summary.to_csv(summary_plot_path + "aggregate_summary.csv", index = False)
 
-
-
-# # ----------------------------------------------------
-# # Fit logistic regression
-# print('Start fitting logistic regression...\n')
-# lr = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l1',
-#                                         max_iter = 1000).fit(XTrain, yTrain)
-# print('Fitting complete\n')
-
-# # Save results
-# pred = lr.predict(XTest)
-# _ = lr_roc_plot(yTest, pred, save_path = fig_path + 'roc_fit1.eps')
-
-# # ----------------------------------------------------
-# # Re-fit after removing features of zero coefficients
-
-# # Refit
-# lr_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2', max_iter = 1000)
-# logistic_regressor = DoubleLogisticRegression(lr, XTrain, yTrain)
-# lr_new = logistic_regressor.double_fits(lr_new, XTrain, yTrain)
-
-# XTest = logistic_regressor.remove_zero_coeffs(XTest)
-
-# pred_new = lr_new.predict(XTest)
-# _ = lr_roc_plot(yTest, pred_new, save_path = fig_path + 'roc_fit2.eps')
-
-
-
-
-
-
+print("Summary plots saved at {}".format(summary_plot_path))
 

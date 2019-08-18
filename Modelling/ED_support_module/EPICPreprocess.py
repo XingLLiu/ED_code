@@ -27,7 +27,7 @@ class Preprocess:
         # Convert three cols of notes to list
         for col in notes:
             noteLst = pd.Series( map( lambda note: note[2:-2].split('\', \''), EPIC_CUI[col] ) )
-            EPIC_CUI[col] = noteLst
+            EPIC_CUI.loc[:, col] = noteLst.values
         # Change 'Disch.Date.Time' and 'Roomed' to categorical
         EPIC['Disch.Date.Time'] = EPIC['Disch.Date.Time'].astype('object')
         EPIC['Roomed'] = EPIC['Roomed'].astype('object')

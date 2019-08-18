@@ -135,8 +135,58 @@ class Evaluation:
         summary['TPR'] = tpr
         summary['FPR'] = fpr
         return summary
-    
-    
+
+
+
+class FeatureImportance:
+    def __init__(self, mean, var, feature_names, model_name=None):
+        '''
+        Class for evaluating feature importance
+        Input : mean = [list, Series] vector of means of the importance scores.
+                var = [list, Series] vector of variances of the importance scores.
+                model_name = [str] name of the model used in title of plot
+        '''
+        self.mean = mean
+        self.var = var
+        self.feature_names = feature_names
+        self.model_name = model_name
+        self.indices = np.argsort(self.mean)[::-1]
+        self.sorted_names = self.feature_names[self.indices]
+    def FI_plot(self, sorted_features=None, save_path=None, y_fontsize=8, eps=False):
+        '''
+        Plot the feature importance.
+        Input : sorted_features = [list] If given, this would be used as the y-ticks on the plot.
+                                  Default as feature_names sorted by the mean scores.
+        '''
+        if sorted_features is None:
+            sorted_features = self.sorted_names
+        std = np.std(self.var, axis=1)
+        # Plot importance values
+        _ = plt.figure()
+        _ = plt.title(f"{self.model_name} Feature Importance WITH Std. Dev.")
+        _ = sns.barplot(y = sorted_features, x = self.mean[self.indices],
+                        xerr = std[self.indices])
+        _ = plt.yticks(fontsize = y_fontsize)
+        if save_path is not None:
+            if eps:
+                plt.savefig(save_path + "feature_importance.eps", format="eps", dpi=800)
+            else:
+                plt.savefig(save_path + "feature_importance.png")
+            plt.close()
+        else:
+            plt.show()
+    def sort_feature_names(self):
+        '''
+        Return a [list] of feature name sorted by the mean scores.
+        '''
+        return self.sorted_names
+
+
+
+
+
+
+
     # def load_data(self, data_path):
     #     '''
     #     Data loader for this specific class. For developer's use.
