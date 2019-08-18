@@ -26,11 +26,11 @@ def add_method(y_true, fpr):
 # ========= 0. Preliminary seetings =========
 MODEL_NAME = "RF"
 RANDOM_SEED = 27
+CLASS_WEIGHT = 500
+MODE = "a"
 N_ESTIMATORS = 4000
 MAX_DEPTH = 30
 MAX_FEATURES = "auto"
-CLASS_WEIGHT = 500
-MODE = "a"
 FPR_THRESHOLD = 0.1
 
 
@@ -59,8 +59,6 @@ def setup_parser():
 # args = parser.parse_args()
 
 
-
-# ----------------------------------------------------
 # Path to save figures
 FIG_PATH = "/".join(os.getcwd().split("/")[:3]) + "/Pictures/random_forest/"
 DATA_PATH = "/home/xingliu/Documents/ED/data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
@@ -98,12 +96,20 @@ for j, time in enumerate(time_span[2:-1]):
     DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
     if not os.path.exists(DYNAMIC_PATH):
         os.makedirs(DYNAMIC_PATH)
+    
     # Prepare train/test sets
-    XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival, num_cols, MODE, time_threshold=time, test_size=None,
-                                           EPIC_CUI=EPIC_CUI, seed=RANDOM_SEED)
+    XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival,
+                                            num_cols,
+                                            MODE,
+                                            time_threshold = time,
+                                            test_size = None,
+                                            EPIC_CUI = EPIC_CUI,
+                                            seed = RANDOM_SEED)
+
     print("Training for data up to {} ...".format(time))
     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+
     # ========= 2.a.i. Model =========
     # Apply SMOTE only if class weight is 1
     if CLASS_WEIGHT == 1:
@@ -111,11 +117,16 @@ for j, time in enumerate(time_span[2:-1]):
         col_names = XTrain.columns
         XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
         XTrain = pd.DataFrame(XTrain, columns=col_names)
-    # Fit logistic regression
-    model = sk.ensemble.RandomForestClassifier(n_estimators = N_ESTIMATORS, max_depth = MAX_DEPTH, max_features = MAX_FEATURES,
-                                            class_weight = {0:1, 1:CLASS_WEIGHT}).fit(XTrain, yTrain)
+    
+    # Fit model
+    model = sk.ensemble.RandomForestClassifier(n_estimators = N_ESTIMATORS,
+                                               max_depth = MAX_DEPTH,
+                                               max_features = MAX_FEATURES,
+                                               class_weight = {0:1, 1:CLASS_WEIGHT}).fit(XTrain, yTrain)
+
     # Prediction
     pred = model.predict_proba(XTest)[:, 1]
+
     # ========= 2.a.ii. Feature importances by Gini impurity =========
     # Get importance scores
     importance_vals = model.feature_importances_
@@ -128,9 +139,11 @@ for j, time in enumerate(time_span[2:-1]):
     _ = plt.yticks(fontsize = 4)
     plt.savefig(DYNAMIC_PATH + f"feature_imp_by_gini_{time_pred}.eps", format = 'eps', dpi = 800)
     plt.close()
+
     # ========= 2.a.iii. Feature importance by permutation test =========
     # Add method for feature importance evaluation
     add_method(y_true = yTest, fpr = FPR_THRESHOLD)
+
     # Permutation test
     imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
                             predict_method = model.threshold_predict,
@@ -139,16 +152,21 @@ for j, time in enumerate(time_span[2:-1]):
                             metric = true_positive_rate,
                             num_rounds = 10,
                             seed = RANDOM_SEED)
-    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+
     # Save feature importance plot
+    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
     fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+
     # ========= 2.b. Evaluation =========
     evaluator = Evaluation.Evaluation(yTest, pred)
+
     # Save ROC plot
     _ = evaluator.roc_plot(plot = False, title = MODEL_NAME, save_path = DYNAMIC_PATH + f"roc_{time_pred}")
+
     # Save summary
     summary_data = evaluator.summary()
     summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
+
     # ========= End of iteration =========
     print("Completed evaluation for {}.\n".format(time_pred))
 
