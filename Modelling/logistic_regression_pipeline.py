@@ -65,11 +65,82 @@ class DoubleLogisticRegression(sk.linear_model.LogisticRegression):
 
 
 
+def which_zero(self, col_names):
+    '''
+    Check which coefficients of the LR model are zero.
+    Input : col_names = [list or Series] column names.
+    Output: coeffs_rm = [list] names of the columns to be reomved.
+    '''
+    # Find zero coefficients
+    if_zero = (self.coef_ == 0).reshape(-1)
+    coeffs_rm = [ col_names[i] for i in range( len( col_names ) ) if if_zero[i] ]
+    return coeffs_rm
+
+
+def remove_zero_coef_(self, x_data):
+    '''
+    Remove the features whose coefficients are zero.
+    Input : x_data = [DataFrame] design matrix used to fit model.
+    Output: x_data = [DataFrame] design matrix with the columns of zero
+                     coefficients removed.
+    '''
+    # Get names of columns to be kept
+    not_zero = (self.coef_ != 0).reshape(-1)
+    which_keep = pd.Series( range( len( not_zero ) ) )
+    which_keep = which_keep.loc[not_zero]
+    # Remove the features
+    x_data = x_data.iloc[:, which_keep].copy()
+    return x_data
+
+
+def double_fits(self, x_train, y_train):
+    '''
+    Fit the logistic regression with l1 penalty and refit
+    after removing all features with zero coefficients.
+    Input : model: [object] instantiated logistic regression model.
+            penalty: [str] penalty to be used for the refitting.
+            max_iter: [int] maximum no. of iterations.
+    Output: lr_new: [object] refitted logistic regression model.
+    '''
+    x_train = self.remove_zero_coef_(x_train)
+    return self.fit(x_train, y_train)
+
+
+sk.linear_model.LogisticRegression.which_zero = which_zero
+sk.linear_model.LogisticRegression.remove_zero_coef_ = remove_zero_coef_
+sk.linear_model.LogisticRegression.double_fits = double_fits
+
+
+# Add-method function for feature importance
+def add_method(y_true, fpr):
+    '''
+    Add method to LogisticRegression for evaluating feature importance.
+    Evaluation metric would be the TPR corresponding to the given FPR.
+    Input : y_true = [list or Series] true response values.
+            fpr = [float] threshold false positive rate.
+    '''
+    def threshold_predict_method(self, x_data, y_true=y_true, fpr=fpr):
+        # Predicted probability
+        pred_prob = self.predict_proba(x_data)   # Problem here!!!!!!!
+        # Predicted response vector
+        y_pred = threshold_predict(pred_prob, y_true, fpr)
+        return y_pred
+    
+    sk.linear_model.LogisticRegression.threshold_predict = threshold_predict_method
+
+
 
 
 # ----------------------------------------------------
 # ========= 0. Preliminary seetings =========
+MODEL_NAME = "LR"
 RANDOM_SEED = 27
+MODE = "a"
+FPR_THRESHOLD = 0.1
+
+PENALTY = "l1"   # Penalty of the first fit
+
+
 
 # # Set logger
 # logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
@@ -147,9 +218,17 @@ for j, time in enumerate(time_span[2:-1]):
     dynamic_path = fig_path + "dynamic/" + f"{time_pred}/"
     if not os.path.exists(dynamic_path):
         os.makedirs(dynamic_path)
+
+
     # Prepare train/test sets
-    XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival, num_cols, "a", time_threshold=time, test_size=None,
-                                        EPIC_CUI=EPIC_CUI, seed=RANDOM_SEED)
+    XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival,
+                                            num_cols = num_cols,
+                                            mode = "a",
+                                            time_threshold = time,
+                                            test_size  =None,
+                                            EPIC_CUI = EPIC_CUI,
+                                            seed=RANDOM_SEED)
+
     print("Training for data up to {} ...".format(time))
     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
@@ -163,17 +242,27 @@ for j, time in enumerate(time_span[2:-1]):
     XTrain = pd.DataFrame(XTrain, columns=col_names)
 
     # Fit logistic regression
-    model = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
-                                        max_iter = 1000).fit(XTrain, yTrain)
+    model = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = PENALTY,
+                                                max_iter = 1000).fit(XTrain, yTrain)
+
+    # # Re-fit after removing features of zero coefficients
+    # model_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2', max_iter = 1000)
+    # double_logistic_regressor = DoubleLogisticRegression(model, XTrain, yTrain)
+    # model_new = double_logistic_regressor.double_fits(model_new, XTrain, yTrain)
+
+    # # Remove features in test set
+    # XTest = double_logistic_regressor.remove_zero_coeffs(XTest)
+    # pred_new = model_new.predict_proba(XTest)[:, 1]
+
 
     # Re-fit after removing features of zero coefficients
-    model_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2', max_iter = 1000)
-    double_logistic_regressor = DoubleLogisticRegression(model, XTrain, yTrain)
-    model_new = double_logistic_regressor.double_fits(model_new, XTrain, yTrain)
+    XTest = model.remove_zero_coef_(XTest)
+    model_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
+                                                    max_iter = 1000).fit(XTest, yTest)
 
-    # Remove features in test set
-    XTest = double_logistic_regressor.remove_zero_coeffs(XTest)
+    # Predict
     pred_new = model_new.predict_proba(XTest)[:, 1]
+
 
 
     # ========= 2.a.ii. Plot beta values =========
@@ -186,25 +275,35 @@ for j, time in enumerate(time_span[2:-1]):
     _ = plt.yticks(fontsize = 4)
     plt.savefig(dynamic_path + f"coeffs_{time_pred}.eps", format = 'eps', dpi = 800)
     plt.close()
+
+
+    # ========= 2.c. Feature importance =========
+    # Add method for feature importance evaluation
+    add_method(y_true = yTest, fpr = FPR_THRESHOLD)
+
+    # Permutation test
+    imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
+                            predict_method = model_new.threshold_predict,
+                            X = np.array(XTest),
+                            y = np.array(yTest),
+                            metric = true_positive_rate,
+                            num_rounds = 15,
+                            seed = RANDOM_SEED)
+
+    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    # Save feature importance plot
+    fi_evaluator.FI_plot(save_path = dynamic_path, y_fontsize = 4, eps = True)
+
+
     # ========= 2.b. Evaluation =========
     evaluator = Evaluation.Evaluation(yTest, pred_new)
     # Save ROC plot
-    _ = evaluator.roc_plot(plot = False, title = "LR", save_path = dynamic_path + f"roc_{time_pred}")
+    _ = evaluator.roc_plot(plot = False, title = MODEL_NAME, save_path = dynamic_path + f"roc_{time_pred}")
     # Save summary
     summary_data = evaluator.summary()
     summary_data.to_csv(dynamic_path + f"summary_{time_pred}.csv", index = False)
-    # ========= 2.c. Feature importance =========
-    # Permutation test
-    imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
-                    predict_method = model_new.predict,
-                    X = np.array(XTest),
-                    y = np.array(yTest),
-                    metric = sk.metrics.f1_score,
-                    num_rounds = 15,
-                    seed = RANDOM_SEED)
-    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, "LR")
-    # Save feature importance plot
-    fi_evaluator.FI_plot(save_path = dynamic_path, y_fontsize = 4, eps = True)
+
+
     # ========= End of iteration =========
     print("Completed evaluation for {}.\n".format(time_pred))
 
