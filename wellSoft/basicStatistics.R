@@ -11,24 +11,24 @@ source("dischargeCategories.R")
 
 path <- "/home/lebo/data/lebo/data/"
 
-wellSoft <- fread(paste0(path, "cleaned_wellSoft.csv"))
-reg_codes <- fread(paste0(path, "RegistrationCodes.csv"))
+all_data <- fread(paste0(path, "all_data.csv"))
+reg_codes <- fread(paste0(path, "processedRegistrationCodes.csv"))
 
 willReturn <- fread(paste0(path, "willReturn.csv"))
 
-dim(wellSoft); colnames(wellSoft)
+dim(all_data); colnames(all_data)
 dim(reg_codes); colnames(reg_codes)
 dim(willReturn); head(willReturn)
 
-wellSoft$Arrival_Time_9 <- as.POSIXct(strptime(wellSoft$Arrival_Time_9, format="%Y-%m-%d %H:%M:%S"), tz="EST")
-head(wellSoft$Arrival_Time_9)
-wellSoft$Discharge_Time_276 <- as.POSIXct(strptime(wellSoft$Discharge_Time_276, format="%Y-%m-%d %H:%M:%S"), tz="EST")
-wellSoft$Year <- format(wellSoft$Arrival_Time_9, "%Y")
+all_data$Arrival_Time_9 <- as.POSIXct(strptime(all_data$Arrival_Time_9, format="%Y-%m-%d %H:%M:%S"), tz="EST")
+head(all_data$Arrival_Time_9)
+all_data$Discharge_Time_276 <- as.POSIXct(strptime(all_data$Discharge_Time_276, format="%Y-%m-%d %H:%M:%S"), tz="EST")
+all_data$Year <- format(all_data$Arrival_Time_9, "%Y")
 
-wellSoft$Age_Dob_40 <- as.POSIXct(strptime(wellSoft$Age_Dob_40, format="%Y-%m-%d %H:%M:%S"), tz="EST")
-wellSoft$DaysOld <- as.numeric(round(difftime(wellSoft$Arrival_Time_9, wellSoft$Age_Dob_40, units='days'), 1))
-wellSoft$DaysOld[wellSoft$DaysOld < 0] <- NA
-head(wellSoft$DaysOld)
+all_data$Age_Dob_40 <- as.POSIXct(strptime(all_data$Age_Dob_40, format="%Y-%m-%d %H:%M:%S"), tz="EST")
+all_data$DaysOld <- as.numeric(round(difftime(all_data$Arrival_Time_9, all_data$Age_Dob_40, units='days'), 1))
+all_data$DaysOld[all_data$DaysOld < 0] <- NA
+head(all_data$DaysOld)
 
 reg_codes$VisitStartDate <- convertToDate(reg_codes$VisitStartDate)
 attr(reg_codes$VisitStartDate, "tzone") <- "EST"
@@ -39,45 +39,38 @@ attr(reg_codes$StartOfVisit, "tzone") <- "EST"
 reg_codes$EndOfVisit <- convertToDateTime(reg_codes$EndOfVisit)
 attr(reg_codes$EndOfVisit, "tzone") <- "EST"
 
-all.wellSoft <- merge(x=wellSoft, 
-                  y=reg_codes, 
-                  by.x=c("Pt_Accnt_5"),
-                  by.y=c("RegistrationNumber"))
-
-nrow(wellSoft); nrow(all.wellSoft)
-
 
 # ================== 2. Overview of All Numbers ==================
 
 
 # left before seen by doctor
-left.before.seen.num <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% left.labels)); left.before.seen.num # number
-left.before.seen.per <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% left.labels)) / nrow(all.wellSoft); round(left.before.seen.per*100,2) # percentage
+left.before.seen.num <- nrow(all_data %>% filter(DischargeDisposition %in% left.labels)); left.before.seen.num # number
+left.before.seen.per <- nrow(all_data %>% filter(DischargeDisposition %in% left.labels)) / nrow(all_data); round(left.before.seen.per*100,2) # percentage
 
 
 # seen by doctor
-seen.by.doc.num <- nrow(all.wellSoft %>% filter(!DischargeDisposition %in% left.labels)); seen.by.doc.num  # number
-seen.by.doc.per <- nrow(all.wellSoft %>% filter(!DischargeDisposition %in% left.labels)) / nrow(all.wellSoft); round(seen.by.doc.per*100, 2) # percentage
+seen.by.doc.num <- nrow(all_data %>% filter(!DischargeDisposition %in% left.labels)); seen.by.doc.num  # number
+seen.by.doc.per <- nrow(all_data %>% filter(!DischargeDisposition %in% left.labels)) / nrow(all_data); round(seen.by.doc.per*100, 2) # percentage
 
 
 # admitted to ED
-admit.to.ed.num <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c("ADMIT TO HOLD - SENT HOME",
+admit.to.ed.num <- nrow(all_data %>% filter(DischargeDisposition %in% c("ADMIT TO HOLD - SENT HOME",
                                                      "SENT HOME-EMERG. ADMIT"))); admit.to.ed.num
 
 
-admit.to.ed.per <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c("ADMIT TO HOLD - SENT HOME",
+admit.to.ed.per <- nrow(all_data %>% filter(DischargeDisposition %in% c("ADMIT TO HOLD - SENT HOME",
                       "SENT HOME-EMERG. ADMIT"))) / seen.by.doc.num; round(admit.to.ed.per*100, 2)
 
 
 # admitted to sick kids
-admit.hsk.num <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c("ADMITTED TO HSC", # Admitted to Sick Kids
+admit.hsk.num <- nrow(all_data %>% filter(DischargeDisposition %in% c("ADMITTED TO HSC", # Admitted to Sick Kids
                                                       "ADMIT VIA O.R.", 
                                                       "ADMITTED TO CCU", 
                                                       "ADMITTED VIA O.R.",
                                                       "ADMITTED TO CCU OR THE O.R.",
                                                     "TRANSFERRED-EMERG. ADMIT"))); admit.hsk.num
 
-admit.hsk.per <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c("ADMITTED TO HSC", # Admitted to Sick Kids
+admit.hsk.per <- nrow(all_data %>% filter(DischargeDisposition %in% c("ADMITTED TO HSC", # Admitted to Sick Kids
                          "ADMIT VIA O.R.", 
                          "ADMITTED TO CCU", 
                          "ADMITTED VIA O.R.",
@@ -87,33 +80,33 @@ admit.hsk.per <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c("ADMIT
 
 
 # admitted to another institution
-other.inst.num <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c("TRANSFER TO ANOTHER INSTITUTION", # sent to another institution
+other.inst.num <- nrow(all_data %>% filter(DischargeDisposition %in% c("TRANSFER TO ANOTHER INSTITUTION", # sent to another institution
                                                     "OTHER INSTITUTION",
                                                     "Transfer to another facility",
                                                     "ADMIT TO HOLD - TRANSFERRED"))); other.inst.num
 
-other.inst.per <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c("TRANSFER TO ANOTHER INSTITUTION", # sent to another institution
+other.inst.per <- nrow(all_data %>% filter(DischargeDisposition %in% c("TRANSFER TO ANOTHER INSTITUTION", # sent to another institution
                           "OTHER INSTITUTION",
                           "Transfer to another facility",
                           "ADMIT TO HOLD - TRANSFERRED"))) / seen.by.doc.num; round(other.inst.per*100,2)
 
 # held for intervention
-held.int.num <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c("SENT HOME VIA O.R.", # Held for intervention then sent home 
+held.int.num <- nrow(all_data %>% filter(DischargeDisposition %in% c("SENT HOME VIA O.R.", # Held for intervention then sent home 
                                                     "TRNSFR TO D/S",
                                                     "TRANSFER TO DAY SURGERY"))); held.int.num  
 
-held.int.per <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c("SENT HOME VIA O.R.", # Held for intervention then sent home 
+held.int.per <- nrow(all_data %>% filter(DischargeDisposition %in% c("SENT HOME VIA O.R.", # Held for intervention then sent home 
                                 "TRNSFR TO D/S",
                                 "TRANSFER TO DAY SURGERY"))) /seen.by.doc.num; round(held.int.per*100,2)
 
 
 # died
-died.num <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c("DEATH AFTER ARRIVAL", # Death
+died.num <- nrow(all_data %>% filter(DischargeDisposition %in% c("DEATH AFTER ARRIVAL", # Death
                                                     "DEAD ON ARRIVAL",
                                                     "EXPIRED",
                                                     "ADMIT TO HOLD - EXP."))); died.num
 
-died.per <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c("DEATH AFTER ARRIVAL", # Death
+died.per <- nrow(all_data %>% filter(DischargeDisposition %in% c("DEATH AFTER ARRIVAL", # Death
                                       "DEAD ON ARRIVAL",
                                       "EXPIRED",
                                       "ADMIT TO HOLD - EXP."))) / seen.by.doc.num; round(died.per*100, 2)
@@ -121,13 +114,13 @@ died.per <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c("DEATH AFTE
 
 
 # sent home
-sent.home.num <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c(home.labels))); sent.home.num
+sent.home.num <- nrow(all_data %>% filter(DischargeDisposition %in% c(home.labels))); sent.home.num
 
-sent.home.per <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c(home.labels))) / seen.by.doc.num; round(sent.home.per*100,2)
+sent.home.per <- nrow(all_data %>% filter(DischargeDisposition %in% c(home.labels))) / seen.by.doc.num; round(sent.home.per*100,2)
 
 # other
-other.num <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c(to.remove))); other.num
-other.per <- nrow(all.wellSoft %>% filter(DischargeDisposition %in% c(to.remove))) / seen.by.doc.num; round(other.per*100, 2)
+other.num <- nrow(all_data %>% filter(DischargeDisposition %in% c(to.remove))); other.num
+other.per <- nrow(all_data %>% filter(DischargeDisposition %in% c(to.remove))) / seen.by.doc.num; round(other.per*100, 2)
 
 
 # check
@@ -140,7 +133,7 @@ admit.to.ed.num + admit.hsk.num + other.inst.num + held.int.num + died.num + sen
 
 # ================== 3. BASED ON PATHS ==================
 
-# Date: July 31st, 2018
+# Date: July 31st, 2019
 # 
 # Produces all the statistics used in the power point, of number of patients
 # and number of unique visits in patient pipeline
