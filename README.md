@@ -31,6 +31,33 @@ Now assume that ED_code is contained in the same subfolder as the ED folder avai
 |-- Exploratory
 |   |-- ED_devin_data_clean_excel.py
 |   |-- ED_support_funs.py
+|-- ED_environment.yml           # Python environment
 |__ README.md
 ```
+
+
+## Set up virtual environment
+
+Furture versions of packages might not be compatible with the current code and implementation, so it is important to set up a virtual environment before running the scripts. `ED_environment.yml` has the required python version and packages installed. To install:
+
+1. Install the latest conda ([tutorial](https://www.digitalocean.com/community/tutorials/how-to-install-anaconda-on-ubuntu-18-04-quickstart)) or update as:
+```bash
+conda update conda
+```
+
+2. Install the virtual environment:
+```bash
+conda env create -f ED_environment.yml
+```
+
+3. Enter the virtual environment as follows when working on the project:
+```bash
+source activate SepsisPrediction
+```
+
+4. You shoud then see the prefix of your terminal command line changes into the following:
+```bash
+(SepsisPrediction) username@pcname:~/path_to_ED/$
+```
+
 

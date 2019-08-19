@@ -12,7 +12,6 @@ class Person:
 
 # ----------------------------------------------------
 from ED_support_module import *
-import argparse
 
 timeSpan = [201807, 201808, 201809, 201810, 201811, 201812, 201901, 201902,
             201903, 201904, 201905, 201906]
@@ -72,17 +71,4 @@ plt.show()
 
 
 # ----------------------------------------------------
-def setup_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--mode",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="The mode to be used.")
-    return parser
-    
 
-parser = setup_parser()
-args = parser.parse_args()
-
-print(args.mode)

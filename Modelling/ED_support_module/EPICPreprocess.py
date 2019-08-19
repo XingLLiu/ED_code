@@ -2,10 +2,9 @@ from ED_support_module import *
 
 # ----------------------------------------------------
 # EDA pipeline (further preprocessing)
-class EPICPreprocess:
+class Preprocess:
     '''
     Preparing datasets for modelling using the preprocessed EPIC dataset.
-
     '''
     def __init__(self, path, drop_cols='default', after_triage='default'):
         self.path = path
@@ -28,14 +27,13 @@ class EPICPreprocess:
         # Convert three cols of notes to list
         for col in notes:
             noteLst = pd.Series( map( lambda note: note[2:-2].split('\', \''), EPIC_CUI[col] ) )
-            EPIC_CUI[col] = noteLst
+            EPIC_CUI.loc[:, col] = noteLst.values
         # Change 'Disch.Date.Time' and 'Roomed' to categorical
         EPIC['Disch.Date.Time'] = EPIC['Disch.Date.Time'].astype('object')
         EPIC['Roomed'] = EPIC['Roomed'].astype('object')
         # Change 'Will.Return' to binary
         EPIC['WillReturn'] = EPIC['WillReturn'].astype('object')
         return EPIC, EPIC_CUI, EPIC_arrival
-
 
 
     def CleanColNames(self, EPIC):
@@ -114,7 +112,7 @@ class EPICPreprocess:
 
         # (Some) features obtained after triage
         if self.after_triage == 'default':
-            self.after_triage = ['Lab.Status', 'Rad.Status', 'ED.PIA.Threshold', 'Same.First.And.Last', 
+            self.after_triage = ['Lab.Status', 'Rad.Status', 'ED.PIA.Threshold', 'Same.First.And.Last',
                                  'Dispo', 'Size.Of.Treatment.Team', 'Number.Of.Prescriptions',
                                  'Length.Of.Stay.In.Minutes', 'Arrival.to.Room', 'Roomed']
         colRem = self.drop_cols + self.after_triage
@@ -173,7 +171,8 @@ class EPICPreprocess:
         '''
         y = EPIC['Primary.Dx']
         X = EPIC.drop('Primary.Dx', axis = 1)
-        numCols = X.select_dtypes(include = [np.number]).columns.tolist()
+        numCols = self.which_numerical(X)
+        # numCols = X.select_dtypes(include = [np.number]).columns.tolist()
         catCols = [col for col in X.columns if col not in numCols]
         XCat = X.drop(numCols, axis = 1)
         XNum = X.drop(catCols, axis = 1)
@@ -226,6 +225,55 @@ class EPICPreprocess:
         return EPIC_arrival
     
     
+    def TFIDF(self, cui, EPIC):
+        '''
+        Compute the TF-IDF of the CUIs in cui and append to EPIC.
+        Input : cui: dataframe of the triage notes CUIs. Must contain column Triage.Notes
+                EPIC: dataframe to which the TF-IDFs are appended. Must have Primary.Dx.
+        Output: EPIC: dataframe with the TF-IDFs appended.
+                cuiCols: Column names of the CUIs
+        '''
+        # Find all Sepsis
+        ifSepsis = EPIC['Primary.Dx'] == 1
+        CUISepsis = EPIC.iloc[ifSepsis.values]
+        # Get all unique CUIs
+        triageNotes = {}
+        for i in CUISepsis.index:
+            cuiLst = [cui for cui in CUISepsis.loc[i, 'Triage.Notes']]
+            for cui in cuiLst:
+                if cui not in triageNotes.keys():
+                    triageNotes[cui] = 0
+        # For each unique CUI, count the number of documents that contains it
+        for notes in EPIC['Triage.Notes']:
+            for cui in triageNotes.keys():
+                if cui in notes:
+                    triageNotes[cui] += 1
+        # Create TF-IDF dataframe
+        triageDf = pd.DataFrame(index = range(len(EPIC)),
+                                columns = range(len(triageNotes)),
+                                dtype = 'float')
+        triageDf.iloc[:, :] = 0
+        triageDf.columns = triageNotes.keys()
+        triageDf.index = EPIC.index
+        # Compute TF and IDF
+        corpusLen = len(EPIC)
+        for i in triageDf.index:
+            notes = EPIC.loc[i, 'Triage.Notes']
+            for cui in notes:
+                # Compute TF-IDF if cui is in vocab
+                if cui in triageNotes.keys():
+                    # TF 
+                    tf = sum([term == cui for term in notes]) / len(notes)
+                    # IDF 
+                    idf = np.log( corpusLen / triageNotes[cui] )
+                    # Store TF-IDF
+                    triageDf.loc[i, cui] = tf * idf
+        # Append to EPIC
+        cuiCols = triageDf.columns
+        EPIC = pd.concat([EPIC, triageDf], axis = 1, sort = False)
+        return EPIC, cuiCols
+
+
     def streamline(self):
         # Load data
         EPIC = pd.read_csv(self.path, encoding = 'ISO-8859-1')
@@ -254,7 +302,72 @@ class EPICPreprocess:
         return EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival
 
 
+    def which_numerical(self, data):
+        '''
+        Get names of numerical columns.
+        Input : data = [DataFrame]
+        Output: num_cols = [list] col names of numerical features
+        '''
+        num_cols = data.select_dtypes(include = [np.number]).columns.tolist()
+        return num_cols
 
 
 
-    
+
+
+# ----------------------------------------------------
+
+# XTrain2, XTest2, XValid2, yTrain2, yTest2, yValid2 = stratified_split(EPIC_enc, numCols, "b", test_size=0.25, EPIC_CUI=EPIC_CUI,
+#                                                                       valid_size=0.15, seed=27, pca_components=0.95)
+
+# XTrain2, XTest2, XValid2, yTrain2, yTest2, yValid2 = stratified_split(EPIC_enc, numCols, "e", test_size=0.25, EPIC_CUI=EPIC_CUI,
+#                                                                       valid_size=0.15, seed=27, pca_components=0.95)
+
+
+# XTrain2, XTest2, XValid2, yTrain2, yTest2, yValid2 = stratified_split(EPIC_arrival, numCols, "e", time_threshold=201902,
+#                                                                       test_size=0.25, EPIC_CUI=EPIC_CUI,
+#                                                                       valid_size=0.15, seed=27, pca_components=0.95)
+
+
+
+# ----------------------------------------------------
+
+
+
+# ----------------------------------------------------
+# class EPICTrainTest2:
+#     def __init__(self, EPIC_enc, num_cols, mode,
+#                 EPIC_CUI=None, valid_size=None, pca_components=None, seed=None,
+#                 time_threshold=None):
+#         self.EPIC_enc = EPIC_enc
+#         self.num_cols = num_cols
+
+#         def add_TFIDF(self, ):
+#             if mode not in ['a', 'b']:
+#                 try:
+#                     return TFIDF(EPIC_CUI, EPIC_enc)
+#                 except:
+#                     raise ValueError("EPIC_CUI must be given when including TF-IDF")
+
+
+#             # Prepare taining set
+#             if mode not in ['a', 'b']:
+#                 try:
+#                     EPIC_enc, cui_cols = TFIDF(EPIC_CUI, EPIC_enc)
+#                 except:
+#                     raise ValueError("EPIC_CUI must be given when including TF-IDF")
+#             # Separate input features and target
+#             y = EPIC_enc['Primary.Dx']
+#             X = EPIC_enc.drop('Primary.Dx', axis = 1)
+#             # Prepare train and test sets
+#             if "Arrived" in X.columns:
+#                 XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True)
+#             else:
+#                 raise ValueError("\'Arrived\' must be included as a feature in input EPIC_enc.")
+#             return PCA_splitter(XTrain, XTest, yTrain, yTest, num_cols,
+#                                 valid_size=valid_size, pca_compoents=pca_components, seed=seed)
+
+
+
+
+

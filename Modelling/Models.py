@@ -332,9 +332,9 @@ roc_plot(yTest, eisofPred)
 
 # Visulize the scores
 _ = sns.scatterplot(x = range(len(yTest)), y = anomalyScores)
-_ = sns.scatterplot(x = np.linspace(1, len(yTest), len(yTest))[yTest == 1], 
+_ = sns.scatterplot(x = np.linspace(1, len(yTest), len(yTest))[yTest == 1],
                     y = anomalyScores[yTest == 1])
-_ = sns.scatterplot(x = np.linspace(1, len(yTest), len(yTest))[eisofPred == 1], 
+_ = sns.scatterplot(x = np.linspace(1, len(yTest), len(yTest))[eisofPred == 1],
                     y = anomalyScores[eisofPred == 1])
 plt.show()
 
