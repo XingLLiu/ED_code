@@ -210,15 +210,25 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.ii. Feature importance by permutation test =========
-    # Add method for feature importance evaluation
-    add_method(y_true = yTest, fpr = FPR_THRESHOLD)
+    # # Add method for feature importance evaluation
+    # add_method(y_true = yTest, fpr = FPR_THRESHOLD)
+
+    # # Permutation test
+    # imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
+    #                         predict_method = model.threshold_predict,
+    #                         X = np.array(XTest),
+    #                         y = np.array(yTest),
+    #                         metric = true_positive_rate,
+    #                         num_rounds = 5,
+    #                         seed = RANDOM_SEED)
 
     # Permutation test
-    imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
-                            predict_method = model.threshold_predict,
+    imp_means, imp_vars = feature_importance_permutation(
+                            predict_method = model.predict_proba,
                             X = np.array(XTest),
                             y = np.array(yTest),
                             metric = true_positive_rate,
+                            fpr_threshold = FPR_THRESHOLD,
                             num_rounds = 5,
                             seed = RANDOM_SEED)
 
