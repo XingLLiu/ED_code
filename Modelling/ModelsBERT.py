@@ -110,11 +110,12 @@ CACHE_DIR = '/'.join(path.split('/')[:-3]) + '/ClinicalBert/pretrained_bert_tf/b
 MAX_SEQ_LENGTH = 512
 
 # Other model hyper-parameters
-WEIGHT = 3000
-TRAIN_BATCH_SIZE = 40 # 128
+WEIGHT = 500
+WEIGHT2 = 16
+TRAIN_BATCH_SIZE = 40
 EVAL_BATCH_SIZE = 40
 LEARNING_RATE = 1e-3
-NUM_TRAIN_EPOCHS = 12
+NUM_TRAIN_EPOCHS = 2
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
 WARMUP_PROPORTION = 0.1
@@ -604,7 +605,6 @@ if args.mode == "train" or args.mode == "train_test":
     #                     lr=LEARNING_RATE,
     #                     warmup=WARMUP_PROPORTION,
     #                     t_total=num_train_optimization_steps)
-    # optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 
     # logger.info("***** Running training *****")
@@ -619,17 +619,17 @@ if args.mode == "train" or args.mode == "train_test":
     all_input_ids = torch.tensor([f.input_ids for f in trainFeatures], dtype=torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in trainFeatures], dtype=torch.long)
     all_segment_ids = torch.tensor([f.segment_ids for f in trainFeatures], dtype=torch.long)
-
     all_label_ids = torch.tensor([f.label_id for f in trainFeatures], dtype=torch.long)
 
-    # Set up weight vector
-    train_weights = np.array(WEIGHT * yTrain + 1 - yTrain)
+    ## Set up weight vector
+    train_weights = np.array(WEIGHT2 * yTrain + 1 - yTrain)
+    # train_sampler = torch.utils.data.sampler.WeightedRandomSampler( train_weights, len(XTrain) )
 
     # Set up data loaders
     train_dataloader = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
-    train_sampler = torch.utils.data.sampler.RandomSampler(train_dataloader)
-    train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAIN_BATCH_SIZE,
-                                                    sampler=train_sampler)
+    # train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAIN_BATCH_SIZE,
+    #                                                 sampler=train_sampler)
+    train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size=TRAIN_BATCH_SIZE)
 
 
     # ----------------------------------------------------
@@ -640,16 +640,33 @@ if args.mode == "train" or args.mode == "train_test":
     loss_vec = np.zeros(NUM_TRAIN_EPOCHS * (len(train_dataloader) // 10))
 
     prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
-    # prediction_head = NoteClassificationHead(device, model, hidden_size=model.config.hidden_size)
     _ = prediction_head.to(device)
-    # optimizer = torch.optim.Adam(prediction_head.parameters(), lr=LEARNING_RATE)
-    optimizer = torch.optim.Adam(list(model.parameters()) + list(prediction_head.parameters()), lr=LEARNING_RATE)
+
+    # optimizer = torch.optim.Adam(list(model.parameters()) + list(prediction_head.parameters()), lr=LEARNING_RATE)
+
+    # Optimizers
+    param_optimizer = list(model.named_parameters())
+    # no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+    no_decay = []
+    optimizer_grouped_parameters = [
+        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+    ]
+
+
+    optimizer_bert = BertAdam(optimizer_grouped_parameters,
+                        lr=LEARNING_RATE,
+                        warmup=WARMUP_PROPORTION,
+                        t_total=num_train_optimization_steps)
+    optimizer_head = torch.optim.Adam( list( prediction_head.parameters() ), lr=LEARNING_RATE )
+
     loss_func = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT])).to(device)
     _ = model.train()
     _ = prediction_head.train()
 
     print("Start fine-tuning ...")
     for epoch in range(NUM_TRAIN_EPOCHS):
+
         tr_loss = 0
         nb_tr_examples, nb_tr_steps = 0, 0
         for i, batch in enumerate(tqdm(train_dataloader)):
@@ -658,18 +675,12 @@ if args.mode == "train" or args.mode == "train_test":
             input_ids, input_mask, segment_ids, label_ids = batch
             _, pooled_output = model(input_ids, segment_ids, input_mask)
             logits = prediction_head(pooled_output.to(device)).to(device)
-            # logits = prediction_head(input_ids, segment_ids, input_mask)
-            # logits = logits.to(device)
-
-            # if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
-            #     optimizer.zero_grad()
-                # optimizer.step()
-                # global_step += 1
 
             # Compute loss
             loss = loss_func(logits, label_ids)
             if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
-                optimizer.zero_grad()
+                optimizer_bert.zero_grad()
+                optimizer_head.zero_grad()
 
             if NUM_GPU > 1:
                 loss = loss.mean() # mean() to average on multi-gpu.
@@ -680,15 +691,42 @@ if args.mode == "train" or args.mode == "train_test":
             loss.backward()
 
             if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
-                optimizer.step()
+                optimizer_bert.step()
+                optimizer_head.step()
 
             if (i + 1) % 10 == 0:
                 loss_vec[epoch * (len(train_dataloader) // 10) + i // 10] = loss.item()
-                # print("Epoch: {}/{}, Step: [{}/{}], Loss: {:.4f}".
-                #     format(epoch + 1, NUM_TRAIN_EPOCHS, i+1, len(train_dataloader), loss.item()))
-            # ifEqual = torch.any(torch.eq(tuned_params1[-1], tuned_params2[-1]))
-            # if ifEqual == 0:
-            #     print("{} not equal!".format(i))
+
+
+
+        ## Save at checkpoints
+        # if epoch % 10 == 0:
+        #     # ----------------------------------------------------
+        #     # Save model
+        #     model_to_save = model.module if hasattr(model, "module") else model
+        #     layer_to_save = prediction_head.module if hasattr(prediction_head, "module") else prediction_head
+
+        #     # Save using the predefined names so that one can load using `from_pretrained`
+        #     output_model_file = os.path.join(OUTPUT_DIR, WEIGHTS_NAME + str(epoch))
+        #     output_config_file = os.path.join(OUTPUT_DIR, CONFIG_NAME + str(epoch))
+        #     output_classification_file = os.path.join(OUTPUT_DIR, PREDICTION_HEAD_NAME + str(epoch))
+
+        #     torch.save(model_to_save.state_dict(), output_model_file)
+        #     model_to_save.config.to_json_file(output_config_file)
+        #     tokenizer.save_vocabulary(OUTPUT_DIR)
+
+        #     # save weights of the final classification layer
+        #     torch.save(layer_to_save.state_dict(), output_classification_file)
+
+        #     # Save loss vector
+        #     pickle.dump(loss_vec, open(REPORTS_DIR + f"loss{epoch}.pkl", 'wb'))
+
+        #     # Save loss plot
+        #     _ = sns.scatterplot(x=range(len(loss_vec)), y=loss_vec)
+        #     _ = plt.title("Clinical BERT Train Loss")
+        #     plt.savefig(REPORTS_DIR + f"train_loss{epoch}.eps", format="eps", dpi=1000)
+        #     print("Checkpoint epoch: {}".format(epoch))
+
 
 
 
