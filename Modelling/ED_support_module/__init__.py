@@ -449,7 +449,7 @@ def threshold_predict(pred_prob, y_data, fpr=0.05):
         # Compute FPR for the current predicted response vector
         current_fpr = false_positive_rate(y_data, y_pred)
         # Stop if the current FPR is just over the desired FPR
-        if current_fpr < fpr and i > 0:
+        if current_fpr >= fpr and i > 0:
             break
     # Return the predicted response vector
     if i == len(threshold):
@@ -473,10 +473,10 @@ def predict_transform(self, x_data):
 
 # Helper function for threshold_predict. For developer's use
 def false_positive_rate(y_true, y_pred):
-    true_positive = ( (y_pred == 1) & (y_true == 1) ).sum()
-    positive = y_true.sum()
-    if positive != 0:
-        fpr = 1 - true_positive / positive
+    true_negative = ( (y_pred == 0) & (y_true == 0) ).sum()
+    negative = len(y_true) -  y_true.sum()
+    if negative != 0:
+        fpr = 1 - float(true_negative) / negative
     else:
         fpr = 0
         Warning("No positives detected. Filled in by 0 for FPR instead.")
@@ -491,8 +491,14 @@ def true_positive_rate(y_true, y_pred):
             y_pred = [Series or array] predicted response vector.
     Output: tpr = [float] true positive rate.
     '''
-    fpr = false_positive_rate(y_true, y_pred)
-    return 1 - fpr
+    true_positive = ( (y_pred == 1) & (y_true == 1) ).sum()
+    positive = y_true.sum()
+    if positive != 0:
+        tpr = float(true_positive) / positive
+    else:
+        tpr = 0
+        Warning("No positives detected. Filled in by 0 for FPR instead.")
+    return tpr
 
 
 
