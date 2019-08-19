@@ -122,6 +122,60 @@ fig1.subplots_adjust(left = 0.125, bottom = 0.125, hspace= 0.8)
 plt.show()
 '''
 
+
+# ----------------------------------------------------
+'''
+# Heatmap
+corrMat = EPIC.corr()
+_ = sns.heatmap(corrMat, cmap = 'YlGnBu', square = True)
+# _ = plt.xticks(rotation = 30)
+plt.subplots_adjust(left = 0.125, top = 0.95)
+plt.xticks(rotation = 45, fontsize = 6)
+plt.show()
+'''
+
+'''
+# Write summary of each feature into ./colSum.txt
+file = open('colSum.txt', 'w')
+# table = EPIC['Gender'].describe()
+for col in colNames:
+    _ = file.write('\n\n')
+    _ = file.write(col)
+    _ = file.write('\n')
+    _ = file.write(EPIC[col].describe().to_string())
+
+file.close()
+
+'''
+
+'''
+# Pairplots
+sns.pairplot(EPIC[numCols[:4]])
+sns.pairplot(EPIC[numCols[4:8]])
+sns.pairplot(EPIC[numCols[8:12]])
+sns.pairplot(EPIC[numCols[12:16]])
+
+# Countplots (for categorical variables):
+for j in range(3):
+    for i in range(6):
+        name = catCols[i + 6* j]
+        _ = plt.subplot(2, 3, i + 1)
+        _ = sns.countplot(y = name, data = EPIC, 
+                        order = EPIC[name].value_counts().index)
+    plt.subplots_adjust(wspace = 1.2)
+    plt.show()
+
+for i in range(4):
+    name = catCols[i + 18]
+    _ = plt.subplot(2, 2, i + 1)
+    _ = sns.countplot(y = name, data = EPIC, 
+                    order = EPIC[name].value_counts().index)
+
+plt.subplots_adjust(wspace = 0.6)
+plt.show()
+'''
+
+
 # ----------------------------------------------------
 # Correlation between missing values
 # plt.matshow(missingData.corr())

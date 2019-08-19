@@ -182,10 +182,10 @@ saveModel(model, './saved_results/vae/' + mode + '/vaeModel' + '_' + suffix)
 
 
 # Plot losses
-sns.scatterplot(x = range(len(recLossVec)), y = recLossVec)
+_ = sns.scatterplot(x = range(len(recLossVec)), y = recLossVec)
 plt.show()
 
-sns.scatterplot(x = range(len(klDivVec)), y = klDivVec)
+_ = sns.scatterplot(x = range(len(klDivVec)), y = klDivVec)
 plt.show()
 
 
@@ -236,5 +236,3 @@ roc_plot(yTest, vaePred)
 
 vaePred, threshold = vaePredict(klDivVec, testRL, batch_size, k = 0, percent = 0.1)
 roc_plot(yTest, vaePred)
-
-

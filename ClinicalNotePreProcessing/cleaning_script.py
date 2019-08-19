@@ -99,6 +99,7 @@ def clean_text(text):
     text = text.replace ("?", " possible ")
     text = text.replace ("~", " approximately ")
     text = text.replace ("(!)", " abnormal ")
+    text = text.replace("@", "at")
     
     #numeric ratios
     grp = re.findall ("(\d{1,1}) *\: *(\d{1,2}) *[^ap][^m][^a-zA-Z0-9]", text)
