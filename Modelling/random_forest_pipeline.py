@@ -1,36 +1,8 @@
 from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
+from ED_support_module import RandomForest
 # About 20 mins for each iteration
-
-# ----------------------------------------------------
-# Supporting functions and classes
-# def add_method(y_true, fpr):
-#     '''
-#     Add method to RandomForestClassifier for evaluating feature importance.
-#     Evaluation metric would be the TPR corresponding to the given FPR.
-#     Input : y_true = [list or Series] true response values.
-#             fpr = [float] threshold false positive rate.
-#     '''
-#     def threshold_predict_method(self, x_data, y_true=y_true, fpr=fpr):
-#         # Predicted probability
-#         pred_prob = self.predict_proba(x_data)[:, 1]
-#         # Predicted response vector
-#         y_pred = threshold_predict(pred_prob, y_true, fpr)
-#         return y_pred
-    
-#     sk.ensemble.RandomForestClassifier.threshold_predict = threshold_predict_method
-
-
-def predict_proba_single(self, x):
-    '''
-    Output the predicted probability of being of class 1
-    only, as opposed to 2 columns for being of class 0 and class 1.
-    '''
-    return self.predict_proba(x)[:, 1]
-    
-
-sk.ensemble.RandomForestClassifier.predict_proba_single = predict_proba_single
 
 
 # ----------------------------------------------------
@@ -73,8 +45,8 @@ def setup_parser():
 
 
 # Path to save figures
-FIG_PATH = "/".join(os.getcwd().split("/")[:3]) + "/Pictures/random_forest/"
-DATA_PATH = "/home/xingliu/Documents/ED/data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+FIG_PATH = "../../results/random_forest/"
+DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 
 
 # Create folder if not already exist

@@ -170,8 +170,8 @@ def setup_parser():
 
 
 # Path to save figures
-FIG_PATH = "/".join(os.getcwd().split("/")[:3]) + "/Pictures/neural_net/"
-DATA_PATH = "/home/xingliu/Documents/ED/data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+FIG_PATH = "../../results/neural_net/"
+DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 
 
 # Create folder if not already exist
@@ -221,6 +221,7 @@ for j, time in enumerate(time_span[2:-1]):
     print("Training for data up to {} ...".format(time))
     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+
 
     # ========= 2.a.i. Model =========
     # Construct data loaders
@@ -297,6 +298,12 @@ for j, time in enumerate(time_span[2:-1]):
     summary_data = evaluator.summary()
     summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
     quit()
+
+
+    # ========= 2.c. Save predicted results =========
+    pred.to_csv(DYNAMIC_PATH + f"pedicted_result_{time_pred}.csv", index = False)
+
+
     # ========= End of iteration =========
     print("Completed evaluation for {}.\n".format(time_pred))
 
@@ -307,7 +314,7 @@ print("Saving summary plots ...")
 
 SUMMARY_PLOT_PATH = FIG_PATH + "dynamic/"
 # Subplots of ROCs
-evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, [3, 3])
+evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, dim = [3, 3], eps = True)
 # Aggregate ROC
 aggregate_summary = evaluator.roc_aggregate(SUMMARY_PLOT_PATH, time_span)
 # Save aggregate summary

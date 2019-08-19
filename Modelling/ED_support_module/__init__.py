@@ -592,5 +592,3 @@ def feature_importance_permutation(X, y, predict_method,
     return mean_importance_vals, all_importance_vals
 
 
-
-
