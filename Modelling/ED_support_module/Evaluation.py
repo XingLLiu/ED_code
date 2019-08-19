@@ -3,16 +3,16 @@ from ED_support_module import *
 class Evaluation:
     '''
     Class for plotting and summarizing ROC for each month and on aggregate.
-    Input : y_test = [list or Series] real response values.
+    Input : y_true = [list or Series] real response values.
             pred_prob = [list or Series] predicted probability of class 1.
     '''
-    def __init__(self, y_test, pred_prob):
+    def __init__(self, y_true, pred_prob):
         self.pred_prob = pred_prob
-        self.y_test = y_test
+        self.y_true = y_true
     def roc_plot(self, plot=True, title="", n_pts = 51, save_path = None):
         '''
         Plot the roc curve of a trained logistic regression model.
-        Input:  self.y_test = test set (pd.dataframe or series)
+        Input:  self.y_true = test set (pd.dataframe or series)
         Output: ROC plot
         '''
         plt.close()
@@ -20,10 +20,10 @@ class Evaluation:
         threshold = np.linspace(0, 1, n_pts)
         score_sorted = np.argsort(self.pred_prob)
         for i in range(n_pts):
-            indices_with_preds = score_sorted[-int(np.ceil( threshold[i] * self.y_test.shape[0] )):]
-            pred = self.y_test * 0
+            indices_with_preds = score_sorted[-int(np.ceil( threshold[i] * self.y_true.shape[0] )):]
+            pred = self.y_true * 0
             pred.iloc[indices_with_preds] = 1
-            fpr, tpr, _ = sk.metrics.roc_curve(self.y_test, pred)
+            fpr, tpr, _ = sk.metrics.roc_curve(self.y_true, pred)
             fpr_lst.append(fpr[1])
             tpr_lst.append(tpr[1])
         fpr_lst[-1], tpr_lst[-1] = 1, 1
@@ -55,9 +55,9 @@ class Evaluation:
         # Compute TPR and FPR
         summary = self.roc_plot(plot=False)
         # No. of positives
-        p_num = self.y_test.sum()
+        p_num = self.y_true.sum()
         # No. of negatives
-        n_num = len(self.y_test) - p_num
+        n_num = len(self.y_true) - p_num
         # Compute no. of TP and FN
         summary['TP'] = (summary['TPR'] * p_num).round().astype('int')
         summary['FN'] = p_num - summary['TP']
@@ -186,16 +186,6 @@ class FeatureImportance:
         '''
         return self.sorted_names
 
-
-
-
-
-
-
-    # def load_data(self, data_path):
-    #     '''
-    #     Data loader for this specific class. For developer's use.
-    #     '''
 
 
 

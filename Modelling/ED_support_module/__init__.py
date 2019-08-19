@@ -48,7 +48,7 @@ def double_scatter(x_feature = None, y_feature = None, classes = 'Primary.Dx', d
 
 # ROC curve
 def roc_plot(yTest = None, pred = None, plot = True, show_results = True,
-             save_path = None):
+             save_path = None, eps = False):
     '''
     Plot the roc curve of a given test set and predictions
     Input : yTest = test set (pd.dataframe or series)
@@ -62,7 +62,7 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True,
     fpr, tpr, _ = sk.metrics.roc_curve(yTest, pred)
     roc_auc = sk.metrics.auc(fpr, tpr)
     plt.title('Receiver Operating Characteristic')
-    plt.plot(fpr, tpr, 'b', label = 'AUC = %0.2f' % roc_auc)
+    plt.plot(fpr, tpr, 'b', label = 'AUC = %0.3f' % roc_auc)
     plt.legend(loc = 'lower right')
     plt.plot([0, 1], [0, 1],'r--')
     plt.xlim([0, 1])
@@ -70,7 +70,10 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True,
     plt.ylabel('True Positive Rate')
     plt.xlabel('False Positive Rate')
     if save_path != None:
-        plt.savefig(save_path, format='eps', dpi=1000)
+        if eps:
+            plt.savefig(save_path, format="eps", dpi=800)
+        else:
+            plt.savefig(save_path)
         plt.close()
     if plot == True:
         plt.show()
@@ -429,7 +432,8 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
 def threshold_predict(pred_prob, y_data, fpr=0.05):
     '''
     Predict y values by controling the false positive rate.
-    Input : pred_prob = predicted scores. Higher for class 1.
+    Input : pred_prob = [Series] predicted scores. Higher for class 1.
+            y_data = [Series] true response vector.
     '''
     # Initialization
     num_fp = int( np.round( len( y_data ) * fpr ) )
@@ -450,6 +454,20 @@ def threshold_predict(pred_prob, y_data, fpr=0.05):
     if i == len(threshold):
         Warning("All thresholds give a FPR lower than the given value. Make sure it is from 0 to 1.")
     return y_pred
+
+
+# Transform predicted resposne from -1, 1 to 0, 1
+def predict_transform(self, x_data):
+    '''
+    Predict and transform the predicted response to 0 or 1 instead of -1 and 1.
+    '''
+    # Predicted response
+    y_pred = self.predict(x_data)
+    # Transform
+    y_pred = -0.5 * y_pred + 0.5
+    return y_pred.astype(int)
+
+
 
 
 # Helper function for threshold_predict. For developer's use

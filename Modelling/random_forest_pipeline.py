@@ -12,14 +12,14 @@ def add_method(y_true, fpr):
     Input : y_true = [list or Series] true response values.
             fpr = [float] threshold false positive rate.
     '''
-    def rf_threshold_predict(self, x_data, y_true=y_true, fpr=fpr):
+    def threshold_predict_method(self, x_data, y_true=y_true, fpr=fpr):
         # Predicted probability
         pred_prob = self.predict_proba(x_data)[:, 1]
         # Predicted response vector
         y_pred = threshold_predict(pred_prob, y_true, fpr)
         return y_pred
     
-    sk.ensemble.RandomForestClassifier.threshold_predict = rf_threshold_predict
+    sk.ensemble.RandomForestClassifier.threshold_predict = threshold_predict_method
 
 
 # ----------------------------------------------------
@@ -28,10 +28,12 @@ MODEL_NAME = "RF"
 RANDOM_SEED = 27
 CLASS_WEIGHT = 500
 MODE = "a"
+FPR_THRESHOLD = 0.1
+
 N_ESTIMATORS = 4000
 MAX_DEPTH = 30
 MAX_FEATURES = "auto"
-FPR_THRESHOLD = 0.1
+
 
 
 # Arguments
