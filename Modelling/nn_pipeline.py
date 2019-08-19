@@ -187,7 +187,6 @@ EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival = preprocessor.streamline()
 # Get numerical columns (for later transformation)
 num_cols = preprocessor.which_numerical(EPIC)
 num_cols.remove("Primary.Dx")
-num_cols.remove("Will.Return")
 
 # Get time span
 time_span = EPIC_arrival['Arrived'].unique().tolist()
@@ -307,6 +306,7 @@ for j, time in enumerate(time_span[2:-1]):
     # ========= End of iteration =========
     print("Completed evaluation for {}.\n".format(time_pred))
 
+    quit()
 
 
 # ========= 2.c. Summary plots =========

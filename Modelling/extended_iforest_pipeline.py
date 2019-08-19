@@ -60,7 +60,6 @@ EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival = preprocessor.streamline()
 # Get numerical columns (for later transformation)
 num_cols = preprocessor.which_numerical(EPIC)
 num_cols.remove("Primary.Dx")
-num_cols.remove("Will.Return")
 
 # Get time span
 time_span = EPIC_arrival['Arrived'].unique().tolist()
@@ -79,6 +78,7 @@ for j, time in enumerate(time_span[2:-1]):
     DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
     if not os.path.exists(DYNAMIC_PATH):
         os.makedirs(DYNAMIC_PATH)
+
 
     # Prepare train/test sets
     XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival,
@@ -133,11 +133,12 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.iii. Plot scores =========
-    # Predicted response
+    # Predicted response (0, 1)
     y_pred = model.predict(x_data = XTest,
                            outlier_proportion = OUTLIER_PROPORTION,
                            anomaly_scores = pred)
     # Save score plot
+    plt.close()
     model.plot_scores(pred, yTest, y_pred,
                       save_path = DYNAMIC_PATH + f"roc_{time_pred}",
                       title= MODEL_NAME,
