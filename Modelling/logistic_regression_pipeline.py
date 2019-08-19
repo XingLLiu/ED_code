@@ -153,22 +153,29 @@ for j, time in enumerate(time_span[2:-1]):
     print("Training for data up to {} ...".format(time))
     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+            
+
     # ========= 2.a.i. Model =========
     # Apply SMOTE
     smote = SMOTE(random_state = RANDOM_SEED, sampling_strategy = 'auto')
     col_names = XTrain.columns
     XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
     XTrain = pd.DataFrame(XTrain, columns=col_names)
+
     # Fit logistic regression
     model = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
                                         max_iter = 1000).fit(XTrain, yTrain)
+
     # Re-fit after removing features of zero coefficients
     model_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2', max_iter = 1000)
     double_logistic_regressor = DoubleLogisticRegression(model, XTrain, yTrain)
     model_new = double_logistic_regressor.double_fits(model_new, XTrain, yTrain)
+
     # Remove features in test set
     XTest = double_logistic_regressor.remove_zero_coeffs(XTest)
     pred_new = model_new.predict_proba(XTest)[:, 1]
+
+
     # ========= 2.a.ii. Plot beta values =========
     # Plot the features whose coefficients are the top 50 largest in magnitude
     non_zero_coeffs = model_new.coef_[model_new.coef_ != 0]

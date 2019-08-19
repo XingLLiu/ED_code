@@ -1,7 +1,7 @@
 from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
-
+# About 20 mins for each iteration
 
 # ----------------------------------------------------
 # Supporting functions and classes
@@ -119,7 +119,7 @@ for j, time in enumerate(time_span[2:-1]):
         col_names = XTrain.columns
         XTrain, yTrain = smote.fit_sample(XTrain, yTrain)
         XTrain = pd.DataFrame(XTrain, columns=col_names)
-    
+
     # Fit model
     model = sk.ensemble.RandomForestClassifier(n_estimators = N_ESTIMATORS,
                                                max_depth = MAX_DEPTH,
@@ -152,7 +152,7 @@ for j, time in enumerate(time_span[2:-1]):
                             X = np.array(XTest),
                             y = np.array(yTest),
                             metric = true_positive_rate,
-                            num_rounds = 10,
+                            num_rounds = 15,
                             seed = RANDOM_SEED)
 
     # Save feature importance plot

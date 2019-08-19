@@ -446,10 +446,9 @@ def threshold_predict(pred_prob, y_data, fpr=0.05):
         indices_with_preds = score_sorted[ -int( np.ceil( threshold[i] * y_data.shape[0] ) ): ]
         y_pred = y_data * 0
         y_pred.iloc[indices_with_preds] = 1
-        if i == 2:
-            break
+        # Compute FPR for the current predicted response vector
         current_fpr = false_positive_rate(y_data, y_pred)
-        # Stop if the current FPR is just over the desired fpr
+        # Stop if the current FPR is just over the desired FPR
         if current_fpr < fpr and i > 0:
             break
     # Return the predicted response vector
