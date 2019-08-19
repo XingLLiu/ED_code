@@ -10,16 +10,18 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # NN model
 class NeuralNet(nn.Module):
-    def __init__(self, input_size=61, num_classes=2, drop_prob=0):
+    def __init__(self, input_size=61, hidden_size=500, num_classes=2, drop_prob=0):
         super(NeuralNet, self).__init__()
-        self.fc1 = nn.Linear(input_size, input_size)
+        self.fc1 = nn.Linear(input_size, hidden_size)
         self.ac1 = nn.ReLU()
-        self.fc2 = nn.Linear(input_size, num_classes)
-        self.dp_layer = nn.Dropout(drop_prob)
+        self.fc2 = nn.Linear(hidden_size, num_classes)
+        self.dp_layer1 = nn.Dropout(drop_prob)
+        self.dp_layer2 = nn.Dropout(drop_prob)
     def forward(self, x):
-        h = self.dp_layer(x)
+        h = self.dp_layer1(x)
         h = self.fc1(h)
         h = self.ac1(h)
+        h = self.dp_layer2(h)
         return self.fc2(h)
     def train_model(self, train_loader, criterion, optimizer, device):
         '''
@@ -78,40 +80,46 @@ class NeuralNet(nn.Module):
                 if transformation is not None:
                     # Probability of belonging to class 1
                     outputs = transformation(outputs).detach()
-        return np.array(outputs[:, 1])
+                if i == 0:
+                    outputs_vec = np.array(outputs[:, 1])
+                else:
+                    outputs_vec = np.append(outputs_vec,
+                                            np.array(outputs[:, 1]),
+                                            axis = 0)
+        return outputs_vec
 
 
 
 
-# For feature importance evaluation
-def add_method(y_true, fpr, device, transformation=None):
-    '''
-    Add method to RandomForestClassifier for evaluating feature importance.
-    Evaluation metric would be the TPR corresponding to the given FPR.
-    Input : y_true = [list or Series] true response values.
-            fpr = [float] threshold false positive rate.
-    '''
-    def threshold_predict_method(self,
-                                 x_data,
-                                 y_true = y_true,
-                                 fpr = fpr,
-                                 device = device,
-                                 transformation = transformation):
-        # Prepare test dataloader as required by the method
-        y_true_mat = np.matrix(y_true).reshape(-1, 1)
-        dataset = np.concatenate( ( np.array(x_data), y_true_mat ), axis = 1 )
-        test_loader = torch.utils.data.DataLoader(dataset = np.array(dataset),
-                                                    batch_size = len(y_true))
-        # Predicted probability
-        pred_prob = self.eval_model(test_loader = test_loader,
-                                    device = device,
-                                    transformation = transformation)
-        # Predicted response vector
-        pred_prob = pd.Series(pred_prob)
-        y_pred = threshold_predict(pred_prob, y_true, fpr)
-        return y_pred
+# # For feature importance evaluation
+# def add_method(y_true, fpr, device, transformation=None):
+#     '''
+#     Add method to RandomForestClassifier for evaluating feature importance.
+#     Evaluation metric would be the TPR corresponding to the given FPR.
+#     Input : y_true = [list or Series] true response values.
+#             fpr = [float] threshold false positive rate.
+#     '''
+#     def threshold_predict_method(self,
+#                                  x_data,
+#                                  y_true = y_true,
+#                                  fpr = fpr,
+#                                  device = device,
+#                                  transformation = transformation):
+#         # Prepare test dataloader as required by the method
+#         y_true_mat = np.matrix(y_true).reshape(-1, 1)
+#         dataset = np.concatenate( ( np.array(x_data), y_true_mat ), axis = 1 )
+#         test_loader = torch.utils.data.DataLoader(dataset = np.array(dataset),
+#                                                     batch_size = len(y_true))
+#         # Predicted probability
+#         pred_prob = self.eval_model(test_loader = test_loader,
+#                                     device = device,
+#                                     transformation = transformation)
+#         # Predicted response vector
+#         pred_prob = pd.Series(pred_prob)
+#         y_pred = threshold_predict(pred_prob, y_true, fpr)
+#         return y_pred
     
-    NeuralNet.threshold_predict = threshold_predict_method
+#     NeuralNet.threshold_predict = threshold_predict_method
 
 
 
@@ -130,6 +138,7 @@ BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
 DROP_PROB = 0.1
+HIDDEN_SIZE = 200
 
 
 
@@ -224,7 +233,7 @@ for j, time in enumerate(time_span[2:-1]):
 
     # Neural net model
     input_size = XTrain.shape[1]
-    model = NeuralNet(input_size = input_size, drop_prob = DROP_PROB).to(device)
+    model = NeuralNet(input_size = input_size, drop_prob = DROP_PROB, hidden_size = HIDDEN_SIZE).to(device)
 
     # Loss and optimizer
     # nn.CrossEntropyLoss() computes softmax internally
@@ -237,9 +246,9 @@ for j, time in enumerate(time_span[2:-1]):
     # Train the model
     for epoch in trange(NUM_EPOCHS):
         loss = model.train_model(train_loader,
-                                    criterion = criterion,
-                                    optimizer = optimizer,
-                                    device = device)
+                                criterion = criterion,
+                                optimizer = optimizer,
+                                device = device)
         loss_vec[epoch] = loss.item()
 
 
@@ -263,19 +272,19 @@ for j, time in enumerate(time_span[2:-1]):
     #                         num_rounds = 10,
     #                         seed = RANDOM_SEED)
 
-    # Permutation test
-    imp_means, imp_vars = feature_importance_permutation(
-                            predict_method = model.predict_proba_single,
-                            X = np.array(XTest),
-                            y = np.array(yTest),
-                            metric = true_positive_rate,
-                            fpr_threshold = FPR_THRESHOLD,
-                            num_rounds = 5,
-                            seed = RANDOM_SEED)
+    # # Permutation test
+    # imp_means, imp_vars = feature_importance_permutation(
+    #                         predict_method = model.predict_proba_single,
+    #                         X = np.array(XTest),
+    #                         y = np.array(yTest),
+    #                         metric = true_positive_rate,
+    #                         fpr_threshold = FPR_THRESHOLD,
+    #                         num_rounds = 5,
+    #                         seed = RANDOM_SEED)
 
-    # Save feature importance plot
-    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+    # # Save feature importance plot
+    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
 
     # ========= 2.b. Evaluation =========
@@ -287,7 +296,7 @@ for j, time in enumerate(time_span[2:-1]):
     # Save summary
     summary_data = evaluator.summary()
     summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
-
+    quit()
     # ========= End of iteration =========
     print("Completed evaluation for {}.\n".format(time_pred))
 
