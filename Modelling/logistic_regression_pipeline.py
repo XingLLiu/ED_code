@@ -122,125 +122,6 @@ sk.linear_model.LogisticRegression.double_fits = double_fits
 sk.linear_model.LogisticRegression.predict_proba_single = predict_proba_single
 
 
-# Add-method function for feature importance
-def add_method(y_true, fpr):
-    '''
-    Add method to LogisticRegression for evaluating feature importance.
-    Evaluation metric would be the TPR corresponding to the given FPR.
-    Input : y_true = [list or Series] true response values.
-            fpr = [float] threshold false positive rate.
-    '''
-    def threshold_predict_method(self, x_data, y_true=y_true, fpr=fpr):
-        # Predicted probability
-        pred_prob = self.predict_proba(x_data)[:, 1]
-        # Predicted response vector
-        y_pred = threshold_predict(pred_prob, y_true, fpr)
-        return y_pred
-    
-    sk.linear_model.LogisticRegression.threshold_predict = threshold_predict_method
-
-
-
-
-
-
-# Feature importance function
-def feature_importance_permutation(X, y, predict_method,
-                                   metric, num_rounds=1, seed=None,
-                                   fpr_threshold=0.1):
-    """Feature importance imputation via permutation importance
-       This function only makes sense if the model is able to output
-       probabilities for the predicted responses.
-    Parameters
-    ----------
-
-    X : NumPy array, shape = [n_samples, n_features]
-        Dataset, where n_samples is the number of samples and
-        n_features is the number of features.
-
-    y : NumPy array, shape = [n_samples]
-        Target values.
-
-    predict_method : prediction function
-        A callable function that predicts the target values
-        from X.
-
-    metric : str, callable
-        The metric for evaluating the feature importance through
-        permutation. By default, the strings 'accuracy' is
-        recommended for classifiers and the string 'r2' is
-        recommended for regressors. Optionally, a custom
-        scoring function (e.g., `metric=scoring_func`) that
-        accepts two arguments, y_true and y_pred, which have
-        similar shape to the `y` array.
-
-    num_rounds : int (default=1)
-        Number of rounds the feature columns are permuted to
-        compute the permutation importance.
-
-    seed : int or None (default=None)
-        Random seed for permuting the feature columns.
-
-    Returns
-    ---------
-
-    mean_importance_vals, all_importance_vals : NumPy arrays.
-      The first array, mean_importance_vals has shape [n_features, ] and
-      contains the importance values for all features.
-      The shape of the second array is [n_features, num_rounds] and contains
-      the feature importance for each repetition. If num_rounds=1,
-      it contains the same values as the first array, mean_importance_vals.
-
-    Examples
-    -----------
-    For usage examples, please see
-    http://rasbt.github.io/mlxtend/user_guide/evaluate/feature_importance_permutation/
-    """
-    if not isinstance(num_rounds, int):
-        raise ValueError('num_rounds must be an integer.')
-    if num_rounds < 1:
-        raise ValueError('num_rounds must be greater than 1.')
-    if not (metric in ('r2', 'accuracy') or hasattr(metric, '__call__')):
-        raise ValueError('metric must be either "r2", "accuracy", '
-                         'or a function with signature func(y_true, y_pred).')
-    if metric == 'r2':
-        def score_func(y_true, y_pred):
-            sum_of_squares = np.sum(np.square(y_true - y_pred))
-            res_sum_of_squares = np.sum(np.square(y_true - y_true.mean()))
-            r2_score = 1. - (sum_of_squares / res_sum_of_squares)
-            return r2_score
-    elif metric == 'accuracy':
-        def score_func(y_true, y_pred):
-            return np.mean(y_true == y_pred)
-    else:
-        score_func = metric
-    rng = np.random.RandomState(seed)
-    mean_importance_vals = np.zeros(X.shape[1])
-    all_importance_vals = np.zeros((X.shape[1], num_rounds))
-    pred_prob = predict_method(X)
-    y_pred = threshold_predict(pred_prob, y, fpr_threshold)
-    baseline = score_func(y, y_pred)
-    for round_idx in range(num_rounds):
-        for col_idx in range(X.shape[1]):
-            save_col = X[:, col_idx].copy()
-            new_col = rng.choice(save_col)
-            X[:, col_idx] = new_col
-            # print("sampled no. of equal:", (X[:, col_idx] == save_col).sum())
-            pred_prob = predict_method(X)
-            y_pred = threshold_predict(pred_prob, y, fpr_threshold)
-            new_score = score_func(y, y_pred)
-            X[:, col_idx] = save_col
-            importance = baseline - new_score
-            mean_importance_vals[col_idx] += importance
-            all_importance_vals[col_idx, round_idx] = importance
-            # print(pred_prob)
-            # print( (y == np.array(y_pred)).sum(), len(y) )
-            # print("new score", new_score)
-    mean_importance_vals /= num_rounds
-    return mean_importance_vals, all_importance_vals
-
-
-
 # ----------------------------------------------------
 # ========= 0. Preliminary seetings =========
 MODEL_NAME = "LR"
@@ -355,16 +236,6 @@ for j, time in enumerate(time_span[2:-1]):
     model = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = PENALTY,
                                                 max_iter = 1000).fit(XTrain, yTrain)
 
-    # # Re-fit after removing features of zero coefficients
-    # model_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2', max_iter = 1000)
-    # double_logistic_regressor = DoubleLogisticRegression(model, XTrain, yTrain)
-    # model_new = double_logistic_regressor.double_fits(model_new, XTrain, yTrain)
-
-    # # Remove features in test set
-    # XTest = double_logistic_regressor.remove_zero_coeffs(XTest)
-    # pred_new = model_new.predict_proba(XTest)[:, 1]
-
-
     # Re-fit after removing features of zero coefficients
     XTest = model.remove_zero_coef_(XTest)
     model_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
@@ -387,18 +258,6 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.c. Feature importance =========
-    # # Add method for feature importance evaluation
-    # add_method(y_true = yTest, fpr = FPR_THRESHOLD)
-
-    # # Permutation test
-    # imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
-    #                         predict_method = model_new.threshold_predict,
-    #                         X = np.array(XTest),
-    #                         y = np.array(yTest),
-    #                         metric = true_positive_rate,
-    #                         num_rounds = 15,
-    #                         seed = RANDOM_SEED)
-
     # Permutation test
     imp_means, imp_vars = feature_importance_permutation(
                             predict_method = model_new.predict_proba_single,

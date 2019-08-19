@@ -469,9 +469,7 @@ def predict_transform(self, x_data):
     return y_pred.astype(int)
 
 
-
-
-# Helper function for threshold_predict. For developer's use
+# Compute FPR. Helper function for threshold_predict.
 def false_positive_rate(y_true, y_pred):
     true_negative = ( (y_pred == 0) & (y_true == 0) ).sum()
     negative = len(y_true) -  y_true.sum()
@@ -501,115 +499,98 @@ def true_positive_rate(y_true, y_pred):
     return tpr
 
 
+# Feature importance function
+def feature_importance_permutation(X, y, predict_method,
+                                   metric, num_rounds=1, seed=None,
+                                   fpr_threshold=0.1):
+    """Feature importance imputation via permutation importance
+       This function only makes sense if the model is able to output
+       probabilities for the predicted responses.
+       Adapted from mlxtend.evaluate.feature_importance_permutation
+    Parameters
+    ----------
 
-# def time_time_split(EPIC_enc, num_cols, mode,
-#                     EPIC_CUI=None, valid_size=None, pca_components=None, seed=None,
-#                     time_threshold=None):
-#     '''
-#     Split EPIC_enc into train/test/(valid) with/without PCA/Sparse PCA (see 'mode'). This can be
-#     used as a substitute of sklearn.model_selection.TrainTestSplit.
-#     Input : num_cols = [list or pd.Index] names of numerical cols to be transformed.
-#             cui_cols = [list or pd.Index] names of CUI cols to be transformed if
-#                        EPIC_CUI is not None.
-#             valid_size = [float] proportion of train set to be split into valid set. None if
-#                           no validation is required.
-#             mode = [str] must be one of the following:
-#                             a -- No PCA, no TF-IDF
-#                             b -- PCA, no TF-IDF
-#                             c -- No PCA, TF-IDF
-#                             d -- PCA, but not on TF-IDF
-#                             e -- PCA, TF-IDF
-#                             f -- Sparse PCA, TF-IDF
-#     Output: XTrain, XTest, (XValid), yTrain, yTest, (yValid)
-#     '''
-#     # Prepare taining set
-#     if mode not in ['a', 'b']:
-#         try:
-#             EPIC_enc, cui_cols = TFIDF(EPIC_CUI, EPIC_enc)
-#         except:
-#             raise ValueError("EPIC_CUI must be given when including TF-IDF")
-#     # Separate input features and target
-#     y = EPIC_enc['Primary.Dx']
-#     X = EPIC_enc.drop('Primary.Dx', axis = 1)
-#     # Prepare train and test sets
-#     if "Arrived" in X.columns:
-#         XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True)
-#     else:
-#         raise ValueError("\'Arrived\' must be included as a feature in input EPIC_enc.")
-#     if valid_size != None:
-#         # Prepare validation set
-#         XTrain, XValid, yTrain, yValid = sk.model_selection.train_test_split(XTrain, yTrain, test_size=valid_size,
-#                                         random_state=seed, stratify=yTrain)
-#     # Separate the numerical features
-#     if mode in ['c', 'e', 'f']:
-#         num_cols = num_cols + list(cui_cols)
-#     # Extract the numerical columns to be transformed
-#     XTrainNum = XTrain[num_cols]
-#     XTestNum = XTest[num_cols]
-#     if valid_size != None:
-#         XValidNum = XValid[num_cols]
-#     # PCA on the numerical entries   # 27, 11  # Without PCA: 20, 18
-#     if mode in ['b', 'd', 'e', 'f']:
-#         if mode in ['f']:
-#             if type(pca_components) != float:
-#                 raise ValueError("pca_components is of type {} but must be float for Sparse PCA.".format(type(pca_components)))
-#             # Sparse PCA 
-#             pca = sk.decomposition.SparsePCA(int(np.ceil(XTrainNum.shape[1]/2))).fit(XTrainNum)
-#         else:
-#             # Usual PCA
-#             pca = sk.decomposition.PCA(pca_components).fit(XTrainNum)
-#         # Assign the transformed values back
-#         XTrainNum = pd.DataFrame( pca.transform( XTrainNum ) )
-#         XTestNum = pd.DataFrame( pca.transform( XTestNum ) )
-#         XTrainNum.index = XTrain.index
-#         XTestNum.index = XTest.index
-#         if valid_size != None:
-#             # Transform validation set
-#             XValidNum = pd.DataFrame( pca.transform( XValidNum ) )
-#             XValidNum.index = XValidNum.index
-#     # Assign the transformed values back
-#     keep_cols = [col for col in X.columns if col not in num_cols]
-#     XTrain = pd.concat( [ XTrain[keep_cols], XTrainNum ], axis=1 )
-#     XTest = pd.concat( [ XTest[keep_cols], XTestNum ], axis=1 )
-#     if valid_size != None:
-#         XValid = pd.concat( [ XValid[keep_cols], XValidNum ], axis=1 )
-#         return XTrain, XTest, XValid, yTrain, yTest, yValid
-#     else:
-#         return XTrain, XTest, yTrain, yTest
+    X : NumPy array, shape = [n_samples, n_features]
+        Dataset, where n_samples is the number of samples and
+        n_features is the number of features.
 
+    y : NumPy array, shape = [n_samples]
+        Target values.
 
+    predict_method : prediction function
+        A callable function that predicts the target values
+        from X.
 
+    metric : str, callable
+        The metric for evaluating the feature importance through
+        permutation. By default, the strings 'accuracy' is
+        recommended for classifiers and the string 'r2' is
+        recommended for regressors. Optionally, a custom
+        scoring function (e.g., `metric=scoring_func`) that
+        accepts two arguments, y_true and y_pred, which have
+        similar shape to the `y` array.
 
+    num_rounds : int (default=1)
+        Number of rounds the feature columns are permuted to
+        compute the permutation importance.
 
+    seed : int or None (default=None)
+        Random seed for permuting the feature columns.
 
-# # Dynamic prediction ROC
-# def dynamic_roc():
-# # Create a directory if not exists
-# plot_path = '/'.join(os.getcwd().split('/')[:3]) + '/Pictures/neural_net/'
-# dynamic_plot_path = plot_path + 'dynamic/'
+    Returns
+    ---------
 
-# # Create subplot
-# for i, month in enumerate(timeSpan[1:-2]):
-#     csv_name = dynamic_plot_path + f'summary_{month}.csv'
-#     summary = pd.read_csv(csv_name)
-#     _ = plt.subplot(3, 3, i + 1)
-#     # ROC plot
-#     tpr = summary['TPR']
-#     fpr = summary['FPR']
-#     roc_auc = sk.metrics.auc(fpr, tpr)
-#     month_pred = timeSpan[i + 3]
-#     _ = plt.title(f'ROC {month_pred}')
-#     _ = plt.plot(fpr, tpr, 'b', label = 'AUC = %0.2f' % roc_auc)
-#     _ = plt.legend(loc = 'lower right')
-#     _ = plt.plot([0, 1], [0, 1],'r--')
-#     _ = plt.xlim([0, 1])
-#     _ = plt.ylim([0, 1])
-#     _ = plt.ylabel('True Positive Rate')
-#     _ = plt.xlabel('False Positive Rate')
+    mean_importance_vals, all_importance_vals : NumPy arrays.
+      The first array, mean_importance_vals has shape [n_features, ] and
+      contains the importance values for all features.
+      The shape of the second array is [n_features, num_rounds] and contains
+      the feature importance for each repetition. If num_rounds=1,
+      it contains the same values as the first array, mean_importance_vals.
+
+    Examples
+    -----------
+    For usage examples, please see
+    http://rasbt.github.io/mlxtend/user_guide/evaluate/feature_importance_permutation/
+    """
+    if not isinstance(num_rounds, int):
+        raise ValueError('num_rounds must be an integer.')
+    if num_rounds < 1:
+        raise ValueError('num_rounds must be greater than 1.')
+    if not (metric in ('r2', 'accuracy') or hasattr(metric, '__call__')):
+        raise ValueError('metric must be either "r2", "accuracy", '
+                         'or a function with signature func(y_true, y_pred).')
+    if metric == 'r2':
+        def score_func(y_true, y_pred):
+            sum_of_squares = np.sum(np.square(y_true - y_pred))
+            res_sum_of_squares = np.sum(np.square(y_true - y_true.mean()))
+            r2_score = 1. - (sum_of_squares / res_sum_of_squares)
+            return r2_score
+    elif metric == 'accuracy':
+        def score_func(y_true, y_pred):
+            return np.mean(y_true == y_pred)
+    else:
+        score_func = metric
+    rng = np.random.RandomState(seed)
+    mean_importance_vals = np.zeros(X.shape[1])
+    all_importance_vals = np.zeros((X.shape[1], num_rounds))
+    pred_prob = predict_method(X)
+    y_pred = threshold_predict(pred_prob, y, fpr_threshold)
+    baseline = score_func(y, y_pred)
+    for round_idx in range(num_rounds):
+        for col_idx in range(X.shape[1]):
+            save_col = X[:, col_idx].copy()
+            new_col = rng.choice(save_col)
+            X[:, col_idx] = new_col
+            pred_prob = predict_method(X)
+            y_pred = threshold_predict(pred_prob, y, fpr_threshold)
+            new_score = score_func(y, y_pred)
+            X[:, col_idx] = save_col
+            importance = baseline - new_score
+            mean_importance_vals[col_idx] += importance
+            all_importance_vals[col_idx, round_idx] = importance
+    mean_importance_vals /= num_rounds
+    return mean_importance_vals, all_importance_vals
 
 
-# plt.tight_layout()
-# plt.savefig(dynamic_plot_path + 'aggregate_roc.eps', format='eps', dpi=1000)
-# plt.show()
 
 
