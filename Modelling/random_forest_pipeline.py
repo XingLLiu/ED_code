@@ -5,21 +5,32 @@ from ED_support_module import Evaluation
 
 # ----------------------------------------------------
 # Supporting functions and classes
-def add_method(y_true, fpr):
-    '''
-    Add method to RandomForestClassifier for evaluating feature importance.
-    Evaluation metric would be the TPR corresponding to the given FPR.
-    Input : y_true = [list or Series] true response values.
-            fpr = [float] threshold false positive rate.
-    '''
-    def threshold_predict_method(self, x_data, y_true=y_true, fpr=fpr):
-        # Predicted probability
-        pred_prob = self.predict_proba(x_data)[:, 1]
-        # Predicted response vector
-        y_pred = threshold_predict(pred_prob, y_true, fpr)
-        return y_pred
+# def add_method(y_true, fpr):
+#     '''
+#     Add method to RandomForestClassifier for evaluating feature importance.
+#     Evaluation metric would be the TPR corresponding to the given FPR.
+#     Input : y_true = [list or Series] true response values.
+#             fpr = [float] threshold false positive rate.
+#     '''
+#     def threshold_predict_method(self, x_data, y_true=y_true, fpr=fpr):
+#         # Predicted probability
+#         pred_prob = self.predict_proba(x_data)[:, 1]
+#         # Predicted response vector
+#         y_pred = threshold_predict(pred_prob, y_true, fpr)
+#         return y_pred
     
-    sk.ensemble.RandomForestClassifier.threshold_predict = threshold_predict_method
+#     sk.ensemble.RandomForestClassifier.threshold_predict = threshold_predict_method
+
+
+def predict_proba_single(self, x):
+    '''
+    Output the predicted probability of being of class 1
+    only, as opposed to 2 columns for being of class 0 and class 1.
+    '''
+    return self.predict_proba(x)[:, 1]
+    
+
+sk.ensemble.RandomForestClassifier.predict_proba_single = predict_proba_single
 
 
 # ----------------------------------------------------
@@ -143,16 +154,27 @@ for j, time in enumerate(time_span[2:-1]):
     plt.close()
 
     # ========= 2.a.iii. Feature importance by permutation test =========
-    # Add method for feature importance evaluation
-    add_method(y_true = yTest, fpr = FPR_THRESHOLD)
+    # # Add method for feature importance evaluation
+    # add_method(y_true = yTest, fpr = FPR_THRESHOLD)
+
+    # # Permutation test
+    # imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
+    #                         predict_method = model.threshold_predict,
+    #                         X = np.array(XTest),
+    #                         y = np.array(yTest),
+    #                         metric = true_positive_rate,
+    #                         num_rounds = 15,
+    #                         seed = RANDOM_SEED)
+
 
     # Permutation test
-    imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
-                            predict_method = model.threshold_predict,
+    imp_means, imp_vars = feature_importance_permutation(
+                            predict_method = model.predict_proba_single,
                             X = np.array(XTest),
                             y = np.array(yTest),
                             metric = true_positive_rate,
-                            num_rounds = 15,
+                            fpr_threshold = FPR_THRESHOLD,
+                            num_rounds = 5,
                             seed = RANDOM_SEED)
 
     # Save feature importance plot
