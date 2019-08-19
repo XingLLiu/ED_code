@@ -168,7 +168,7 @@ class FeatureImportance:
         std = np.std(self.var, axis=1)
         # Plot importance values
         _ = plt.figure()
-        _ = plt.title(f"{self.model_name} Feature Importance WITH Std. Dev.")
+        _ = plt.title(f"{self.model_name} Feature Importance with Std. Dev.")
         _ = sns.barplot(y = sorted_features, x = self.mean[self.indices],
                         xerr = std[self.indices])
         _ = plt.yticks(fontsize = y_fontsize)

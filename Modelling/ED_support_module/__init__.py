@@ -443,9 +443,11 @@ def threshold_predict(pred_prob, y_data, fpr=0.05):
     score_sorted = np.argsort(pred_prob)
     # Find threshold
     for i in range(len(threshold)):
-        indices_with_preds = score_sorted[-int(np.ceil( threshold[i] * y_data.shape[0] )):]
+        indices_with_preds = score_sorted[ -int( np.ceil( threshold[i] * y_data.shape[0] ) ): ]
         y_pred = y_data * 0
         y_pred.iloc[indices_with_preds] = 1
+        if i == 2:
+            break
         current_fpr = false_positive_rate(y_data, y_pred)
         # Stop if the current FPR is just over the desired fpr
         if current_fpr < fpr and i > 0:
@@ -471,9 +473,9 @@ def predict_transform(self, x_data):
 
 
 # Helper function for threshold_predict. For developer's use
-def false_positive_rate(y_data, y_pred):
-    true_positive = ( (y_pred == 1) & (y_data == 1) ).sum()
-    positive = y_data.sum()
+def false_positive_rate(y_true, y_pred):
+    true_positive = ( (y_pred == 1) & (y_true == 1) ).sum()
+    positive = y_true.sum()
     if positive != 0:
         fpr = 1 - true_positive / positive
     else:
@@ -483,8 +485,14 @@ def false_positive_rate(y_data, y_pred):
 
 
 # Compute TPR
-def true_positive_rate(y_data, y_pred):
-    fpr = false_positive_rate(y_data, y_pred)
+def true_positive_rate(y_true, y_pred):
+    '''
+    Compute TPR.
+    Input : y_true = [Series or array] true response vector.
+            y_pred = [Series or array] predicted response vector.
+    Output: tpr = [float] true positive rate.
+    '''
+    fpr = false_positive_rate(y_true, y_pred)
     return 1 - fpr
 
 

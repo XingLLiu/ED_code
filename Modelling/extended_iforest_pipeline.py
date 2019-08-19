@@ -210,21 +210,21 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.ii. Feature importance by permutation test =========
-    # # Add method for feature importance evaluation
-    # add_method(y_true = yTest, fpr = FPR_THRESHOLD)
+    # Add method for feature importance evaluation
+    add_method(y_true = yTest, fpr = FPR_THRESHOLD)
 
-    # # Permutation test
-    # imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
-    #                         predict_method = model.threshold_predict,
-    #                         X = np.array(XTest),
-    #                         y = np.array(yTest),
-    #                         metric = true_positive_rate,
-    #                         num_rounds = 5,
-    #                         seed = RANDOM_SEED)
+    # Permutation test
+    imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
+                            predict_method = model.threshold_predict,
+                            X = np.array(XTest),
+                            y = np.array(yTest),
+                            metric = true_positive_rate,
+                            num_rounds = 5,
+                            seed = RANDOM_SEED)
 
-    # # Save feature importance plot
-    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+    # Save feature importance plot
+    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
 
     # ========= 2.a.iii. Plot scores =========

@@ -78,7 +78,7 @@ class NeuralNet(nn.Module):
                 if transformation is not None:
                     # Probability of belonging to class 1
                     outputs = transformation(outputs).detach()
-        return outputs[:, 1]
+        return np.array(outputs[:, 1])
 
 
 
@@ -125,11 +125,11 @@ MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 50
+NUM_EPOCHS = 10000
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
-SAMPLE_WEIGHT = 15
-DROP_PROB = 0
+# SAMPLE_WEIGHT = 15
+DROP_PROB = 0.1
 
 
 
@@ -251,21 +251,22 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.ii. Feature importance by permutation test =========
-    # Add method for feature importance evaluation
-    add_method(y_true = yTest, fpr = FPR_THRESHOLD, device = device, transformation = transformation)
+    # # Add method for feature importance evaluation
+    # add_method(y_true = yTest, fpr = FPR_THRESHOLD, device = device, transformation = transformation)
 
-    # Permutation test
-    imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
-                            predict_method = model.threshold_predict,
-                            X = np.array(XTest),
-                            y = np.array(yTest),
-                            metric = true_positive_rate,
-                            num_rounds = 10,
-                            seed = RANDOM_SEED)
+    # # Permutation test
+    # imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
+    #                         predict_method = model.threshold_predict,
+    #                         X = np.array(XTest),
+    #                         y = np.array(yTest),
+    #                         metric = true_positive_rate,
+    #                         num_rounds = 10,
+    #                         seed = RANDOM_SEED)
 
-    # Save feature importance plot
-    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+    # # Save feature importance plot
+    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+
 
     # ========= 2.b. Evaluation =========
     evaluator = Evaluation.Evaluation(yTest, pred)
