@@ -17,6 +17,20 @@ logger = logging.getLogger(__name__)
 
 
 # ----------------------------------------------------
+#a list of common abbreviations that do not have other potential meanings
+abbrevs = {'hrs':'hours', 'mins':'minutes',
+           'S&S':'signs and symptoms', 
+           'bc':'because', 'b/c':'because', 
+           'wo':'without', 'w/o':'without', 
+           'yo':'year old', 'y.o':'year old', 'wk':'weeks',
+           'm.o':'month old', 'mo':'months', 'mos':'months', 
+           'b4':'before', 'pt':'patient',
+           'ro':'rule out', 'w/':'with', 
+           'o/n':'overnight', 'f/u':'follow up',
+           'M':'male', 'F':'female'}
+
+
+# ----------------------------------------------------
 # Text to feature classes
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
@@ -263,7 +277,7 @@ class BertForSepsis(nn.Module):
                 loss_vec[i // 10] = loss.item()
         return loss_vec
     def eval_model(self, test_loader, batch_size, transformation=None):
-        model.eval()
+        self.eval()
         with torch.no_grad():
             for i, batch in enumerate(tqdm(test_loader, desc="Evaluating")):
                 # Get batch
