@@ -433,3 +433,20 @@ def feature_to_loader(train_features, batch_size):
     train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size = batch_size)
     return train_dataloader
 
+
+
+
+def save_bert(prediction_model, tokenizer, OUTPUT_DIR, WEIGHTS_NAME, CONFIG_NAME, PREDICTION_HEAD_NAME):
+    '''
+    Save BERT with prediction head layer.
+    '''
+    model_to_save = prediction_model.module if hasattr(prediction_model, "module") else prediction_model
+    # Save using the predefined names so that one can load using `from_pretrained`
+    output_model_file = os.path.join(OUTPUT_DIR, WEIGHTS_NAME)
+    output_config_file = os.path.join(OUTPUT_DIR, CONFIG_NAME)
+    output_classification_file = os.path.join(OUTPUT_DIR, PREDICTION_HEAD_NAME)
+    # Save
+    torch.save(model_to_save.state_dict(), output_model_file)
+    model_to_save.config.to_json_file(output_config_file)
+    tokenizer.save_vocabulary(OUTPUT_DIR)
+

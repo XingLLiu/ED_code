@@ -139,21 +139,6 @@ CLEAN_NOTES = False
 
 
 # ----------------------------------------------------
-# Copied and modified from cleaning_script.py
-#a list of common abbreviations that do not have other potential meanings
-abbrevs = {'hrs':'hours', 'mins':'minutes',
-           'S&S':'signs and symptoms', 
-           'bc':'because', 'b/c':'because', 
-           'wo':'without', 'w/o':'without', 
-           'yo':'year old', 'y.o':'year old', 'wk':'weeks',
-           'm.o':'month old', 'mo':'months', 'mos':'months', 
-           'b4':'before', 'pt':'patient',
-           'ro':'rule out', 'w/':'with', 
-           'o/n':'overnight', 'f/u':'follow up',
-           'M':'male', 'F':'female'}
-
-
-# ----------------------------------------------------
 # Create folder to save raw text data if not exist
 if not os.path.exists(RAW_SAVE_DIR):
     os.makedirs(RAW_SAVE_DIR)
@@ -314,6 +299,13 @@ for j, time in enumerate(time_span[2:-1]):
             loss_vec = np.append(loss_vec, loss)
     
     
+    # Save model
+    save_bert(prediction_model,
+                tokenizer,
+                OUTPUT_DIR,
+                WEIGHTS_NAME,
+                CONFIG_NAME,
+                PREDICTION_HEAD_NAME)
 
 
     # Prediction
