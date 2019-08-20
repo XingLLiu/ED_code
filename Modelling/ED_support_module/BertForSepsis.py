@@ -32,6 +32,20 @@ abbrevs = {'hrs':'hours', 'mins':'minutes',
 
 
 # ----------------------------------------------------
+#a list of common abbreviations that do not have other potential meanings
+abbrevs = {'hrs':'hours', 'mins':'minutes',
+           'S&S':'signs and symptoms', 
+           'bc':'because', 'b/c':'because', 
+           'wo':'without', 'w/o':'without', 
+           'yo':'year old', 'y.o':'year old', 'wk':'weeks',
+           'm.o':'month old', 'mo':'months', 'mos':'months', 
+           'b4':'before', 'pt':'patient',
+           'ro':'rule out', 'w/':'with', 
+           'o/n':'overnight', 'f/u':'follow up',
+           'M':'male', 'F':'female'}
+
+
+# ----------------------------------------------------
 # Text to feature classes
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
@@ -278,7 +292,7 @@ class BertForSepsis(nn.Module):
                 loss_vec[i // 10] = loss.item()
         return loss_vec
     def eval_model(self, test_loader, batch_size, transformation=None):
-        model.eval()
+        self.eval()
         with torch.no_grad():
             for i, batch in enumerate(tqdm(test_loader, desc="Evaluating")):
                 # Get batch
@@ -433,4 +447,21 @@ def feature_to_loader(train_features, batch_size):
     train_dataloader = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
     train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size = batch_size)
     return train_dataloader
+
+
+
+
+def save_bert(prediction_model, tokenizer, OUTPUT_DIR, WEIGHTS_NAME, CONFIG_NAME, PREDICTION_HEAD_NAME):
+    '''
+    Save BERT with prediction head layer.
+    '''
+    model_to_save = prediction_model.module if hasattr(prediction_model, "module") else prediction_model
+    # Save using the predefined names so that one can load using `from_pretrained`
+    output_model_file = os.path.join(OUTPUT_DIR, WEIGHTS_NAME)
+    output_config_file = os.path.join(OUTPUT_DIR, CONFIG_NAME)
+    output_classification_file = os.path.join(OUTPUT_DIR, PREDICTION_HEAD_NAME)
+    # Save
+    torch.save(model_to_save.state_dict(), output_model_file)
+    model_to_save.config.to_json_file(output_config_file)
+    tokenizer.save_vocabulary(OUTPUT_DIR)
 
