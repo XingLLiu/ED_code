@@ -5,9 +5,6 @@ from ED_support_module import Evaluation
 
 # ----------------------------------------------------
 # ========= 0.i. Supporting functions and classes =========
-# Device configuration
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 # NN model
 class NeuralNet(nn.Module):
     def __init__(self, input_size=61, hidden_size=500, num_classes=2, drop_prob=0):
@@ -126,6 +123,9 @@ class NeuralNet(nn.Module):
 
 # ----------------------------------------------------
 # ========= 0.ii. Preliminary seetings =========
+# Device configuration
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 MODEL_NAME = "NN"
 RANDOM_SEED = 27
 CLASS_WEIGHT = 3000
@@ -138,7 +138,7 @@ BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
 DROP_PROB = 0.1
-HIDDEN_SIZE = 200
+HIDDEN_SIZE = 250
 
 
 
@@ -208,6 +208,7 @@ for j, time in enumerate(time_span[2:-1]):
     if not os.path.exists(DYNAMIC_PATH):
         os.makedirs(DYNAMIC_PATH)
 
+
     # Prepare train/test sets
     XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival,
                                             num_cols,
@@ -223,25 +224,33 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.i. Model =========
-    # Construct data loaders
-    train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
-                                                batch_size = BATCH_SIZE,
-                                                shuffle = True)
-    test_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yTest], axis = 1)),
-                                                batch_size = len(yTest),
-                                                shuffle = False)
+    # Initialize the model at the first iteration
+    if j == 0:
+        # Neural net model
+        input_size = XTrain.shape[1]
+        model = NeuralNet(input_size = input_size, drop_prob = DROP_PROB, hidden_size = HIDDEN_SIZE).to(device)
+        # Loss and optimizer
+        # nn.CrossEntropyLoss() computes softmax internally
+        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
+        optimizer = torch.optim.SGD(model.parameters(), lr = LEARNING_RATE)
+        # Initialize loss vector
+        loss_vec = np.zeros(NUM_EPOCHS)
+        # Construct data loaders
+        train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
+                                                    batch_size = BATCH_SIZE,
+                                                    shuffle = True)
+        test_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yTest], axis = 1)),
+                                                    batch_size = len(yTest),
+                                                    shuffle = False)
+    # Otherwise only update the model on data from the previous month
+    else: 
+        train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrainOld, yTrainOld], axis = 1)),
+                                                    batch_size = BATCH_SIZE,
+                                                    shuffle = True)
+        test_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yTest], axis = 1)),
+                                                    batch_size = len(yTest),
+                                                    shuffle = False)
 
-    # Neural net model
-    input_size = XTrain.shape[1]
-    model = NeuralNet(input_size = input_size, drop_prob = DROP_PROB, hidden_size = HIDDEN_SIZE).to(device)
-
-    # Loss and optimizer
-    # nn.CrossEntropyLoss() computes softmax internally
-    criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr = LEARNING_RATE)
-
-    # Initialize loss vector
-    loss_vec = np.zeros(NUM_EPOCHS)
 
     # Train the model
     for epoch in trange(NUM_EPOCHS):
@@ -257,6 +266,10 @@ for j, time in enumerate(time_span[2:-1]):
     pred = model.eval_model(test_loader = test_loader,
                             device = device,
                             transformation = transformation)
+
+    # Save data of this month as train set for the next iteration
+    XTrainOld = XTest
+    yTrainOld = yTest
 
 
     # ========= 2.a.ii. Feature importance by permutation test =========
@@ -296,7 +309,6 @@ for j, time in enumerate(time_span[2:-1]):
     # Save summary
     summary_data = evaluator.summary()
     summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
-    quit()
 
 
     # ========= 2.c. Save predicted results =========
@@ -306,7 +318,6 @@ for j, time in enumerate(time_span[2:-1]):
     # ========= End of iteration =========
     print("Completed evaluation for {}.\n".format(time_pred))
 
-    quit()
 
 
 # ========= 2.c. Summary plots =========

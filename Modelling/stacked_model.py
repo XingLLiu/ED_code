@@ -5,16 +5,21 @@ from ED_support_module import Evaluation
 
 # ----------------------------------------------------
 # ========= 0.i. Supporting functions and classes =========
-# Device configuration
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 # NN model
-class Ensemble(nn.Module):
-    def __init__(self, input_size, num_classes=2):
-        super(Ensemble, self).__init__()
-        self.fc = nn.Linear(input_size, num_classes)
+class NeuralNet(nn.Module):
+    def __init__(self, input_size=61, hidden_size=500, num_classes=2, drop_prob=0):
+        super(NeuralNet, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.ac1 = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_size, num_classes)
+        self.dp_layer1 = nn.Dropout(drop_prob)
+        self.dp_layer2 = nn.Dropout(drop_prob)
     def forward(self, x):
-        return self.fc(x)
+        h = self.dp_layer1(x)
+        h = self.fc1(h)
+        h = self.ac1(h)
+        h = self.dp_layer2(h)
+        return self.fc2(h)
     def train_model(self, train_loader, criterion, optimizer, device):
         '''
         Train and back-propagate the neural network model. Note that
@@ -82,11 +87,11 @@ class Ensemble(nn.Module):
 
 
 
-
-
-
 # ----------------------------------------------------
 # ========= 0.ii. Preliminary seetings =========
+# Device configuration
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 MODEL_NAME = "Ensemble"
 RANDOM_SEED = 27
 CLASS_WEIGHT = 3000
@@ -94,12 +99,12 @@ MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 10000
+NUM_EPOCHS = 1000
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
 DROP_PROB = 0.1
-HIDDEN_SIZE = 200
+HIDDEN_SIZE = 250
 
 
 
@@ -148,7 +153,6 @@ EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival = preprocessor.streamline()
 # Get numerical columns (for later transformation)
 num_cols = preprocessor.which_numerical(EPIC)
 num_cols.remove("Primary.Dx")
-num_cols.remove("Will.Return")
 
 # Get time span
 time_span = EPIC_arrival['Arrived'].unique().tolist()
@@ -170,14 +174,16 @@ for j, time in enumerate(time_span[2:-1]):
     if not os.path.exists(DYNAMIC_PATH):
         os.makedirs(DYNAMIC_PATH)
 
+
     # Prepare train/test sets
-    XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival,
-                                            num_cols,
-                                            MODE,
-                                            time_threshold = time,
-                                            test_size = None,
-                                            EPIC_CUI = EPIC_CUI,
-                                            seed = RANDOM_SEED)
+    XTrain, XTest, XValid, yTrain, yTest, yValid = splitter(EPIC_arrival,
+                                                    num_cols,
+                                                    MODE,
+                                                    time_threshold = time,
+                                                    test_size = None,
+                                                    valid_size = 0.15,
+                                                    EPIC_CUI = EPIC_CUI,
+                                                    seed = RANDOM_SEED)
 
     print("Training for data up to {} ...".format(time))
     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
@@ -189,21 +195,26 @@ for j, time in enumerate(time_span[2:-1]):
     train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
                                                 batch_size = BATCH_SIZE,
                                                 shuffle = True)
+    test_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XValid, yValid], axis = 1)),
+                                                batch_size = len(yValid),
+                                                shuffle = False)
     test_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yTest], axis = 1)),
                                                 batch_size = len(yTest),
                                                 shuffle = False)
 
-    # Neural net model
-    input_size = XTrain.shape[1]
-    model = NeuralNet(input_size = input_size, drop_prob = DROP_PROB, hidden_size = HIDDEN_SIZE).to(device)
+    # Initialize the model at the first iteration
+    if j == 0:
+        # Neural net model
+        input_size = XTrain.shape[1]
+        model = NeuralNet(input_size = input_size, drop_prob = DROP_PROB, hidden_size = HIDDEN_SIZE).to(device)
 
-    # Loss and optimizer
-    # nn.CrossEntropyLoss() computes softmax internally
-    criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr = LEARNING_RATE)
+        # Loss and optimizer
+        # nn.CrossEntropyLoss() computes softmax internally
+        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
+        optimizer = torch.optim.SGD(model.parameters(), lr = LEARNING_RATE)
 
-    # Initialize loss vector
-    loss_vec = np.zeros(NUM_EPOCHS)
+        # Initialize loss vector
+        loss_vec = np.zeros(NUM_EPOCHS)
 
     # Train the model
     for epoch in trange(NUM_EPOCHS):
@@ -246,7 +257,6 @@ for j, time in enumerate(time_span[2:-1]):
     # Save summary
     summary_data = evaluator.summary()
     summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
-    quit()
 
 
     # ========= 2.c. Save predicted results =========

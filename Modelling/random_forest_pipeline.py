@@ -111,6 +111,7 @@ for j, time in enumerate(time_span[2:-1]):
     # Prediction
     pred = model.predict_proba(XTest)[:, 1]
 
+
     # ========= 2.a.ii. Feature importances by Gini impurity =========
     # Get importance scores
     importance_vals = model.feature_importances_
@@ -123,6 +124,7 @@ for j, time in enumerate(time_span[2:-1]):
     _ = plt.yticks(fontsize = 4)
     plt.savefig(DYNAMIC_PATH + f"feature_imp_by_gini_{time_pred}.eps", format = 'eps', dpi = 800)
     plt.close()
+
 
     # ========= 2.a.iii. Feature importance by permutation test =========
     # # Add method for feature importance evaluation
@@ -174,7 +176,7 @@ SUMMARY_PLOT_PATH = FIG_PATH + "dynamic/"
 # Subplots of ROCs
 evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, [3, 3])
 # Aggregate ROC
-aggregate_summary = evaluator.roc_aggregate(SUMMARY_PLOT_PATH, time_span)
+aggregate_summary = evaluator.roc_aggregate(SUMMARY_PLOT_PATH, time_span, eps = True)
 # Save aggregate summary
 aggregate_summary.to_csv(SUMMARY_PLOT_PATH + "aggregate_summary.csv", index = False)
 

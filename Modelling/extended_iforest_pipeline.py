@@ -117,19 +117,19 @@ for j, time in enumerate(time_span[2:-1]):
     #                         num_rounds = 5,
     #                         seed = RANDOM_SEED)
 
-    # Permutation test
-    imp_means, imp_vars = feature_importance_permutation(
-                            predict_method = model.predict_proba,
-                            X = np.array(XTest),
-                            y = np.array(yTest),
-                            metric = true_positive_rate,
-                            fpr_threshold = FPR_THRESHOLD,
-                            num_rounds = 5,
-                            seed = RANDOM_SEED)
+    # # Permutation test
+    # imp_means, imp_vars = feature_importance_permutation(
+    #                         predict_method = model.predict_proba,
+    #                         X = np.array(XTest),
+    #                         y = np.array(yTest),
+    #                         metric = true_positive_rate,
+    #                         fpr_threshold = FPR_THRESHOLD,
+    #                         num_rounds = 5,
+    #                         seed = RANDOM_SEED)
 
-    # Save feature importance plot
-    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+    # # Save feature importance plot
+    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
 
     # ========= 2.a.iii. Plot scores =========
@@ -137,6 +137,7 @@ for j, time in enumerate(time_span[2:-1]):
     y_pred = model.predict(x_data = XTest,
                            outlier_proportion = OUTLIER_PROPORTION,
                            anomaly_scores = pred)
+
     # Save score plot
     plt.close()
     model.plot_scores(pred, yTest, y_pred,
@@ -167,7 +168,7 @@ SUMMARY_PLOT_PATH = FIG_PATH + "dynamic/"
 # Subplots of ROCs
 evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, [3, 3])
 # Aggregate ROC
-aggregate_summary = evaluator.roc_aggregate(SUMMARY_PLOT_PATH, time_span)
+aggregate_summary = evaluator.roc_aggregate(SUMMARY_PLOT_PATH, time_span, eps = True)
 # Save aggregate summary
 aggregate_summary.to_csv(SUMMARY_PLOT_PATH + "aggregate_summary.csv", index = False)
 

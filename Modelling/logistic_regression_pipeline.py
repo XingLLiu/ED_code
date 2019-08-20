@@ -165,7 +165,7 @@ for j, time in enumerate(time_span[2:-1]):
     summary_data = evaluator.summary()
     summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
 
-    
+
     # ========= 2.c. Save predicted results =========
     pred_new = pd.DataFrame(pred_new, columns = ["pred_prob"])
     pred_new.to_csv(DYNAMIC_PATH + f"pedicted_result_{time_pred}.csv", index = False)
@@ -183,7 +183,7 @@ summary_plot_path = FIG_PATH + "dynamic/"
 # Subplots of ROCs
 evaluator.roc_subplot(summary_plot_path, time_span, [3, 3])
 # Aggregate ROC
-aggregate_summary = evaluator.roc_aggregate(summary_plot_path, time_span)
+aggregate_summary = evaluator.roc_aggregate(summary_plot_path, time_span, eps = True)
 # Save aggregate summary
 aggregate_summary.to_csv(summary_plot_path + "aggregate_summary.csv", index = False)
 
