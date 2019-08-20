@@ -7,20 +7,21 @@ from ED_support_module import Evaluation
 # ========= 0.i. Supporting functions and classes =========
 # NN model
 class NeuralNet(nn.Module):
-    def __init__(self, input_size=61, hidden_size=500, num_classes=2, drop_prob=0):
+    def __init__(self, device, input_size=61, hidden_size=500, num_classes=2, drop_prob=0):
         super(NeuralNet, self).__init__()
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.ac1 = nn.ReLU()
         self.fc2 = nn.Linear(hidden_size, num_classes)
         self.dp_layer1 = nn.Dropout(drop_prob)
         self.dp_layer2 = nn.Dropout(drop_prob)
+        self.device = device
     def forward(self, x):
         h = self.dp_layer1(x)
         h = self.fc1(h)
         h = self.ac1(h)
         h = self.dp_layer2(h)
         return self.fc2(h)
-    def train_model(self, train_loader, criterion, optimizer, device):
+    def train_model(self, train_loader, criterion, optimizer):
         '''
         Train and back-propagate the neural network model. Note that
         this is different from the built-in method self.train, which
@@ -38,7 +39,7 @@ class NeuralNet(nn.Module):
         '''
         self.train()
         for i, x in enumerate(train_loader):
-            x = x.to(device)
+            x = x.to(self.device)
             # Retrieve design matrix and labels
             labels = x[:, -1].long()
             x = x[:, :(-1)].float()
@@ -50,33 +51,36 @@ class NeuralNet(nn.Module):
             loss.backward()
             optimizer.step()
         return loss
-    def eval_model(self, test_loader, device, transformation=None):
+    def eval_model(self, test_loader, transformation=None):
         '''
         Evaluate the neural network model. Only makes sense if
         test_loader contains all test data. Note that this is
-        different from the built-in method self.train, which
+        different from the built-in method self.eval, which
         sets the model to train mode.
         
         Model will be set to evaluation mode internally.
 
-        Input : train_loader = [DataLoader] training set. The
-                               last column must be the response.
+        Input : 
+                train_loader = [DataLoader] training set. Must not
+                                contain the response.
                 transformation = [Function] function for evaluatin
                                  transforming the output. If not given,
                                  raw output is return.
-        Output: outputs = output from the model (after transformation).
+        Output: 
+                outputs = output from the model (after transformation).
         '''
         model.eval()
         with torch.no_grad():
             for i, x in enumerate(test_loader):
-                x = x.to(device)
+                x = x.to(self.device)
                 # Retrieve design matrix
-                x = x[:, :(-1)].float()
+                x = x.float()
                 # Prediction
                 outputs = model(x)
                 if transformation is not None:
                     # Probability of belonging to class 1
                     outputs = transformation(outputs).detach()
+                # Append probabilities
                 if i == 0:
                     outputs_vec = np.array(outputs[:, 1])
                 else:
@@ -84,7 +88,22 @@ class NeuralNet(nn.Module):
                                             np.array(outputs[:, 1]),
                                             axis = 0)
         return outputs_vec
-
+    def predict_proba_single(self, x_data):
+        '''
+        Transform x_data into dataloader and return predicted scores
+        for being of class 1.
+        Input :
+                x_data = [DataFrame or array] train set. Must not contain
+                         the response.
+        Output:
+                pred_prob = [array] predicted probability for being
+                            of class 1.
+        '''
+        test_loader = torch.utils.data.DataLoader(dataset = np.array(x_data),
+                                                batch_size = len(x_data),
+                                                shuffle = False)
+        return self.eval_model(test_loader, transformation=None)
+        
 
 
 
@@ -133,7 +152,7 @@ MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 10000
+NUM_EPOCHS = 100
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
@@ -228,7 +247,10 @@ for j, time in enumerate(time_span[2:-1]):
     if j == 0:
         # Neural net model
         input_size = XTrain.shape[1]
-        model = NeuralNet(input_size = input_size, drop_prob = DROP_PROB, hidden_size = HIDDEN_SIZE).to(device)
+        model = NeuralNet(device = device,
+                          input_size = input_size,
+                          drop_prob = DROP_PROB,
+                          hidden_size = HIDDEN_SIZE).to(device)
         # Loss and optimizer
         # nn.CrossEntropyLoss() computes softmax internally
         criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
@@ -239,11 +261,11 @@ for j, time in enumerate(time_span[2:-1]):
         train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
                                                     batch_size = BATCH_SIZE,
                                                     shuffle = True)
-        test_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yTest], axis = 1)),
+        test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
                                                     batch_size = len(yTest),
                                                     shuffle = False)
     # Otherwise only update the model on data from the previous month
-    else: 
+    else:
         train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrainOld, yTrainOld], axis = 1)),
                                                     batch_size = BATCH_SIZE,
                                                     shuffle = True)
@@ -256,15 +278,13 @@ for j, time in enumerate(time_span[2:-1]):
     for epoch in trange(NUM_EPOCHS):
         loss = model.train_model(train_loader,
                                 criterion = criterion,
-                                optimizer = optimizer,
-                                device = device)
+                                optimizer = optimizer)
         loss_vec[epoch] = loss.item()
 
 
     # Prediction
     transformation = nn.Sigmoid()
     pred = model.eval_model(test_loader = test_loader,
-                            device = device,
                             transformation = transformation)
 
     # Save data of this month as train set for the next iteration
