@@ -120,7 +120,7 @@ MAX_SEQ_LENGTH = 512
 MODE = "a"
 WEIGHT = 500
 WEIGHT2 = 16
-TRAIN_BATCH_SIZE = 32
+TRAIN_BATCH_SIZE = 20
 EVAL_BATCH_SIZE = 40
 LEARNING_RATE = 1e-3
 NUM_TRAIN_EPOCHS = 6
@@ -674,7 +674,7 @@ for j, time in enumerate(time_span[2:-1]):
         # Prediction model
         prediction_model = BertForSepsis(bert_model = model,
                                         device = device,
-                                        hidden_size = model.config.hidden_size)
+                                        hidden_size = model.config.hidden_size).to(device)
     else:
         # Load pretrained tokenizer and model
         tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR + 'vocab.txt', do_lower_case=False)
