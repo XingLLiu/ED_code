@@ -12,23 +12,30 @@ import logging
 from tqdm import tqdm, trange
 from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM, BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
+from ED_support_module import EPICPreprocess
 
 # from EDA import EPIC, EPIC_enc, EPIC_CUI, numCols, catCols 
 
 
 # ----------------------------------------------------
 # Directories for saving files
-path = '/home/xingliu/Documents/ED/data/EPIC_DATA/EPIC.csv'
-SAVE_DIR = '/'.join(path.split('/')[:-1]) + '/EPIC_with_Bert/'
-RAW_SAVE_DIR = SAVE_DIR + 'Raw_Notes/'
-PROCESSED_SAVE_DIR = SAVE_DIR + 'Processed_Notes/'
+# Path to save figures
+FIG_PATH = "../../results/bert/"
+DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+TEXT_DATA_PATH = "../../data/EPIC_DATA/EPIC.csv"
+RAW_SAVE_DIR = FIG_PATH + "Raw_Notes/"
+
+
+# path = '../../data/EPIC_DATA/EPIC.csv'
+# SAVE_DIR = '/'.join(path.split('/')[:-1]) + '/EPIC_with_Bert/'
+# RAW_SAVE_DIR = SAVE_DIR + 'Raw_Notes/'
+# PROCESSED_SAVE_DIR = SAVE_DIR + 'Processed_Notes/'
 
 
 # ----------------------------------------------------
 # Arguments
 def setup_parser():
     parser = argparse.ArgumentParser()
-
     # Required arguments
     parser.add_argument("--clean_notes",
                         default=False,
@@ -96,20 +103,21 @@ BERT_MODEL = 'clinical_bert'
 # The name of the task to train.I'm going to name this 'yelp'.
 TASK_NAME = 'epic_task'
 
-# The output directory where the fine-tuned model and checkpoints will be written.
-OUTPUT_DIR = SAVE_DIR + f'Saved_Checkpoints/{TASK_NAME}/'
+# # The output directory where the fine-tuned model and checkpoints will be written.
+# OUTPUT_DIR = SAVE_DIR + f'Saved_Checkpoints/{TASK_NAME}/'
 
-# The directory where the evaluation reports will be written to.
-REPORTS_DIR = SAVE_DIR + f'Reports/{TASK_NAME}_evaluation_report/'
+# # The directory where the evaluation reports will be written to.
+# REPORTS_DIR = SAVE_DIR + f'Reports/{TASK_NAME}_evaluation_report/'
 
 # This is where BERT will look for pre-trained models to load parameters from.
-CACHE_DIR = '/'.join(path.split('/')[:-3]) + '/ClinicalBert/pretrained_bert_tf/biobert_pretrain_output_all_notes_150000/'
+CACHE_DIR = '../../ClinicalBert/pretrained_bert_tf/biobert_pretrain_output_all_notes_150000/'
 
 # The maximum total input sequence length after WordPiece tokenization.
 # Sequences longer than this will be truncated, and sequences shorter than this will be padded.
 MAX_SEQ_LENGTH = 512
 
 # Other model hyper-parameters
+MODE = "a"
 WEIGHT = 500
 WEIGHT2 = 16
 TRAIN_BATCH_SIZE = 40
@@ -125,206 +133,16 @@ CONFIG_NAME = "bert_config.json"
 WEIGHTS_NAME = "pytorch_model.bin"
 PREDICTION_HEAD_NAME = "prediction_head.bin"
 
+MODEL_NAME = "bert"   # For saving the results
+
 # Use GPU if exists otherwise CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NUM_GPU = torch.cuda.device_count()
 
 
-# ----------------------------------------------------
-# Create folder to save evaluation reports if not exist
-if not os.path.exists(REPORTS_DIR):
-    os.makedirs(REPORTS_DIR)
 
+CLEAN_NOTES = True
 
-# Create folder to save fine-tuned model if not exist
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
-
-
-# ----------------------------------------------------
-# Prepare train and test sets
-# Load file
-EPIC_original = pd.read_csv(path, encoding = 'ISO-8859-1')
-
-# Assign labels
-# Check if Primary.Dx contains Sepsis or related classes
-ifSepsis1 = EPIC_original['Primary.Dx'].str.contains('epsis')
-# Check if Diagnosis contains Sepsis or related classes
-ifSepsis2 = EPIC_original['Diagnosis'].str.contains('epsis')
-# Check if Diagnoses contains Sepsis or related classes
-ifSepsis3 = EPIC_original['Diagnoses'].str.contains('epsis')
-# Lable as sepsis if any of the above contains Sepsis
-ifSepsis = ifSepsis1 | ifSepsis2 | ifSepsis3
-EPIC_original['Primary.Dx'] = ifSepsis.astype('int')
-
-# Only keep text columns and ID's
-# notesCols = ['Note.Data_ED.Notes', 'Note.Data_ED.Procedure.Note', 'Note.Data_ED.Provider.Notes', 'Note.Data_ED.Triage.Notes']
-notesCols = ['Note.Data_ED.Triage.Notes']
-EPIC = EPIC_original[['Primary.Dx'] + notesCols]
-
-
-# ----------------------------------------------------
-# Clean notes 
-
-# Copied and modified from cleaning_script.py
-#a list of common abbreviations that do not have other potential meanings
-abbrevs = {'hrs':'hours', 'mins':'minutes',
-           'S&S':'signs and symptoms', 
-           'bc':'because', 'b/c':'because', 
-           'wo':'without', 'w/o':'without', 
-           'yo':'year old', 'y.o':'year old', 'wk':'weeks',
-           'm.o':'month old', 'mo':'months', 'mos':'months', 
-           'b4':'before', 'pt':'patient',
-           'ro':'rule out', 'w/':'with', 
-           'o/n':'overnight', 'f/u':'follow up',
-           'M':'male', 'F':'female'}
-
-
-# Function that cleans the text
-def clean_text(text):
-    if ((text == 'nan') | (text != text)):
-        return ''
-    #date extraction and replacement
-    # dates = findDates(text)[0] # USE ME PLEASE!
-    text = findDates(text)[1]
-    #note structure
-    text = text.replace ("," , " ")
-    text = re.sub (" *<<STARTNOTE.*<NOTETEXT", "", text)
-    text = text.replace("NOTETEXT>ENDNOTE>>", " ")
-    text = re.sub (" *<CRLF>", ". ", text)
-    #erroneous UTF symbols
-    text = re.sub ("[•â€¢Ã]+", "", text)
-    #abbreviations
-    for abb in abbrevs:
-        if " " + abb + "." in text:
-            text = text.replace (" " + abb + ".", " " + abbrevs[abb] + ".")
-        elif  " " + abb + " " in text:
-            text = text.replace (" " + abb + " ", " " + abbrevs[abb] + " ")
-    #numeric ranges
-    grp = re.findall ("(?<![0-9]-)([0-9]+) *- *([0-9]+)(?!-[0-9])", text)
-    for g in grp:
-        text = re.sub ("(?<![0-9]-)" + g[0]+" *- *" + g[1] + "(?!-[0-9])", g[0] + " to " + g[1], text)
-    #dealing with x[0-9]+ d
-    grp = re.findall("x *([0-9]+) *d([ .,]+)", text)
-    for g in grp:
-        text = re.sub ("x *" + g[0] + " *d"+g[1], "for " + g[0] + " days" + g[1], text)
-    grp = re.findall("x *([0-9]+)/d([ .,]+)", text)
-    for g in grp:
-        text = re.sub ("x *" + g[0] + "/d"+g[1], g[0] + " times per day" + g[1], text)
-    grp = re.findall("x *([0-9]+)/day([ .,]+)", text)
-    for g in grp:
-        text = re.sub ("x *" + g[0] + "/day" + g[1], g[0] + " times per day" + g[1], text)       
-    #dealing with multiple plus signs
-    grp = re.findall ("([a-zA-Z0-9]*) *\+{2,3}", text)
-    for g in grp:
-        text = re.sub (g + " *\+{2,3}", "significant " + g, text)
-    #switching symbols for equivalent words
-    text = text.replace ("%", " percent ")
-    text = text.replace ("=" , " is ")
-    text = text.replace ("\$", " dollars ")
-    text = text.replace (">", " greater than ")
-    text = text.replace ("<", " less than ")
-    text = text.replace ("?", " possible ")
-    text = text.replace ("~", " approximately ")
-    text = text.replace ("(!)", " abnormal ")
-    text = text.replace ("@", "at")
-    #switching abbreviations: pt or Pt for patient
-    text = re.sub ("(\spt\s)|(Pt\s)", " patient ", text)
-    #numeric ratios
-    grp = re.findall ("(\d{1,1}) *\: *(\d{1,2}) *[^ap][^m][^a-zA-Z0-9]", text)
-    for g in grp:
-        text = re.sub (g[0] + " *: *" + g[1], g[0] + " to " + g[1] + " ratio", text)
-	#symbol removal
-    text = text.replace ("["," ")
-    text = text.replace ("]"," ")
-    text = text.replace ("{"," ")
-    text = text.replace ("}"," ")
-    text = text.replace ("\\"," ")
-    text = text.replace ("|"," ")
-    text = text.replace ("-"," ")
-    text = text.replace ("_"," ")
-    # BERT special tokens
-    text = text.replace ('.', ' [SEP] ')
-    text = '[CLS] '+ text
-    if '[SEP]' not in text[-10:]:
-        text = text +' [SEP]'
-    text = re.sub("\[SEP\]\s+\[SEP\]", " [SEP] ", text)
-    #extra spaces
-    text = re.sub (" +", " ", text)
-	#extra periods
-    text = re.sub ("\. *\.[ .]+", ". ", text)	
-    return text
-
-
-if args.clean_notes == True:
-    # Loop over each file and write to a csv
-    print("Start cleaning notes ...")
-    # Clean text
-    for col in notesCols:
-        print("Cleaning {}".format(col))
-        EPIC.loc[:, col] = list(map(clean_text, EPIC[col]))
-    # Save data
-    if len(notesCols) == 1:
-        EPIC.to_csv(RAW_SAVE_DIR + 'EPIC_triage.csv', index=False)
-    else:
-        EPIC.to_csv(RAW_SAVE_DIR + 'EPIC_all_notes.csv', index=False)
-    # Load data nonetheless to convert empty notes "" to nan
-    EPIC = pd.read_csv(RAW_SAVE_DIR + 'EPIC_triage.csv')
-else:
-    # Load data
-    EPIC = pd.read_csv(RAW_SAVE_DIR + 'EPIC_triage.csv')
-
-
-# Fill in missing notes by CC
-for col in notesCols:
-    ifNull = EPIC[col].isnull()
-    print('Column:', col, '\nNo. of empty entries:', ifNull.sum())
-    EPIC.loc[ifNull, col] = "[CLS] " + EPIC_original['CC'][ifNull] + " [SEP]"
-    print('No. of empty entries after imputing by CC: {}'
-          .format(EPIC[col].isnull().sum()))
-    # Impute the remaining missing notes by 'none'
-    if EPIC[col].isnull().sum() > 0:
-        print('Impute the remaining missing notes by \'None.\' ')
-        EPIC.loc[EPIC[col].isnull(), col] = '[CLS] None [SEP]'
-
-
-# ----------------------------------------------------
-# Train-test-validation split
-y = EPIC['Primary.Dx']
-X = EPIC.drop('Primary.Dx', axis = 1)
-XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=0.25,
-                               random_state=RANDOM_SEED, stratify=y)
-# XTrain, XValid, yTrain, yValid = sk.model_selection.train_test_split(XTrain, yTrain, test_size=0.15,
-#                                 random_state=RANDOM_SEED, stratify=yTrain)
-
-
-
-# Change the format of train/test sets
-trainBert = pd.DataFrame({
-             'id': range(XTrain.shape[0]),
-             'label': yTrain,
-             'alpha': ['a'] * XTrain.shape[0],
-             'text': XTrain['Note.Data_ED.Triage.Notes']
-})
-
-devBert = pd.DataFrame({
-            'id': range(XTest.shape[0]),
-            'label': yTest,
-            'alpha': ['a'] * XTest.shape[0],
-            'text': XTest['Note.Data_ED.Triage.Notes']
-})
-
-# validBert = pd.DataFrame({
-#             'id': range(XValid.shape[0]),
-#             'label': yValid,
-#             'alpha': ['a'] * XValid.shape[0],
-#             'text': XValid['Note.Data_ED.Triage.Notes']
-# })
-
-# Save data
-trainBert.to_csv(PROCESSED_SAVE_DIR + 'train.tsv', sep='\t', index=False, header=False)
-devBert.to_csv(PROCESSED_SAVE_DIR + 'dev.tsv', sep='\t', index=False, header=False)
-# validBert.to_csv(PROCESSED_SAVE_DIR + 'valid.tsv', sep='\t', index=False, header=False)
 
 
 # ----------------------------------------------------
@@ -526,23 +344,391 @@ class NoteClassificationHead(nn.Module):
         return logits
 
 
-# class NoteClassificationHead(nn.Module):
-#     """
-#     Head layer for prediction.
-#     """
-#     def __init__(self, device, model, hidden_size, dropout_prob=0.4, num_labels=2):
-#         super(NoteClassificationHead, self).__init__()
-#         self.device = device
-#         self.model = model
-#         self.num_labels = num_labels
-#         self.dropout = nn.Dropout(dropout_prob)
-#         self.classifier = nn.Linear(hidden_size, num_labels)
-#         # nn.init.xavier_normal_(self.classifier.weight)
+class BertForSepsis(nn.Module):
+    """
+    Bert model with prediction layer.
+    """
+    def __init__(self, bert_model, device, hidden_size, dropout_prob=0.4, num_labels=2):
+        super(BertForSepsis, self).__init__()
+        self.bert = bert_model
+        self.device = device
+        self.num_labels = num_labels
+        self.dropout = nn.Dropout(dropout_prob)
+        self.classifier = nn.Linear(hidden_size, num_labels)
+        nn.init.xavier_normal_(self.classifier.weight)
     def forward(self, input_ids, segment_ids, input_mask):
-        _, pooled_output = model(input_ids, segment_ids, input_mask)
+        _, pooled_output = self.bert(input_ids, segment_ids, input_mask)
         pooled_output = self.dropout(pooled_output.to(self.device))
         logits = self.classifier(pooled_output)
         return logits
+    def train_model(self, train_loader, criterion, optimizer,
+                    gradient_accumulation_steps=1,
+                    NUM_GPU=1):
+        self.train()
+        # Initialize loss vector
+        loss_vec = np.zeros( len( train_dataloader ) // 10 )
+        for i, batch in enumerate(tqdm(train_dataloader)):
+            # Get batch
+            batch = tuple( t.to( self.device ) for t in batch )
+            input_ids, input_mask, segment_ids, label_ids = batch
+            logits = self(input_ids, segment_ids, input_mask).to(self.device)
+            # Compute loss
+            loss = criterion(logits, label_ids)
+            if (i + 1) % gradient_accumulation_steps == 0:
+                optimizer.zero_grad()
+            # Adapt for GPU
+            if NUM_GPU > 1:
+                loss = loss.mean() # mean() to average on multi-gpu.
+            # Accumulate loss
+            if gradient_accumulation_steps > 1:
+                loss = loss / gradient_accumulation_steps
+            # Back propagate
+            loss.backward()
+            # Update optimizer
+            if (i + 1) % gradient_accumulation_steps == 0:
+                optimizer.step()
+            # Store loss
+            if (i + 1) % 10 == 0:
+                loss_vec[i // 10] = loss.item()
+        return loss_vec
+    def eval_model(self, train_loader, batch_size, transformation=None):
+        model.eval()
+        with torch.no_grad():
+            for i, batch in enumerate(tqdm(train_dataloader, desc="Evaluating")):
+                # Get batch
+                batch = tuple( t.to( self.device ) for t in batch )
+                input_ids, input_mask, segment_ids, label_ids = batch
+                # Evaluate loss
+                with torch.no_grad():
+                    logits = self(input_ids, segment_ids, input_mask).to(self.device)
+                    # Evaluation metric
+                    logits = logits.detach().cpu().numpy()
+                    logits = torch.from_numpy(logits[:, 1])
+                    label_ids = label_ids.to('cpu').numpy()
+                # Store predicted probabilities
+                if i == 0:
+                    output = logits
+                else:
+                    output = np.append(output, logits, axis = 0)
+        return output
+
+
+
+# Copied and modified from cleaning_script.py
+#a list of common abbreviations that do not have other potential meanings
+abbrevs = {'hrs':'hours', 'mins':'minutes',
+           'S&S':'signs and symptoms', 
+           'bc':'because', 'b/c':'because', 
+           'wo':'without', 'w/o':'without', 
+           'yo':'year old', 'y.o':'year old', 'wk':'weeks',
+           'm.o':'month old', 'mo':'months', 'mos':'months', 
+           'b4':'before', 'pt':'patient',
+           'ro':'rule out', 'w/':'with', 
+           'o/n':'overnight', 'f/u':'follow up',
+           'M':'male', 'F':'female'}
+
+
+# Function that cleans the text
+def clean_text(text):
+    if ((text == 'nan') | (text != text)):
+        return ''
+    #date extraction and replacement
+    # dates = findDates(text)[0] # USE ME PLEASE!
+    text = findDates(text)[1]
+    #note structure
+    text = text.replace ("," , " ")
+    text = re.sub (" *<<STARTNOTE.*<NOTETEXT", "", text)
+    text = text.replace("NOTETEXT>ENDNOTE>>", " ")
+    text = re.sub (" *<CRLF>", ". ", text)
+    #erroneous UTF symbols
+    text = re.sub ("[•â€¢Ã]+", "", text)
+    #abbreviations
+    for abb in abbrevs:
+        if " " + abb + "." in text:
+            text = text.replace (" " + abb + ".", " " + abbrevs[abb] + ".")
+        elif  " " + abb + " " in text:
+            text = text.replace (" " + abb + " ", " " + abbrevs[abb] + " ")
+    #numeric ranges
+    grp = re.findall ("(?<![0-9]-)([0-9]+) *- *([0-9]+)(?!-[0-9])", text)
+    for g in grp:
+        text = re.sub ("(?<![0-9]-)" + g[0]+" *- *" + g[1] + "(?!-[0-9])", g[0] + " to " + g[1], text)
+    #dealing with x[0-9]+ d
+    grp = re.findall("x *([0-9]+) *d([ .,]+)", text)
+    for g in grp:
+        text = re.sub ("x *" + g[0] + " *d"+g[1], "for " + g[0] + " days" + g[1], text)
+    grp = re.findall("x *([0-9]+)/d([ .,]+)", text)
+    for g in grp:
+        text = re.sub ("x *" + g[0] + "/d"+g[1], g[0] + " times per day" + g[1], text)
+    grp = re.findall("x *([0-9]+)/day([ .,]+)", text)
+    for g in grp:
+        text = re.sub ("x *" + g[0] + "/day" + g[1], g[0] + " times per day" + g[1], text)       
+    #dealing with multiple plus signs
+    grp = re.findall ("([a-zA-Z0-9]*) *\+{2,3}", text)
+    for g in grp:
+        text = re.sub (g + " *\+{2,3}", "significant " + g, text)
+    #switching symbols for equivalent words
+    text = text.replace ("%", " percent ")
+    text = text.replace ("=" , " is ")
+    text = text.replace ("\$", " dollars ")
+    text = text.replace (">", " greater than ")
+    text = text.replace ("<", " less than ")
+    text = text.replace ("?", " possible ")
+    text = text.replace ("~", " approximately ")
+    text = text.replace ("(!)", " abnormal ")
+    text = text.replace ("@", "at")
+    #switching abbreviations: pt or Pt for patient
+    text = re.sub ("(\spt\s)|(Pt\s)", " patient ", text)
+    #numeric ratios
+    grp = re.findall ("(\d{1,1}) *\: *(\d{1,2}) *[^ap][^m][^a-zA-Z0-9]", text)
+    for g in grp:
+        text = re.sub (g[0] + " *: *" + g[1], g[0] + " to " + g[1] + " ratio", text)
+	#symbol removal
+    text = text.replace ("["," ")
+    text = text.replace ("]"," ")
+    text = text.replace ("{"," ")
+    text = text.replace ("}"," ")
+    text = text.replace ("\\"," ")
+    text = text.replace ("|"," ")
+    text = text.replace ("-"," ")
+    text = text.replace ("_"," ")
+    # BERT special tokens
+    text = text.replace ('.', ' [SEP] ')
+    text = '[CLS] '+ text
+    if '[SEP]' not in text[-10:]:
+        text = text +' [SEP]'
+    text = re.sub("\[SEP\]\s+\[SEP\]", " [SEP] ", text)
+    #extra spaces
+    text = re.sub (" +", " ", text)
+	#extra periods
+    text = re.sub ("\. *\.[ .]+", ". ", text)	
+    return text
+
+
+# Function that fills in missing text by CC
+def fill_missing_text(EPIC, EPIC_original, notesCols):
+    '''
+    Fill in missing notes by CC
+    '''
+    for col in notesCols:
+        ifNull = EPIC[col].isnull()
+        print('Column:', col, '\nNo. of empty entries:', ifNull.sum())
+        EPIC.loc[ifNull, col] = "[CLS] " + EPIC_original['CC'][ifNull] + " [SEP]"
+        print('No. of empty entries after imputing by CC: {}'
+            .format(EPIC[col].isnull().sum()))
+        # Impute the remaining missing notes by 'none'
+        if EPIC[col].isnull().sum() > 0:
+            print('Impute the remaining missing notes by \'None.\' ')
+            EPIC.loc[EPIC[col].isnull(), col] = '[CLS] None [SEP]'
+    return EPIC
+
+
+def create_bert_data(x_data, y_data, save_path=None):
+    '''
+    Generate data in the format required by BERT.
+    Input :
+            x_data = [DataFrame or array] text data
+            y_data = [DataFrame or array] lables
+            save_path = [str] if not None, data is saved to save_path. Must
+                        end with .tsv.
+    Output: 
+            data = [DataFrame] data in the BERT format.
+    '''
+    data = pd.DataFrame({
+             'id': range(x_data.shape[0]),
+             'label': y_data,
+             'alpha': ['a'] * x_data.shape[0],
+             'text': x_data
+    })
+    if save_path is not None:
+        data.to_csv(save_path, sep='\t', index=False, header=False)
+    return data
+
+
+def feature_to_loader(train_features, batch_size):
+    '''
+    Takes in the train features from BERT model and prepares a DataLoader from it.
+    
+    Input :
+            train_features = train features returned from conver_example_to_features.
+            batch_size = [int] batch size of the data loader.
+    Output: 
+            [object] data loader.
+    '''
+    all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype = torch.long)
+    all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype = torch.long)
+    all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype = torch.long)
+    all_label_ids = torch.tensor([f.label_id for f in train_features], dtype = torch.long)
+    # Create data loader
+    train_dataloader = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+    train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size = batch_size)
+    return train_dataloader
+
+
+
+# ----------------------------------------------------
+# Create folder to save raw text data if not exist
+if not os.path.exists(RAW_SAVE_DIR):
+    os.makedirs(RAW_SAVE_DIR)
+
+
+# ----------------------------------------------------
+# Prepare train and test sets
+# Load file
+EPIC_original = pd.read_csv(TEXT_DATA_PATH, encoding = 'ISO-8859-1')
+preprocessor = EPICPreprocess.Preprocess(path = path)
+EPIC_original = preprocessor.BinarizeSepsis(EPIC_original)
+
+
+# Only keep text columns and label
+notesCols = ['Note.Data_ED.Triage.Notes']
+EPIC = EPIC_original[['Primary.Dx'] + notesCols]
+
+
+# ----------------------------------------------------
+# Clean notes 
+
+if CLEAN_NOTES == True:
+    # Loop over each file and write to a csv
+    print("\nStart cleaning notes ...")
+    # Clean text
+    for col in notesCols:
+        print("Cleaning {}".format(col))
+        EPIC.loc[:, col] = list(map(clean_text, EPIC[col]))
+    # Save data
+    EPIC.to_csv(RAW_SAVE_DIR + 'EPIC_triage.csv', index=False)
+    # Load data nonetheless to convert empty notes "" to nan
+    EPIC = pd.read_csv(RAW_SAVE_DIR + 'EPIC_triage.csv')
+    # Fill in missing vals
+    EPIC = fill_missing_text(EPIC, EPIC_original, notesCols)
+    # Save imputed text
+    EPIC.to_csv(RAW_SAVE_DIR + 'EPIC_triage.csv', index=False)
+else:
+    # Load data
+    EPIC = pd.read_csv(RAW_SAVE_DIR + 'EPIC_triage.csv')
+
+
+# ----------------------------------------------------
+# ========= 1. Further preprocessing =========
+preprocessor = EPICPreprocess.Preprocess(DATA_PATH)
+_, _, _, EPIC_arrival = preprocessor.streamline()
+
+# Remove the obvious outliers
+EPIC = EPIC.loc[EPIC_arrival.index, :]
+# Add time variable
+EPIC = pd.concat([EPIC, EPIC_arrival["Arrived"].astype(int)], axis = 1)
+
+# # Get numerical columns (for later transformation)
+# num_cols = preprocessor.which_numerical(EPIC)
+# num_cols.remove("Primary.Dx")
+
+# Get time span
+time_span = EPIC['Arrived'].unique().tolist()
+
+
+# ----------------------------------------------------
+# ========= 2.a. One-month ahead prediction =========
+print("====================================")
+print("Dynamically evaluate the model ...\n")
+
+
+for j, time in enumerate(time_span[2:-1]):
+    # ========= 2.a. Setup =========
+    # Month to be predicted
+    time_pred = time_span[j + 3]
+
+    # Create folder if not already exist
+    DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
+    OUTPUT_DIR = DYNAMIC_PATH + f'Saved_Checkpoints/{TASK_NAME}/'
+    REPORTS_DIR = DYNAMIC_PATH + f'Reports/{TASK_NAME}_evaluation_report/'
+
+    for path in [DYNAMIC_PATH, OUTPUT_DIR, REPORTS_DIR]:
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+
+    # Prepare train/test sets
+    XTrain, XTest, yTrain, yTest= time_split(data = EPIC, threshold = time)
+
+    print("Training for data up to {} ...".format(time))
+    print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
+                .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+
+    # Convert to the appropriate format and save
+    train_bert = create_bert_data(x_data = XTrain["Note.Data_ED.Triage.Notes"],
+                                    y_data = yTrain,
+                                    save_path = OUTPUT_DIR + "train.tsv")
+    test_bert = create_bert_data(x_data = XTest["Note.Data_ED.Triage.Notes"],
+                                    y_data = yTest,
+                                    save_path = OUTPUT_DIR + "dev.tsv")
+
+    # Load data. Necessary for feeding in BERT
+    processor = BinaryClassificationProcessor()
+    train_data = processor.get_train_examples(OUTPUT_DIR)
+    label_list = processor.get_labels()
+
+    num_train_optimization_steps = int(
+        len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
+
+
+    # ========= 2.a.i. Model =========
+    if j == 0:
+        # Load pretrained model tokenizer (vocabulary)
+        tokenizer = BertTokenizer.from_pretrained(CACHE_DIR, do_lower_case=False)
+        # Load model
+        model = BertModel.from_pretrained(CACHE_DIR, cache_dir=CACHE_DIR).to(device)
+        # Prediction model
+        prediction_model = BertForSepsis(bert_model = model,
+                                        device = device,
+                                        hidden_size = model.config.hidden_size)
+    else:
+        # Load pretrained tokenizer and model
+        tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR + 'vocab.txt', do_lower_case=False)
+        model = BertModel.from_pretrained(OUTPUT_DIR + f"{TASK_NAME}.tar.gz", cache_dir=OUTPUT_DIR)
+        model.load_state_dict( torch.load( OUTPUT_DIR + WEIGHTS_NAME ) )
+
+
+    # Convert tokens to features.
+    print("No previously converted features. Converting now ...")
+    trainFeatures = convert_examples_to_features(train_data, label_list, MAX_SEQ_LENGTH, tokenizer)
+    # Save converted features
+    pickle.dump(trainFeatures, open(OUTPUT_DIR + "train_features.pkl", 'wb'))
+    print("Complete and saved to {}".format(OUTPUT_DIR))
+
+
+    # Set weights of all embedding layers trainable
+    for p in prediction_model.parameters():
+        p.requires_grad = True
+
+
+    # Set up data loaders
+    train_dataloader2 = feature_to_loader(trainFeatures, TRAIN_BATCH_SIZE)
+
+    # Train the model
+    for epoch in trange(NUM_TRAIN_EPOCHS):
+        loss = prediction_model.train_model(train_loader,
+                                        criterion = criterion,
+                                        optimizer = optimizer)
+        loss_vec[epoch] = loss.item()
+
+
+    # Prediction
+    transformation = nn.Sigmoid()
+    pred = prediction_model.eval_model(test_loader = test_loader,
+                                        batch_size = EVAL_BATCH_SIZE,
+                                        transformation = transformation)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -550,33 +736,6 @@ class NoteClassificationHead(nn.Module):
 # ----------------------------------------------------
 # Main method
 # ----------------------------------------------------
-# Prepare for fine-tuning
-# Load data
-processor = BinaryClassificationProcessor()
-trainData = processor.get_train_examples(PROCESSED_SAVE_DIR)
-labelList = processor.get_labels()
-
-num_train_optimization_steps = int(
-    len(trainData) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
-
-# Load pretrained model tokenizer (vocabulary)
-tokenizer = BertTokenizer.from_pretrained(CACHE_DIR, do_lower_case=False)
-
-# labelMap = {label: i for i, label in enumerate(labelList)}
-# trainForProcessing = [(example, labelMap, MAX_SEQ_LENGTH, tokenizer, OUTPUT_MODE) for example in trainData]
-
-# Convert tokens to features. Load model if exists
-if "train_features.pkl" not in os.listdir(OUTPUT_DIR):
-    print("No previously converted features. Converting now ...")
-    trainFeatures = convert_examples_to_features(trainData, labelList, MAX_SEQ_LENGTH, tokenizer)
-    # Save converted features
-    pickle.dump(trainFeatures, open(OUTPUT_DIR + "train_features.pkl", 'wb'))
-    print("Complete and saved to {}".format(OUTPUT_DIR))
-else:
-    print("Loading converted features ...")
-    trainFeatures = pickle.load(open(OUTPUT_DIR + "train_features.pkl", 'rb'))
-    print("Complete")
-
 
 # ----------------------------------------------------
 if args.mode == "train" or args.mode == "train_test":
@@ -612,7 +771,7 @@ if args.mode == "train" or args.mode == "train_test":
     # logger.info("  Batch size = %d", TRAIN_BATCH_SIZE)
     # logger.info("  Num steps = %d", num_train_optimization_steps)
     print("***** Running training *****")
-    print("  Num examples = {}".format( len(trainData) ) )
+    print("  Num examples = {}".format( len(train_data) ) )
     print("  Batch size = {}".format( TRAIN_BATCH_SIZE ) )
     print("  Num steps = {}".format( num_train_optimization_steps ) )
 
@@ -771,7 +930,7 @@ if args.mode == "test" or args.mode == "train_test":
     # Set test set loaders
     eval_examples = processor.get_dev_examples(PROCESSED_SAVE_DIR)
     eval_features = convert_examples_to_features(eval_examples,
-                        labelList, MAX_SEQ_LENGTH, tokenizer)
+                        label_list, MAX_SEQ_LENGTH, tokenizer)
     logger.info("***** Running evaluation *****")
     logger.info("  Num examples = %d", len(eval_examples))
     logger.info("  Batch size = %d", EVAL_BATCH_SIZE)

@@ -274,7 +274,7 @@ def vaePredict(loss_train = None, loss_test = None, batch_size = None,
 def time_split(data, threshold = 201903, dynamic = True, pred_span = 1):
     '''
     Sort data by the feature 'Arrived' and output train and test sets
-    as specified by threshold. This can be seen as a special version
+    as specified by threshold. This can be used as a special version
     of sk.model_selection.train_test_split.
     Input : data = EPIC dataset with feature 'Arrived'
             threshold = time of the train/test split

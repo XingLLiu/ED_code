@@ -206,7 +206,7 @@ for j, time in enumerate(time_span[2:-1]):
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
 
 
-    # ========= 2.a.i. Model =========
+    # ========= 2.a.i. Model 1 =========
     # Initialize the model at the first iteration
     if j == 0:
         # Neural net model
@@ -259,6 +259,9 @@ for j, time in enumerate(time_span[2:-1]):
     # Save model
     model_to_save = model.module if hasattr(model, "module") else model
     torch.save(model_to_save.state_dict(), DYNAMIC_PATH + f"model_{time_pred}.pkl")
+
+
+    # ========= 2.a.i. Model 2 =========
 
 
     # ========= 2.a.ii. Feature importance by permutation test =========
