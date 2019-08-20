@@ -1,15 +1,11 @@
 from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
+from ED_support_module import OneClassSVM
 
 
 # ----------------------------------------------------
-# ========= 0.i. Supporting functions and classes =========
-# Add method to OneClassSVM for evaluating feature importance.
-sk.svm.OneClassSVM.predict_transform = predict_transform
-
-# ----------------------------------------------------
-# ========= 0.ii. Preliminary seetings =========
+# ========= 0. Preliminary seetings =========
 MODEL_NAME = "OC-SVM"
 RANDOM_SEED = 27
 MODE = "a"
@@ -47,8 +43,8 @@ def setup_parser():
 
 
 # Path to save figures
-FIG_PATH = "/".join(os.getcwd().split("/")[:3]) + "/Pictures/one_class_svm/"
-DATA_PATH = "/home/xingliu/Documents/ED/data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+FIG_PATH = "../../results/ocsvm/"
+DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 
 
 # Create folder if not already exist
@@ -64,7 +60,6 @@ EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival = preprocessor.streamline()
 # Get numerical columns (for later transformation)
 num_cols = preprocessor.which_numerical(EPIC)
 num_cols.remove("Primary.Dx")
-num_cols.remove("Will.Return")
 
 # Get time span
 time_span = EPIC_arrival['Arrived'].unique().tolist()

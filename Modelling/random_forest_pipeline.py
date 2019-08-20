@@ -1,36 +1,8 @@
 from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
+from ED_support_module import RandomForest
 # About 20 mins for each iteration
-
-# ----------------------------------------------------
-# Supporting functions and classes
-# def add_method(y_true, fpr):
-#     '''
-#     Add method to RandomForestClassifier for evaluating feature importance.
-#     Evaluation metric would be the TPR corresponding to the given FPR.
-#     Input : y_true = [list or Series] true response values.
-#             fpr = [float] threshold false positive rate.
-#     '''
-#     def threshold_predict_method(self, x_data, y_true=y_true, fpr=fpr):
-#         # Predicted probability
-#         pred_prob = self.predict_proba(x_data)[:, 1]
-#         # Predicted response vector
-#         y_pred = threshold_predict(pred_prob, y_true, fpr)
-#         return y_pred
-    
-#     sk.ensemble.RandomForestClassifier.threshold_predict = threshold_predict_method
-
-
-def predict_proba_single(self, x):
-    '''
-    Output the predicted probability of being of class 1
-    only, as opposed to 2 columns for being of class 0 and class 1.
-    '''
-    return self.predict_proba(x)[:, 1]
-    
-
-sk.ensemble.RandomForestClassifier.predict_proba_single = predict_proba_single
 
 
 # ----------------------------------------------------
@@ -73,8 +45,8 @@ def setup_parser():
 
 
 # Path to save figures
-FIG_PATH = "/".join(os.getcwd().split("/")[:3]) + "/Pictures/random_forest/"
-DATA_PATH = "/home/xingliu/Documents/ED/data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+FIG_PATH = "../../results/random_forest/"
+DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 
 
 # Create folder if not already exist
@@ -90,7 +62,6 @@ EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival = preprocessor.streamline()
 # Get numerical columns (for later transformation)
 num_cols = preprocessor.which_numerical(EPIC)
 num_cols.remove("Primary.Dx")
-num_cols.remove("Will.Return")
 
 # Get time span
 time_span = EPIC_arrival['Arrived'].unique().tolist()
@@ -140,6 +111,7 @@ for j, time in enumerate(time_span[2:-1]):
     # Prediction
     pred = model.predict_proba(XTest)[:, 1]
 
+
     # ========= 2.a.ii. Feature importances by Gini impurity =========
     # Get importance scores
     importance_vals = model.feature_importances_
@@ -152,6 +124,7 @@ for j, time in enumerate(time_span[2:-1]):
     _ = plt.yticks(fontsize = 4)
     plt.savefig(DYNAMIC_PATH + f"feature_imp_by_gini_{time_pred}.eps", format = 'eps', dpi = 800)
     plt.close()
+
 
     # ========= 2.a.iii. Feature importance by permutation test =========
     # # Add method for feature importance evaluation
@@ -203,7 +176,7 @@ SUMMARY_PLOT_PATH = FIG_PATH + "dynamic/"
 # Subplots of ROCs
 evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, [3, 3])
 # Aggregate ROC
-aggregate_summary = evaluator.roc_aggregate(SUMMARY_PLOT_PATH, time_span)
+aggregate_summary = evaluator.roc_aggregate(SUMMARY_PLOT_PATH, time_span, eps = True)
 # Save aggregate summary
 aggregate_summary.to_csv(SUMMARY_PLOT_PATH + "aggregate_summary.csv", index = False)
 

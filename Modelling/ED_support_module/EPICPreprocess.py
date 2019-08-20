@@ -31,8 +31,9 @@ class Preprocess:
         # Change 'Disch.Date.Time' and 'Roomed' to categorical
         EPIC['Disch.Date.Time'] = EPIC['Disch.Date.Time'].astype('object')
         EPIC['Roomed'] = EPIC['Roomed'].astype('object')
-        # Change 'Will.Return' to binary
-        EPIC['WillReturn'] = EPIC['WillReturn'].astype('object')
+        # Change 'Will.Return' to binary if present
+        if 'Will.Return' in EPIC.columns:
+            EPIC['WillReturn'] = EPIC['WillReturn'].astype('object')
         return EPIC, EPIC_CUI, EPIC_arrival
 
 
@@ -114,7 +115,7 @@ class Preprocess:
         if self.after_triage == 'default':
             self.after_triage = ['Lab.Status', 'Rad.Status', 'ED.PIA.Threshold', 'Same.First.And.Last',
                                  'Dispo', 'Size.Of.Treatment.Team', 'Number.Of.Prescriptions',
-                                 'Length.Of.Stay.In.Minutes', 'Arrival.to.Room', 'Roomed']
+                                 'Length.Of.Stay.In.Minutes', 'Arrival.to.Room', 'Roomed', 'Will.Return']
         colRem = self.drop_cols + self.after_triage
         EPIC =  EPIC.drop(colRem, axis = 1)
         return EPIC
