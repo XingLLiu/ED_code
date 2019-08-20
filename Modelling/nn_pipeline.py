@@ -271,6 +271,10 @@ for j, time in enumerate(time_span[2:-1]):
     XTrainOld = XTest
     yTrainOld = yTest
 
+    # Save model
+    model_to_save = model.module if hasattr(model, "module") else model
+    torch.save(model_to_save.state_dict(), DYNAMIC_PATH + f"model_{time_pred}.pkl")
+
 
     # ========= 2.a.ii. Feature importance by permutation test =========
     # # Add method for feature importance evaluation
@@ -285,19 +289,19 @@ for j, time in enumerate(time_span[2:-1]):
     #                         num_rounds = 10,
     #                         seed = RANDOM_SEED)
 
-    # # Permutation test
-    # imp_means, imp_vars = feature_importance_permutation(
-    #                         predict_method = model.predict_proba_single,
-    #                         X = np.array(XTest),
-    #                         y = np.array(yTest),
-    #                         metric = true_positive_rate,
-    #                         fpr_threshold = FPR_THRESHOLD,
-    #                         num_rounds = 5,
-    #                         seed = RANDOM_SEED)
+    # Permutation test
+    imp_means, imp_vars = feature_importance_permutation(
+                            predict_method = model.predict_proba_single,
+                            X = np.array(XTest),
+                            y = np.array(yTest),
+                            metric = true_positive_rate,
+                            fpr_threshold = FPR_THRESHOLD,
+                            num_rounds = 5,
+                            seed = RANDOM_SEED)
 
-    # # Save feature importance plot
-    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+    # Save feature importance plot
+    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
 
     # ========= 2.b. Evaluation =========
@@ -312,6 +316,7 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.c. Save predicted results =========
+    pred = pd.DataFrame(pred, columns = ["pred_prob"])
     pred.to_csv(DYNAMIC_PATH + f"pedicted_result_{time_pred}.csv", index = False)
 
 

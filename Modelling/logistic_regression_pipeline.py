@@ -8,7 +8,7 @@ from ED_support_module import LogisticRegression
 # ========= 0. Preliminary seetings =========
 MODEL_NAME = "LR"
 RANDOM_SEED = 27
-MODE = "c"
+MODE = "e"
 FPR_THRESHOLD = 0.1
 
 PENALTY = "l1"   # Penalty of the first fit
