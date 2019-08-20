@@ -115,7 +115,7 @@ WEIGHT2 = 16
 TRAIN_BATCH_SIZE = 40
 EVAL_BATCH_SIZE = 40
 LEARNING_RATE = 1e-3
-NUM_TRAIN_EPOCHS = 10
+NUM_TRAIN_EPOCHS = 6
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
 WARMUP_PROPORTION = 0.1
@@ -649,15 +649,15 @@ if args.mode == "train" or args.mode == "train_test":
     # no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
     no_decay = []
     optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.001},
         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
 
 
     optimizer_bert = BertAdam(optimizer_grouped_parameters,
-                        lr=LEARNING_RATE,
-                        warmup=WARMUP_PROPORTION,
-                        t_total=num_train_optimization_steps)
+                            lr=LEARNING_RATE,
+                            warmup=WARMUP_PROPORTION,
+                            t_total=num_train_optimization_steps)
     optimizer_head = torch.optim.Adam( list( prediction_head.parameters() ), lr=LEARNING_RATE )
 
     loss_func = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT])).to(device)
@@ -756,8 +756,6 @@ if args.mode == "train" or args.mode == "train_test":
     _ = plt.title("Clinical BERT Train Loss")
     plt.savefig(REPORTS_DIR + "train_loss.eps", format="eps", dpi=1000)
 
-    print(model_to_save.state_dict(), layer_to_save.state_dict())
-
 
 
 # ----------------------------------------------------
@@ -835,7 +833,6 @@ if args.mode == "test" or args.mode == "train_test":
 
     # Save predicted probabilities
     pickle.dump(prob, open(REPORTS_DIR + "predicted_probs.pkl", 'wb'))
-    print("Complete and saved to {}".format(REPORTS_DIR))
 
     roc = lr_roc_plot(yTest, prob, save_path = REPORTS_DIR + f'roc.eps', plot = True)
 
