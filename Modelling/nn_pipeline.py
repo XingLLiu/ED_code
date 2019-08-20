@@ -105,41 +105,6 @@ class NeuralNet(nn.Module):
         return self.eval_model(test_loader, transformation=None)
         
 
-
-
-# # For feature importance evaluation
-# def add_method(y_true, fpr, device, transformation=None):
-#     '''
-#     Add method to RandomForestClassifier for evaluating feature importance.
-#     Evaluation metric would be the TPR corresponding to the given FPR.
-#     Input : y_true = [list or Series] true response values.
-#             fpr = [float] threshold false positive rate.
-#     '''
-#     def threshold_predict_method(self,
-#                                  x_data,
-#                                  y_true = y_true,
-#                                  fpr = fpr,
-#                                  device = device,
-#                                  transformation = transformation):
-#         # Prepare test dataloader as required by the method
-#         y_true_mat = np.matrix(y_true).reshape(-1, 1)
-#         dataset = np.concatenate( ( np.array(x_data), y_true_mat ), axis = 1 )
-#         test_loader = torch.utils.data.DataLoader(dataset = np.array(dataset),
-#                                                     batch_size = len(y_true))
-#         # Predicted probability
-#         pred_prob = self.eval_model(test_loader = test_loader,
-#                                     device = device,
-#                                     transformation = transformation)
-#         # Predicted response vector
-#         pred_prob = pd.Series(pred_prob)
-#         y_pred = threshold_predict(pred_prob, y_true, fpr)
-#         return y_pred
-    
-#     NeuralNet.threshold_predict = threshold_predict_method
-
-
-
-
 # ----------------------------------------------------
 # ========= 0.ii. Preliminary seetings =========
 # Device configuration
@@ -152,7 +117,7 @@ MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 100
+NUM_EPOCHS = 10000
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
@@ -218,10 +183,10 @@ print("Dynamically evaluate the model ...\n")
 
 
 for j, time in enumerate(time_span[2:-1]):
-
     # ========= 2.a. Setup =========
     # Month to be predicted
     time_pred = time_span[j + 3]
+
     # Create folder if not already exist
     DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
     if not os.path.exists(DYNAMIC_PATH):
@@ -236,7 +201,6 @@ for j, time in enumerate(time_span[2:-1]):
                                             test_size = None,
                                             EPIC_CUI = EPIC_CUI,
                                             seed = RANDOM_SEED)
-
     print("Training for data up to {} ...".format(time))
     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
@@ -251,12 +215,15 @@ for j, time in enumerate(time_span[2:-1]):
                           input_size = input_size,
                           drop_prob = DROP_PROB,
                           hidden_size = HIDDEN_SIZE).to(device)
+
         # Loss and optimizer
         # nn.CrossEntropyLoss() computes softmax internally
         criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
         optimizer = torch.optim.SGD(model.parameters(), lr = LEARNING_RATE)
+
         # Initialize loss vector
         loss_vec = np.zeros(NUM_EPOCHS)
+
         # Construct data loaders
         train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
                                                     batch_size = BATCH_SIZE,
@@ -269,10 +236,9 @@ for j, time in enumerate(time_span[2:-1]):
         train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrainOld, yTrainOld], axis = 1)),
                                                     batch_size = BATCH_SIZE,
                                                     shuffle = True)
-        test_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTest, yTest], axis = 1)),
+        test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest, yTest),
                                                     batch_size = len(yTest),
                                                     shuffle = False)
-
 
     # Train the model
     for epoch in trange(NUM_EPOCHS):
@@ -280,7 +246,6 @@ for j, time in enumerate(time_span[2:-1]):
                                 criterion = criterion,
                                 optimizer = optimizer)
         loss_vec[epoch] = loss.item()
-
 
     # Prediction
     transformation = nn.Sigmoid()
@@ -297,18 +262,6 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.ii. Feature importance by permutation test =========
-    # # Add method for feature importance evaluation
-    # add_method(y_true = yTest, fpr = FPR_THRESHOLD, device = device, transformation = transformation)
-
-    # # Permutation test
-    # imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
-    #                         predict_method = model.threshold_predict,
-    #                         X = np.array(XTest),
-    #                         y = np.array(yTest),
-    #                         metric = true_positive_rate,
-    #                         num_rounds = 10,
-    #                         seed = RANDOM_SEED)
-
     # Permutation test
     imp_means, imp_vars = feature_importance_permutation(
                             predict_method = model.predict_proba_single,
@@ -318,7 +271,6 @@ for j, time in enumerate(time_span[2:-1]):
                             fpr_threshold = FPR_THRESHOLD,
                             num_rounds = 5,
                             seed = RANDOM_SEED)
-
     # Save feature importance plot
     fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
     fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
