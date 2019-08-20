@@ -113,7 +113,7 @@ MAX_SEQ_LENGTH = 512
 MODE = "a"
 WEIGHT = 500
 WEIGHT2 = 16
-TRAIN_BATCH_SIZE = 20
+TRAIN_BATCH_SIZE = 10
 EVAL_BATCH_SIZE = 40
 LEARNING_RATE = 1e-3
 NUM_TRAIN_EPOCHS = 6
@@ -299,7 +299,7 @@ for j, time in enumerate(time_span[2:-1]):
 
     # Train the model
     loss_vec = np.zeros( NUM_TRAIN_EPOCHS * ( len( train_loader ) // 10 ) )
-    criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT])).to(device)
+    criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT]))
     for epoch in trange(NUM_TRAIN_EPOCHS):
         # Set models to train mode
         model.train()
@@ -308,8 +308,8 @@ for j, time in enumerate(time_span[2:-1]):
             # Get batch
             batch = tuple( t.to( device ) for t in batch )
             input_ids, input_mask, segment_ids, label_ids = batch
-            _, pooled_output = model(input_ids, segment_ids, input_mask).to(device)
-            logits = prediction_head(pooled_output)
+            _, pooled_output = model(input_ids, segment_ids, input_mask)
+            logits = prediction_head(pooled_output.to(device))
             # Compute loss
             loss = criterion(logits, label_ids)
             if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
