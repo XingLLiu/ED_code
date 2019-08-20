@@ -259,10 +259,10 @@ for j, time in enumerate(time_span[2:-1]):
 
     # Convert tokens to features.
     print("\nConverting examples to features ...")
-    trainFeatures = convert_examples_to_features(train_data, label_list, MAX_SEQ_LENGTH, tokenizer)
+    train_features = convert_examples_to_features(train_data, label_list, MAX_SEQ_LENGTH, tokenizer)
 
     # Save converted features
-    pickle.dump(trainFeatures, open(OUTPUT_DIR + "train_features.pkl", 'wb'))
+    pickle.dump(train_features, open(OUTPUT_DIR + "train_features.pkl", 'wb'))
     print("Complete and saved to {}".format(OUTPUT_DIR))
 
     # Set weights of all embedding layers trainable
@@ -271,7 +271,8 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # Set up data loaders
-    train_loader = feature_to_loader(trainFeatures, TRAIN_BATCH_SIZE)
+    train_loader = feature_to_loader(train_features, TRAIN_BATCH_SIZE)
+    test_loader = feature_to_loader(train_features, EVAL_BATCH_SIZE)
 
     # Optimizer
     param_optimizer = list(prediction_model.named_parameters())
@@ -297,23 +298,27 @@ for j, time in enumerate(time_span[2:-1]):
             loss_vec = loss
         else:
             loss_vec = np.append(loss_vec, loss)
-    
-    
-    # Save model
-    save_bert(prediction_model,
-                tokenizer,
-                OUTPUT_DIR,
-                WEIGHTS_NAME,
-                CONFIG_NAME,
-                PREDICTION_HEAD_NAME)
 
 
     # Prediction
-    test_loader = feature_to_loader(trainFeatures, EVAL_BATCH_SIZE)
+    test_loader = feature_to_loader(train_features, EVAL_BATCH_SIZE)
     transformation = nn.Sigmoid()
     pred = prediction_model.eval_model(test_loader = test_loader,
                                         batch_size = EVAL_BATCH_SIZE,
                                         transformation = transformation)
+
+
+    # Save data of this month as train set for the next iteration
+    XTrainOld = XTest
+    yTrainOld = yTest
+
+    # Save model
+    save_bert(prediction_model,
+                tokenizer = tokenizer,
+                OUTPUT_DIR = OUTPUT_DIR,
+                WEIGHTS_NAME = WEIGHTS_NAME,
+                CONFIG_NAME = CONFIG_NAME,
+                PREDICTION_HEAD_NAME = PREDICTION_HEAD_NAME)
 
 
 
