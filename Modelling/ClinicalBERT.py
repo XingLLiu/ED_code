@@ -706,8 +706,8 @@ for j, time in enumerate(time_span[2:-1]):
     # Train the model
     for epoch in trange(NUM_TRAIN_EPOCHS):
         loss = prediction_model.train_model(train_loader,
-                                        criterion = criterion,
-                                        optimizer = optimizer)
+                                            criterion = criterion,
+                                            optimizer = optimizer)
         loss_vec[epoch] = loss.item()
 
 
