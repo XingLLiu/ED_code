@@ -8,7 +8,7 @@ from ED_support_module import LogisticRegression
 # ========= 0. Preliminary seetings =========
 MODEL_NAME = "LR"
 RANDOM_SEED = 27
-MODE = "c"
+MODE = "e"
 FPR_THRESHOLD = 0.1
 
 PENALTY = "l1"   # Penalty of the first fit
@@ -72,7 +72,6 @@ EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival = preprocessor.streamline()
 # Get numerical columns (for later transformation)
 num_cols = preprocessor.which_numerical(EPIC)
 num_cols.remove("Primary.Dx")
-num_cols.remove("Will.Return")
 
 # Get time span
 time_span = EPIC_arrival['Arrived'].unique().tolist()
@@ -119,11 +118,14 @@ for j, time in enumerate(time_span[2:-1]):
                                                 max_iter = 1000).fit(XTrain, yTrain)
 
     # Re-fit after removing features of zero coefficients
-    XTest = model.remove_zero_coef_(XTest)
+    XTrain = model.remove_zero_coef_(XTrain)
     model_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
-                                                    max_iter = 1000).fit(XTest, yTest)
+                                                    max_iter = 1000).fit(XTrain, yTrain)
 
     # Predict
+    # Note that remove_zero_coef_ does not use XTest in training. It only removes some
+    # features according to the LR model.
+    XTest = model.remove_zero_coef_(XTest)
     pred_new = model_new.predict_proba(XTest)[:, 1]
 
 
@@ -133,7 +135,7 @@ for j, time in enumerate(time_span[2:-1]):
     indices = np.argsort(abs(non_zero_coeffs))[::-1][:50]
     _ = plt.figure()
     _ = plt.title("Logistic Regression Coefficients Values")
-    _ = sns.barplot(y = XTest.columns[indices], x = np.squeeze(non_zero_coeffs)[indices])
+    _ = sns.barplot(y = XTrain.columns[indices], x = np.squeeze(non_zero_coeffs)[indices])
     _ = plt.yticks(fontsize = 4)
     plt.savefig(DYNAMIC_PATH + f"coeffs_{time_pred}.eps", format = 'eps', dpi = 800)
     plt.close()
@@ -163,7 +165,7 @@ for j, time in enumerate(time_span[2:-1]):
     summary_data = evaluator.summary()
     summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
 
-    
+
     # ========= 2.c. Save predicted results =========
     pred_new = pd.DataFrame(pred_new, columns = ["pred_prob"])
     pred_new.to_csv(DYNAMIC_PATH + f"pedicted_result_{time_pred}.csv", index = False)
@@ -181,7 +183,7 @@ summary_plot_path = FIG_PATH + "dynamic/"
 # Subplots of ROCs
 evaluator.roc_subplot(summary_plot_path, time_span, [3, 3])
 # Aggregate ROC
-aggregate_summary = evaluator.roc_aggregate(summary_plot_path, time_span)
+aggregate_summary = evaluator.roc_aggregate(summary_plot_path, time_span, eps = True)
 # Save aggregate summary
 aggregate_summary.to_csv(summary_plot_path + "aggregate_summary.csv", index = False)
 

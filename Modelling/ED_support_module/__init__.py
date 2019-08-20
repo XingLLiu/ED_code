@@ -300,6 +300,9 @@ def time_split(data, threshold = 201903, dynamic = True, pred_span = 1):
     XTrain = train.drop(['Primary.Dx'], axis = 1)
     yTest = test['Primary.Dx']
     XTest = test.drop(['Primary.Dx'], axis = 1)
+    # Give warning if future data is included in train set
+    if any(XTrain['Arrived'] > end_threshold):
+        raise Warning('Fture data (after {}) is contained in train set. May be overfitting!'.format(end_threshold))
     # Drop arrival date
     XTrain = XTrain.drop(['Arrived'], axis = 1)
     XTest = XTest.drop(['Arrived'], axis = 1)
@@ -321,14 +324,6 @@ def dynamic_summary(summary, p_num, n_num):
     summary['FP'] = (summary['FPR'] * n_num).round().astype('int')
     summary['TN'] = n_num - summary['FP']
     return(summary)
-
-
-
-# Upstream function for train/test/(valid) split.
-def splitter_upstream():
-    '''
-    Downstream of the train/test/(valid) splitting. For developer's use.
-    '''
 
 
 # Downstream function for train/test/(valid) split.
@@ -387,8 +382,9 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
     Input : num_cols = [list or pd.Index] names of numerical cols to be transformed.
             cui_cols = [list or pd.Index] names of CUI cols to be transformed if
                        EPIC_CUI is not None.
-            valid_size = [float] proportion of train set to be split into valid set. None if
-                          no validation is required.
+            test_size = [float] must be None if time_threshold is give.
+            valid_size = [float] proportion of train set to be split into valid set by stratified
+                         sampling. None if no validation is required.
             mode = [str] must be one of the following:
                             a -- No PCA, no TF-IDF
                             b -- PCA, no TF-IDF

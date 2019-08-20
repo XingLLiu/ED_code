@@ -54,12 +54,12 @@ def plot_scores(self, anomaly_scores, y_true, y_pred, save_path=None, title=None
     # Convert to numpy array
     anomaly_scores = np.array(anomaly_scores)
     # Plot scores
-    x_vec = np.linspace(1, len(yTest), len(yTest))
+    x_vec = np.linspace(1, len(y_true), len(y_pred))
     # True positives
     true_positive = (y_true == 1) & (y_pred == 1)
     _ = sns.scatterplot(x = x_vec, y = anomaly_scores)
     _ = sns.scatterplot(x = x_vec[y_true == 1],
-                        y = anomaly_scores[yTest == 1],
+                        y = anomaly_scores[y_true == 1],
                         label = "false negatives")
     _ = sns.scatterplot(x = x_vec[y_pred == 1],
                         y = anomaly_scores[y_pred == 1],
