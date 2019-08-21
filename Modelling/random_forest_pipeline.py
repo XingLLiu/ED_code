@@ -10,7 +10,7 @@ from ED_support_module import RandomForest
 MODEL_NAME = "RF"
 RANDOM_SEED = 27
 CLASS_WEIGHT = 500
-MODE = "a"
+MODE = "c"
 FPR_THRESHOLD = 0.1
 
 N_ESTIMATORS = 4000
@@ -45,7 +45,7 @@ def setup_parser():
 
 
 # Path to save figures
-FIG_PATH = "../../results/random_forest/"
+FIG_PATH = "../../results/random_forest_c/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 
 
@@ -87,6 +87,7 @@ for j, time in enumerate(time_span[2:-1]):
                                             MODE,
                                             time_threshold = time,
                                             test_size = None,
+                                            valid_size = 0.15,
                                             EPIC_CUI = EPIC_CUI,
                                             seed = RANDOM_SEED)
 
@@ -119,8 +120,7 @@ for j, time in enumerate(time_span[2:-1]):
     indices = np.argsort(importance_vals)[::-1]
     _ = plt.figure()
     _ = plt.title("Random Forest Feature Importance (Gini)")
-    _ = sns.barplot(y = XTrain.columns[indices], x = importance_vals[indices],
-                    xerr = std[indices])
+    _ = sns.barplot(y = XTrain.columns[indices][:20], x = importance_vals[indices][:20], xerr = std[indices][:20])
     _ = plt.yticks(fontsize = 4)
     plt.savefig(DYNAMIC_PATH + f"feature_imp_by_gini_{time_pred}.eps", format = 'eps', dpi = 800)
     plt.close()
@@ -140,15 +140,15 @@ for j, time in enumerate(time_span[2:-1]):
     #                         seed = RANDOM_SEED)
 
 
-    # Permutation test
-    imp_means, imp_vars = feature_importance_permutation(
-                            predict_method = model.predict_proba_single,
-                            X = np.array(XTest),
-                            y = np.array(yTest),
-                            metric = true_positive_rate,
-                            fpr_threshold = FPR_THRESHOLD,
-                            num_rounds = 5,
-                            seed = RANDOM_SEED)
+    # # Permutation test
+    # imp_means, imp_vars = feature_importance_permutation(
+    #                         predict_method = model.predict_proba_single,
+    #                         X = np.array(XTest),
+    #                         y = np.array(yTest),
+    #                         metric = true_positive_rate,
+    #                         fpr_threshold = FPR_THRESHOLD,
+    #                         num_rounds = 10,
+    #                         seed = RANDOM_SEED)
 
     # Save feature importance plot
     fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
@@ -163,6 +163,12 @@ for j, time in enumerate(time_span[2:-1]):
     # Save summary
     summary_data = evaluator.summary()
     summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
+
+    
+    # ========= 2.c. Save predicted results =========
+    pred = pd.DataFrame(pred, columns = ["pred_prob"])
+    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = False)
+
 
     # ========= End of iteration =========
     print("Completed evaluation for {}.\n".format(time_pred))
