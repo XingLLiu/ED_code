@@ -122,7 +122,7 @@ BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
 DROP_PROB = 0.1
-HIDDEN_SIZE = 250
+HIDDEN_SIZE = 400
 
 
 
@@ -289,7 +289,7 @@ for j, time in enumerate(time_span[2:-1]):
 
     # ========= 2.c. Save predicted results =========
     pred = pd.DataFrame(pred, columns = ["pred_prob"])
-    pred.to_csv(DYNAMIC_PATH + f"pedicted_result_{time_pred}.csv", index = False)
+    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = False)
 
 
     # ========= End of iteration =========

@@ -164,6 +164,12 @@ for j, time in enumerate(time_span[2:-1]):
     summary_data = evaluator.summary()
     summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
 
+    
+    # ========= 2.c. Save predicted results =========
+    pred = pd.DataFrame(pred, columns = ["pred_prob"])
+    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = False)
+
+
     # ========= End of iteration =========
     print("Completed evaluation for {}.\n".format(time_pred))
 

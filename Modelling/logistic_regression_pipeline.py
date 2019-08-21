@@ -168,7 +168,7 @@ for j, time in enumerate(time_span[2:-1]):
 
     # ========= 2.c. Save predicted results =========
     pred_new = pd.DataFrame(pred_new, columns = ["pred_prob"])
-    pred_new.to_csv(DYNAMIC_PATH + f"pedicted_result_{time_pred}.csv", index = False)
+    pred_new.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = False)
 
 
     # ========= End of iteration =========
