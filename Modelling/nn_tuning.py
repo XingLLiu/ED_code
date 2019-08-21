@@ -122,7 +122,7 @@ BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
 DROP_PROB = 0.1
-HIDDEN_SIZE = 500
+HIDDEN_SIZE = 600
 
 
 
@@ -252,7 +252,7 @@ for j, time in enumerate(time_span[2:-1]):
                                 optimizer = optimizer)
         loss_vec[epoch] = loss.item()
 
-    # Prediction
+    # Prediction on train
     test_loader = torch.utils.data.DataLoader(dataset = np.array(XTrain),
                                                 batch_size = len(yTrain),
                                                 shuffle = False)
@@ -260,6 +260,12 @@ for j, time in enumerate(time_span[2:-1]):
     transformation = nn.Sigmoid()
     pred = model.eval_model(test_loader = test_loader,
                             transformation = transformation)
+
+    evaluator = Evaluation.Evaluation(yTrain, pred)
+
+    # Save ROC plot
+    _ = evaluator.roc_plot(plot = False, title = MODEL_NAME, save_path = DYNAMIC_PATH + f"roc_{time_pred}")
+
 
     # Save data of this month as train set for the next iteration
     XTrainOld = XTest
