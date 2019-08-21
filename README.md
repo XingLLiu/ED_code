@@ -50,12 +50,12 @@ conda update conda
 conda env create -f ED_environment.yml
 ```
 
-3. Enter the virtual environment as follows when working on the project:
+3. Activate the virtual environment as follows when working on the project:
 ```bash
 source activate SepsisPrediction
 ```
 
-4. You shoud then see the prefix of your terminal command line changes into the following:
+4. You shoud then see the prefix of your terminal command line changed into the following:
 ```bash
 (SepsisPrediction) username@pcname:~/path_to_ED/$
 ```
