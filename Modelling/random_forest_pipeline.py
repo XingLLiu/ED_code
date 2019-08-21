@@ -147,7 +147,7 @@ for j, time in enumerate(time_span[2:-1]):
                             y = np.array(yTest),
                             metric = true_positive_rate,
                             fpr_threshold = FPR_THRESHOLD,
-                            num_rounds = 5,
+                            num_rounds = 10,
                             seed = RANDOM_SEED)
 
     # Save feature importance plot
