@@ -364,13 +364,76 @@ def splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, keep_cols, mode,
             XValidNum = pd.DataFrame( pca.transform( XValidNum ) )
             XValidNum.index = XValidNum.index
     # Assign the transformed values back
-    XTrain = pd.concat( [ XTrain[keep_cols], XTrainNum ], axis=1 )
-    XTest = pd.concat( [ XTest[keep_cols], XTestNum ], axis=1 )
+    cat_cols = [col for col in XTrain.columns if col not in num_cols]
+    XTrain = pd.concat( [ XTrain[cat_cols], XTrainNum ], axis=1 )
+    XTest = pd.concat( [ XTest[cat_cols], XTestNum ], axis=1 )
     if valid_size != None:
-        XValid = pd.concat( [ XValid[keep_cols], XValidNum ], axis=1 )
+        XValid = pd.concat( [ XValid[cat_cols], XValidNum ], axis=1 )
         return XTrain, XTest, XValid, yTrain, yTest, yValid
     else:
         return XTrain, XTest, yTrain, yTest
+
+
+# Split EPIC_enc into train/test/(valid)
+def splitter(EPIC_enc, num_cols, mode, test_size,
+             time_threshold=None, EPIC_CUI=None, valid_size=None, pca_components=None, seed=None):
+    '''
+    Split EPIC_enc into train/test/(valid) with/without PCA/Sparse PCA (see 'mode'). This can be
+    used as a substitute of sklearn.model_selection.TrainTestSplit.
+    Input : num_cols = [list or pd.Index] names of numerical cols to be transformed.
+            cui_cols = [list or pd.Index] names of CUI cols to be transformed if
+                       EPIC_CUI is not None.
+            test_size = [float] must be None if time_threshold is give.
+            valid_size = [float] proportion of train set to be split into valid set by stratified
+                         sampling. None if no validation is required.
+            mode = [str] must be one of the following:
+                            a -- No PCA, no TF-IDF
+                            b -- PCA, no TF-IDF
+                            c -- No PCA, TF-IDF
+                            d -- PCA, but not on TF-IDF
+                            e -- PCA, TF-IDF
+                            f -- Sparse PCA, TF-IDF
+    Output: XTrain, XTest, (XValid), yTrain, yTest, (yValid)
+    '''
+    # Split by time
+    if time_threshold is not None:
+        if "Arrived" in EPIC_enc.columns:
+            XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True)
+        else:
+            raise ValueError("Feature \'Arrived\' must be in EPIC_enc to split by time.")
+    # Add TFIDF
+    if mode not in ['a', 'b']:
+        try:
+            EPIC_enc, cui_cols = TFIDF(EPIC_CUI.loc[ pd.concat( [XTrain, XTest], axis=0 ).index, : ],
+                                        EPIC_enc.loc [ pd.concat( [XTrain, XTest], axis=0 ).index, : ] )
+            # # Add TFIDF columns to test set
+            # XTest[cui_cols] = 0 * np.zeros([XTest.shape[0], len(cui_cols)])
+            # XTest, _ = TFIDF(EPIC_CUI.loc[XTest.index, :], EPIC_enc.loc[XTest.index, :])
+        except:
+            raise ValueError("EPIC_CUI must be given when including TF-IDF")
+    else:
+        cui_cols = None
+    # Separate input features and target
+    y = EPIC_enc['Primary.Dx']
+    X = EPIC_enc.drop('Primary.Dx', axis = 1)
+    # Columns that are not transformed
+    keep_cols = [col for col in X.columns if col not in num_cols]
+    # Prepare train and test sets
+    if time_threshold == None:
+        if test_size == None:
+            raise ValueError("test_size cannot be None for stratified train/test split.")
+        XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=test_size,
+                                        random_state=seed, stratify=y)
+    else:
+        if "Arrived" in EPIC_enc.columns:
+            XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True)
+            # Remove the time column
+            keep_cols.remove("Arrived")
+        else:
+            raise ValueError("Feature \'Arrived\' must be in EPIC_enc to split by time.")
+    return splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, keep_cols, mode,
+                               cui_cols=cui_cols, valid_size=valid_size, pca_components=pca_components, seed=seed)
+
 
 
 # Split EPIC_enc into train/test/(valid)

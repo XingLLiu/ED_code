@@ -4,7 +4,7 @@ Contains code for ED project. Assume that ED_Code is a subfolder of ~/ED, where 
 
 ## Update after [27/07/2019]
 
-Now assume that ED_code is contained in the same subfolder as the ED folder available from the PHF. To run the preprocessing scripts:
+Now assume that ED_code is contained in the same subfolder as the ED folder available from the HPF. To run the preprocessing scripts:
 ```bash  
 ./Preprocessing/EPICpreProcessing.sh
 ```
@@ -50,12 +50,12 @@ conda update conda
 conda env create -f ED_environment.yml
 ```
 
-3. Enter the virtual environment as follows when working on the project:
+3. Activate the virtual environment as follows when working on the project:
 ```bash
 source activate SepsisPrediction
 ```
 
-4. You shoud then see the prefix of your terminal command line changes into the following:
+4. You shoud then see the prefix of your terminal command line changed into the following:
 ```bash
 (SepsisPrediction) username@pcname:~/path_to_ED/$
 ```

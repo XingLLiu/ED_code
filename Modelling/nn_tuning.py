@@ -117,12 +117,12 @@ MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 10000
+NUM_EPOCHS = 5000
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
 DROP_PROB = 0.1
-HIDDEN_SIZE = 250
+HIDDEN_SIZE = 500
 
 
 
@@ -194,19 +194,21 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # Prepare train/test sets
-    XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival,
-                                            num_cols,
-                                            MODE,
-                                            time_threshold = time,
-                                            test_size = None,
-                                            EPIC_CUI = EPIC_CUI,
-                                            seed = RANDOM_SEED)
+    XTrain, XTest, XValid, yTrain, yTest, yValid= splitter(EPIC_arrival,
+                                                        num_cols,
+                                                        MODE,
+                                                        time_threshold = time,
+                                                        test_size = None,
+                                                        valid_size = 0.15,
+                                                        EPIC_CUI = EPIC_CUI,
+                                                        seed = RANDOM_SEED)
     print("Training for data up to {} ...".format(time))
-    print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
-                .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+    print( "Train size: {}. Test size: {}. Validation size: {}. Sepsis cases in [train, test, valid]: [{}, {}, {}]."
+                .format( len(yTrain), len(yTest), len(yValid), yTrain.sum(), yTest.sum(), yValid.sum() ) )
 
 
-    # ========= 2.a.i. Model 1 =========
+
+    # ========= 2.a.i. Model =========
     # Initialize the model at the first iteration
     if j == 0:
         # Neural net model
@@ -231,6 +233,9 @@ for j, time in enumerate(time_span[2:-1]):
         test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
                                                     batch_size = len(yTest),
                                                     shuffle = False)
+        valid_loader = torch.utils.data.DataLoader(dataset = np.array(XValid),
+                                                    batch_size = len(yValid),
+                                                    shuffle = False)
     # Otherwise only update the model on data from the previous month
     else:
         train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrainOld, yTrainOld], axis = 1)),
@@ -248,6 +253,10 @@ for j, time in enumerate(time_span[2:-1]):
         loss_vec[epoch] = loss.item()
 
     # Prediction
+    test_loader = torch.utils.data.DataLoader(dataset = np.array(XTrain),
+                                                batch_size = len(yTrain),
+                                                shuffle = False)
+
     transformation = nn.Sigmoid()
     pred = model.eval_model(test_loader = test_loader,
                             transformation = transformation)
@@ -259,9 +268,6 @@ for j, time in enumerate(time_span[2:-1]):
     # Save model
     model_to_save = model.module if hasattr(model, "module") else model
     torch.save(model_to_save.state_dict(), DYNAMIC_PATH + f"model_{time_pred}.pkl")
-
-
-    # ========= 2.a.i. Model 2 =========
 
 
     # ========= 2.a.ii. Feature importance by permutation test =========
