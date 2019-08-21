@@ -13,6 +13,7 @@ from tqdm import tqdm, trange
 from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM, BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
 from ED_support_module import EPICPreprocess
+from ED_support_module import Evaluation
 from ED_support_module.BertForSepsis import *
 
 
@@ -175,7 +176,6 @@ if CLEAN_NOTES:
     EPIC = fill_missing_text(EPIC, EPIC_original, notesCols)
     # Save imputed text
     EPIC.to_csv(RAW_SAVE_DIR + 'EPIC_triage.csv', index=False)
-
     # Further preprocessing
     preprocessor = EPICPreprocess.Preprocess(DATA_PATH)
     _, _, _, EPIC_arrival = preprocessor.streamline()
@@ -223,25 +223,24 @@ for j, time in enumerate(time_span[2:-1]):
     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
 
-    # Convert to the appropriate format and save
-    train_bert = create_bert_data(x_data = XTrain["Note.Data_ED.Triage.Notes"],
-                                    y_data = yTrain,
-                                    save_path = OUTPUT_DIR + "train.tsv")
-    test_bert = create_bert_data(x_data = XTest["Note.Data_ED.Triage.Notes"],
-                                    y_data = yTest,
-                                    save_path = OUTPUT_DIR + "dev.tsv")
-
-    # Load data. Necessary for feeding in BERT
-    processor = BinaryClassificationProcessor()
-    train_data = processor.get_train_examples(OUTPUT_DIR)
-    label_list = processor.get_labels()
-
-    num_train_optimization_steps = int(
-        len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
 
 
     # ========= 2.a.i. Model =========
     if j == 0:
+        # Convert to the appropriate format and save
+        train_bert = create_bert_data(x_data = XTrain["Note.Data_ED.Triage.Notes"],
+                                        y_data = yTrain,
+                                        save_path = OUTPUT_DIR + "train.tsv")
+        test_bert = create_bert_data(x_data = XTest["Note.Data_ED.Triage.Notes"],
+                                        y_data = yTest,
+                                        save_path = OUTPUT_DIR + "dev.tsv")
+        # Load data. Necessary for feeding in BERT
+        processor = BinaryClassificationProcessor()
+        train_data = processor.get_train_examples(OUTPUT_DIR)
+        label_list = processor.get_labels()
+        # Optimization step
+        num_train_optimization_steps = int(
+            len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
         # Load pretrained model tokenizer (vocabulary)
         tokenizer = BertTokenizer.from_pretrained(CACHE_DIR, do_lower_case=False)
         # Load model
@@ -250,19 +249,55 @@ for j, time in enumerate(time_span[2:-1]):
         prediction_model = BertForSepsis(bert_model = model,
                                         device = device,
                                         hidden_size = model.config.hidden_size).to(device)
+        # Optimizer
+        param_optimizer = list(prediction_model.named_parameters())
+        no_decay = []
+        optimizer_grouped_parameters = [
+            {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.001},
+            {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        ]
+        optimizer = BertAdam(optimizer_grouped_parameters,
+                            lr=LEARNING_RATE,
+                            warmup=WARMUP_PROPORTION,
+                            t_total=num_train_optimization_steps)
+
+        # Loss
+        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT])).to(device)
     else:
+        # Convert to the appropriate format and save
+        train_bert = create_bert_data(x_data = XTrainOld["Note.Data_ED.Triage.Notes"],
+                                        y_data = yTrainOld,
+                                        save_path = OUTPUT_DIR + "train.tsv")
+        test_bert = create_bert_data(x_data = XTest["Note.Data_ED.Triage.Notes"],
+                                        y_data = yTest,
+                                        save_path = OUTPUT_DIR + "dev.tsv")
+        # Load data. Necessary for feeding in BERT
+        processor = BinaryClassificationProcessor()
+        train_data = processor.get_train_examples(OUTPUT_DIR)
+        label_list = processor.get_labels()
+        # Optimization step
+        num_train_optimization_steps = int(
+            len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
         # Load pretrained tokenizer and model
-        tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR + 'vocab.txt', do_lower_case=False)
-        model = BertModel.from_pretrained(OUTPUT_DIR + f"{TASK_NAME}.tar.gz", cache_dir=OUTPUT_DIR)
-        model.load_state_dict( torch.load( OUTPUT_DIR + WEIGHTS_NAME ) )
+        tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR_OLD + 'vocab.txt', do_lower_case=False)
+        model = pickle.load(open(OUTPUT_DIR_OLD + "bert_model.pkl", "rb"))
+        # model = BertModel.from_pretrained(CACHE_DIR, cache_dir=CACHE_DIR).to(device)
+        # model.load_state_dict( torch.load( OUTPUT_DIR_OLD + WEIGHTS_NAME ) )
+        # Load entrie model
+        prediction_model = pickle.load(open(OUTPUT_DIR_OLD + "entire_model.pkl", "rb"))
+        # prediction_model = BertForSepsis(bert_model = model,
+        #                                 device = device,
+        #                                 hidden_size = model.config.hidden_size).to(device)
+        # prediction_model = prediction_model.load_state_dict( torch.load( OUTPUT_DIR_OLD + "entire_model.pkl" ) )
+
 
 
     # Convert tokens to features.
     print("\nConverting examples to features ...")
-    trainFeatures = convert_examples_to_features(train_data, label_list, MAX_SEQ_LENGTH, tokenizer)
+    train_features = convert_examples_to_features(train_data, label_list, MAX_SEQ_LENGTH, tokenizer)
 
     # Save converted features
-    pickle.dump(trainFeatures, open(OUTPUT_DIR + "train_features.pkl", 'wb'))
+    pickle.dump(train_features, open(OUTPUT_DIR + "train_features.pkl", 'wb'))
     print("Complete and saved to {}".format(OUTPUT_DIR))
 
     # Set weights of all embedding layers trainable
@@ -271,24 +306,10 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # Set up data loaders
-    train_loader = feature_to_loader(trainFeatures, TRAIN_BATCH_SIZE)
-
-    # Optimizer
-    param_optimizer = list(prediction_model.named_parameters())
-    no_decay = []
-    optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.001},
-        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-    ]
-    optimizer = BertAdam(optimizer_grouped_parameters,
-                        lr=LEARNING_RATE,
-                        warmup=WARMUP_PROPORTION,
-                        t_total=num_train_optimization_steps)
-
+    train_loader = feature_to_loader(train_features, TRAIN_BATCH_SIZE)
 
     # Train the model
     loss_vec = np.zeros(1)
-    criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT])).to(device)
     for epoch in range(NUM_TRAIN_EPOCHS):
         loss = prediction_model.train_model(train_loader,
                                             criterion = criterion,
@@ -297,175 +318,80 @@ for j, time in enumerate(time_span[2:-1]):
             loss_vec = loss
         else:
             loss_vec = np.append(loss_vec, loss)
-    
-    
-<<<<<<< HEAD
 
-=======
+
     # Save model
-    save_bert(prediction_model,
-                tokenizer,
-                OUTPUT_DIR,
-                WEIGHTS_NAME,
-                CONFIG_NAME,
-                PREDICTION_HEAD_NAME)
->>>>>>> 210e99233309f43c99180533df044488cda0ea7e
+    pickle.dump(model, open(OUTPUT_DIR + "bert_model.pkl", "wb"))
+    pickle.dump(prediction_model, open(OUTPUT_DIR + "entire_model.pkl", "wb"))
+    print("Models saved at {} \n".format(OUTPUT_DIR))
+    # save_bert(prediction_model = prediction_model,
+    #             bert_model = model,
+    #             tokenizer = tokenizer,
+    #             OUTPUT_DIR = OUTPUT_DIR,
+    #             WEIGHTS_NAME = WEIGHTS_NAME,
+    #             CONFIG_NAME = CONFIG_NAME)
 
 
     # Prediction
-    test_loader = feature_to_loader(trainFeatures, EVAL_BATCH_SIZE)
+    # Get tokenizer
+    tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR + 'vocab.txt', do_lower_case=False)
+    # Get test data
+    eval_examples = processor.get_dev_examples(OUTPUT_DIR)
+    eval_features = convert_examples_to_features(eval_examples,
+                                                label_list, MAX_SEQ_LENGTH, tokenizer)
+    test_loader = feature_to_loader(eval_features, EVAL_BATCH_SIZE)
+    
+
+
     transformation = nn.Sigmoid()
     pred = prediction_model.eval_model(test_loader = test_loader,
                                         batch_size = EVAL_BATCH_SIZE,
                                         transformation = transformation)
 
 
+    # Save predicted probabilities
+    pred = pd.DataFrame(pred, columns = ["pred_prob"])
+    pred.to_csv(REPORTS_DIR + f"predicted_result_{time_pred}.csv", index = False)
+
+    # Save data of this month as train set for the next iteration
+    XTrainOld = XTest
+    yTrainOld = yTest
+    # Save trained model of this month as train set for the next iteration
+    OUTPUT_DIR_OLD = OUTPUT_DIR
+
+
+    # ========= 2.b. Evaluation =========
+    evaluator = Evaluation.Evaluation(yTest, pred)
+
+    # Save ROC plot
+    _ = evaluator.roc_plot(plot = False, title = MODEL_NAME, save_path = REPORTS_DIR + f"roc_{time_pred}")
+
+    # Save summary
+    summary_data = evaluator.summary()
+    summary_data.to_csv(REPORTS_DIR+ f"summary_{time_pred}.csv", index = False)
+
+
+    # ========= 2.c. Save predicted results =========
+    pred = pd.DataFrame(pred, columns = ["pred_prob"])
+    pred.to_csv(REPORTS_DIR + f"predicted_result_{time_pred}.csv", index = False)
+
+
+    # ========= End of iteration =========
+    print("Completed evaluation for {}.\n".format(time_pred))
 
 
 
 
+# ========= 2.c. Summary plots =========
+print("Saving summary plots ...")
 
+SUMMARY_PLOT_PATH = FIG_PATH + "dynamic/"
+# Subplots of ROCs
+evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, dim = [3, 3], eps = True)
+# Aggregate ROC
+aggregate_summary = evaluator.roc_aggregate(SUMMARY_PLOT_PATH, time_span)
+# Save aggregate summary
+aggregate_summary.to_csv(SUMMARY_PLOT_PATH + "aggregate_summary.csv", index = False)
 
-
-# for j, time in enumerate(time_span[2:-1]):
-#     # ========= 2.a. Setup =========
-#     # Month to be predicted
-#     time_pred = time_span[j + 3]
-
-#     # Create folder if not already exist
-#     DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
-#     OUTPUT_DIR = DYNAMIC_PATH + f'Saved_Checkpoints/{TASK_NAME}/'
-#     REPORTS_DIR = DYNAMIC_PATH + f'Reports/{TASK_NAME}_evaluation_report/'
-#     for path in [DYNAMIC_PATH, OUTPUT_DIR, REPORTS_DIR]:
-#         if not os.path.exists(path):
-#             os.makedirs(path)
-
-
-#     # Prepare train/test sets
-#     XTrain, XTest, yTrain, yTest= time_split(data = EPIC, threshold = time)
-
-#     print("Training for data up to {} ...".format(time))
-#     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
-#                 .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
-
-#     # Convert to the appropriate format and save
-#     train_bert = create_bert_data(x_data = XTrain["Note.Data_ED.Triage.Notes"],
-#                                     y_data = yTrain,
-#                                     save_path = OUTPUT_DIR + "train.tsv")
-#     test_bert = create_bert_data(x_data = XTest["Note.Data_ED.Triage.Notes"],
-#                                     y_data = yTest,
-#                                     save_path = OUTPUT_DIR + "dev.tsv")
-
-#     # Load data. Necessary for feeding in BERT
-#     processor = BinaryClassificationProcessor()
-#     train_data = processor.get_train_examples(OUTPUT_DIR)
-#     label_list = processor.get_labels()
-
-#     num_train_optimization_steps = int(
-#         len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
-
-
-#     # ========= 2.a.i. Model =========
-#     if j == 0:
-#         # Load pretrained model tokenizer (vocabulary)
-#         tokenizer = BertTokenizer.from_pretrained(CACHE_DIR, do_lower_case=False)
-#         # Load model
-#         model = BertModel.from_pretrained(CACHE_DIR, cache_dir=CACHE_DIR).to(device)
-#         # Prediction model
-#         prediction_head = NoteClassificationHead(hidden_size = model.config.hidden_size)
-#     else:
-#         # Load pretrained tokenizer and model
-#         tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR + 'vocab.txt', do_lower_case=False)
-#         model = BertModel.from_pretrained(OUTPUT_DIR + f"{TASK_NAME}.tar.gz", cache_dir=OUTPUT_DIR)
-#         model.load_state_dict( torch.load( OUTPUT_DIR + WEIGHTS_NAME ) )
-
-
-#     # Convert tokens to features.
-#     print("\nConverting examples to features ...")
-#     trainFeatures = convert_examples_to_features(train_data, label_list, MAX_SEQ_LENGTH, tokenizer)
-
-#     # Save converted features
-#     pickle.dump(trainFeatures, open(OUTPUT_DIR + "train_features.pkl", 'wb'))
-#     print("Complete and saved to {}".format(OUTPUT_DIR))
-
-#     # Set weights of all embedding layers trainable
-#     for p in model.parameters():
-#         p.requires_grad = True
-
-
-#     # Set up data loaders
-#     train_loader = feature_to_loader(trainFeatures, TRAIN_BATCH_SIZE)
-
-#     # Optimizer
-#     param_optimizer = list(model.named_parameters()) + list(prediction_head.named_parameters())
-#     no_decay = []
-#     optimizer_grouped_parameters = [
-#         {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.001},
-#         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-#     ]
-#     optimizer = BertAdam(optimizer_grouped_parameters,
-#                         lr=LEARNING_RATE,
-#                         warmup=WARMUP_PROPORTION,
-#                         t_total=num_train_optimization_steps)
-
-
-#     # Train the model
-#     loss_vec = np.zeros( NUM_TRAIN_EPOCHS * ( len( train_loader ) // 10 ) )
-#     criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT])).to(device)
-#     for epoch in trange(NUM_TRAIN_EPOCHS):
-#         # Set models to train mode
-#         model.train()
-#         prediction_head.train()
-#         for i, batch in enumerate(tqdm(train_loader)):
-#             # Get batch
-#             batch = tuple( t.to( device ) for t in batch )
-#             input_ids, input_mask, segment_ids, label_ids = batch
-#             _, pooled_output = model(input_ids, segment_ids, input_mask).to(device)
-#             logits = prediction_head(pooled_output)
-#             # Compute loss
-#             loss = criterion(logits, label_ids)
-#             if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
-#                 optimizer.zero_grad()
-#             # Adapt for GPU
-#             if NUM_GPU > 1:
-#                 loss = loss.mean() # mean() to average on multi-gpu.
-#             # Accumulate loss
-#             if GRADIENT_ACCUMULATION_STEPS > 1:
-#                 loss = loss / GRADIENT_ACCUMULATION_STEPS
-#             # Back propagate
-#             loss.backward()
-#             # Update optimizer
-#             if (i + 1) % GRADIENT_ACCUMULATION_STEPS == 0:
-#                 optimizer.step()
-#             # Store loss
-#             if (i + 1) % 10 == 0:
-#                 loss_vec[epoch * (len(train_loader) // 10) + i // 10] = loss.item()
-
-
-#         if epoch == 0:
-#             loss_vec = loss
-#         else:
-#             loss_vec = np.append(loss_vec, loss)
-    
-    
-#     break
-
-
-#     # Prediction
-#     transformation = nn.Sigmoid()
-#     pred = prediction_model.eval_model(test_loader = test_loader,
-#                                         batch_size = EVAL_BATCH_SIZE,
-#                                         transformation = transformation)
-
-
-
-
-
-
-<<<<<<< HEAD
-
-
-
-=======
->>>>>>> 210e99233309f43c99180533df044488cda0ea7e
-
+print("Summary plots saved at {}".format(SUMMARY_PLOT_PATH))
+print("====================================")
