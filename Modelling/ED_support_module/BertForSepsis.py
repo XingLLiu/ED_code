@@ -326,7 +326,7 @@ def clean_text(text):
     text = text.replace("NOTETEXT>ENDNOTE>>", " ")
     text = re.sub (" *<CRLF>", ". ", text)
     #erroneous UTF symbols
-    text = re.sub ("[•â€¢Ã]+", "", text)
+    text = re.sub ("["⬢�]+", "", text)
     #abbreviations
     for abb in abbrevs:
         if " " + abb + "." in text:
