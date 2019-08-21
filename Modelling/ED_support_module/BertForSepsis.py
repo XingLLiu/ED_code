@@ -16,6 +16,21 @@ logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(messa
 logger = logging.getLogger(__name__)
 
 
+
+# ----------------------------------------------------
+#a list of common abbreviations that do not have other potential meanings
+abbrevs = {'hrs':'hours', 'mins':'minutes',
+           'S&S':'signs and symptoms', 
+           'bc':'because', 'b/c':'because', 
+           'wo':'without', 'w/o':'without', 
+           'yo':'year old', 'y.o':'year old', 'wk':'weeks',
+           'm.o':'month old', 'mo':'months', 'mos':'months', 
+           'b4':'before', 'pt':'patient',
+           'ro':'rule out', 'w/':'with', 
+           'o/n':'overnight', 'f/u':'follow up',
+           'M':'male', 'F':'female'}
+
+
 # ----------------------------------------------------
 #a list of common abbreviations that do not have other potential meanings
 abbrevs = {'hrs':'hours', 'mins':'minutes',
@@ -252,7 +267,7 @@ class BertForSepsis(nn.Module):
         self.train()
         # Initialize loss vector
         loss_vec = np.zeros( len( train_loader ) // 10 )
-        for i, batch in enumerate(tqdm(train_loader)):
+        for i, batch in enumerate(tqdm(train_loader, desc="Training")):
             # Get batch
             batch = tuple( t.to( self.device ) for t in batch )
             input_ids, input_mask, segment_ids, label_ids = batch
@@ -436,16 +451,19 @@ def feature_to_loader(train_features, batch_size):
 
 
 
-def save_bert(prediction_model, tokenizer, OUTPUT_DIR, WEIGHTS_NAME, CONFIG_NAME, PREDICTION_HEAD_NAME):
+def save_bert(prediction_model, bert_model, tokenizer, OUTPUT_DIR, WEIGHTS_NAME, CONFIG_NAME,
+                entire_model_name="entire_model.bin"):
     '''
     Save BERT with prediction head layer.
     '''
-    model_to_save = prediction_model.module if hasattr(prediction_model, "module") else prediction_model
+    model_to_save = bert_model.module if hasattr(bert_model, "module") else bert_model
+    entire_model_to_save = prediction_model.module if hasattr(prediction_model, "module") else prediction_model
     # Save using the predefined names so that one can load using `from_pretrained`
     output_model_file = os.path.join(OUTPUT_DIR, WEIGHTS_NAME)
     output_config_file = os.path.join(OUTPUT_DIR, CONFIG_NAME)
-    output_classification_file = os.path.join(OUTPUT_DIR, PREDICTION_HEAD_NAME)
+    output_entire_file = os.path.join(OUTPUT_DIR, entire_model_name)
     # Save
+    torch.save(entire_model_to_save.state_dict(), output_entire_file)
     torch.save(model_to_save.state_dict(), output_model_file)
     model_to_save.config.to_json_file(output_config_file)
     tokenizer.save_vocabulary(OUTPUT_DIR)

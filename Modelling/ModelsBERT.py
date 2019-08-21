@@ -538,11 +538,11 @@ class NoteClassificationHead(nn.Module):
 #         self.dropout = nn.Dropout(dropout_prob)
 #         self.classifier = nn.Linear(hidden_size, num_labels)
 #         # nn.init.xavier_normal_(self.classifier.weight)
-    def forward(self, input_ids, segment_ids, input_mask):
-        _, pooled_output = model(input_ids, segment_ids, input_mask)
-        pooled_output = self.dropout(pooled_output.to(self.device))
-        logits = self.classifier(pooled_output)
-        return logits
+    # def forward(self, input_ids, segment_ids, input_mask):
+    #     _, pooled_output = model(input_ids, segment_ids, input_mask)
+    #     pooled_output = self.dropout(pooled_output.to(self.device))
+    #     logits = self.classifier(pooled_output)
+    #     return logits
 
 
 
