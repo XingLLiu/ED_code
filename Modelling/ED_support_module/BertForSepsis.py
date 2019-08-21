@@ -265,6 +265,7 @@ class BertForSepsis(nn.Module):
                     gradient_accumulation_steps=1,
                     NUM_GPU=1):
         self.train()
+        self.bert.train()
         # Initialize loss vector
         loss_vec = np.zeros( len( train_loader ) // 10 )
         for i, batch in enumerate(tqdm(train_loader, desc="Training")):
@@ -293,6 +294,7 @@ class BertForSepsis(nn.Module):
         return loss_vec
     def eval_model(self, test_loader, batch_size, transformation=None):
         self.eval()
+        self.bert.eval()
         with torch.no_grad():
             for i, batch in enumerate(tqdm(test_loader, desc="Evaluating")):
                 # Get batch
