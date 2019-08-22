@@ -3,9 +3,9 @@ from ED_support_module import *
 class NeuralNet(nn.Module):
     def __init__(self, device, input_size=61, hidden_size=500, num_classes=2, drop_prob=0):
         super(NeuralNet, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc1 = nn.Linear(input_size, hidden_size * 2)
         self.ac1 = nn.LeakyReLU()
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size * 2, hidden_size)
         self.ac2 = nn.LeakyReLU()
         self.classification = nn.Linear(hidden_size, num_classes)
         self.dp_layer1 = nn.Dropout(drop_prob)

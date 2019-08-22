@@ -20,7 +20,7 @@ MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 1500
+NUM_EPOCHS = 750
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
@@ -59,6 +59,7 @@ def setup_parser():
 # Path to save figures
 FIG_PATH = "../../results/neural_net/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+FIG_ROOT_PATH = FIG_PATH + f"dynamic_{NUM_EPOCHS}_{2 * HIDDEN_SIZE}/"
 
 
 # Create folder if not already exist
@@ -91,7 +92,7 @@ for j, time in enumerate(time_span[2:-1]):
     time_pred = time_span[j + 3]
 
     # Create folder if not already exist
-    DYNAMIC_PATH = FIG_PATH + f"dynamic_{NUM_EPOCHS}/" + f"{time_pred}/"
+    DYNAMIC_PATH = FIG_ROOT_PATH + f"{time_pred}/"
     if not os.path.exists(DYNAMIC_PATH):
         os.makedirs(DYNAMIC_PATH)
 
@@ -165,18 +166,18 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.ii. Feature importance by permutation test =========
-    # Permutation test
-    imp_means, imp_vars = feature_importance_permutation(
-                            predict_method = model.predict_proba_single,
-                            X = np.array(XTest),
-                            y = np.array(yTest),
-                            metric = true_positive_rate,
-                            fpr_threshold = FPR_THRESHOLD,
-                            num_rounds = 5,
-                            seed = RANDOM_SEED)
-    # Save feature importance plot
-    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+    # # Permutation test
+    # imp_means, imp_vars = feature_importance_permutation(
+    #                         predict_method = model.predict_proba_single,
+    #                         X = np.array(XTest),
+    #                         y = np.array(yTest),
+    #                         metric = true_positive_rate,
+    #                         fpr_threshold = FPR_THRESHOLD,
+    #                         num_rounds = 5,
+    #                         seed = RANDOM_SEED)
+    # # Save feature importance plot
+    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
 
     # ========= 2.b. Evaluation =========
@@ -203,7 +204,7 @@ for j, time in enumerate(time_span[2:-1]):
 # ========= 2.c. Summary plots =========
 print("Saving summary plots ...")
 
-SUMMARY_PLOT_PATH = FIG_PATH + "dynamic/"
+SUMMARY_PLOT_PATH = FIG_ROOT_PATH
 # Subplots of ROCs
 evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, dim = [3, 3], eps = True)
 # Aggregate ROC

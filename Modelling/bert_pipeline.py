@@ -216,7 +216,8 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
 
 
     # Create folder if not already exist
-    DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
+    FIG_ROOT_PATH = FIG_PATH + "dynamic/"
+    DYNAMIC_PATH = FIG_ROOT_PATH + f"{time_pred}/"
     OUTPUT_DIR = DYNAMIC_PATH + f'Saved_Checkpoints/{TASK_NAME}/'
     REPORTS_DIR = DYNAMIC_PATH + f'Reports/{TASK_NAME}_evaluation_report/'
     for path in [DYNAMIC_PATH, OUTPUT_DIR, REPORTS_DIR]:
@@ -395,7 +396,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
 if args.start_time == 10:
     print("Saving summary plots ...")
 
-    SUMMARY_PLOT_PATH = FIG_PATH + "dynamic/"
+    SUMMARY_PLOT_PATH = FIG_ROOT_PATH
     # Subplots of ROCs
     evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, dim = [3, 3], eps = True)
     # Aggregate ROC
