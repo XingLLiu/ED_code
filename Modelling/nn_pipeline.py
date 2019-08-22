@@ -16,16 +16,16 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 MODEL_NAME = "NN"
 RANDOM_SEED = 27
 CLASS_WEIGHT = 3000
-MODE = "e"
+MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 3000
+NUM_EPOCHS = 1500
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
 DROP_PROB = 0.4
-HIDDEN_SIZE = 1000
+HIDDEN_SIZE = 500
 
 
 
@@ -91,7 +91,7 @@ for j, time in enumerate(time_span[2:-1]):
     time_pred = time_span[j + 3]
 
     # Create folder if not already exist
-    DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
+    DYNAMIC_PATH = FIG_PATH + f"dynamic_{NUM_EPOCHS}/" + f"{time_pred}/"
     if not os.path.exists(DYNAMIC_PATH):
         os.makedirs(DYNAMIC_PATH)
 
