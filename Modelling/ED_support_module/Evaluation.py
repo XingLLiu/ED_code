@@ -144,12 +144,13 @@ class Evaluation:
 
 
 class FeatureImportance:
-    def __init__(self, mean, var, feature_names, model_name=None):
+    def __init__(self, mean, var, feature_names, model_name=None, show_num=10):
         '''
         Class for evaluating feature importance
         Input : mean = [list, Series] vector of means of the importance scores.
                 var = [list, Series] vector of variances of the importance scores.
                 model_name = [str] name of the model used in title of plot
+                show_num = [int] number of top important features to show.
         '''
         self.mean = mean
         self.var = var
@@ -157,6 +158,7 @@ class FeatureImportance:
         self.model_name = model_name
         self.indices = np.argsort(self.mean)[::-1]
         self.sorted_names = self.feature_names[self.indices]
+        self.show_num = show_num
     def FI_plot(self, sorted_features=None, save_path=None, y_fontsize=8, eps=False):
         '''
         Plot the feature importance.
@@ -169,8 +171,8 @@ class FeatureImportance:
         # Plot importance values
         _ = plt.figure()
         _ = plt.title(f"{self.model_name} Feature Importance with Std. Dev.")
-        _ = sns.barplot(y = sorted_features, x = self.mean[self.indices],
-                        xerr = std[self.indices])
+        _ = sns.barplot(y = sorted_features[:self.show_num], x = self.mean[self.indices][:self.show_num],
+                        xerr = std[self.indices][:self.show_num])
         _ = plt.yticks(fontsize = y_fontsize)
         if save_path is not None:
             if eps:
