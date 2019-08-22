@@ -120,7 +120,7 @@ MAX_SEQ_LENGTH = 512
 MODE = "a"
 WEIGHT = 500
 WEIGHT2 = 16
-TRAIN_BATCH_SIZE = 8
+TRAIN_BATCH_SIZE = 6
 EVAL_BATCH_SIZE = 8
 LEARNING_RATE = 1e-3
 NUM_TRAIN_EPOCHS = 1
@@ -211,7 +211,9 @@ print("Dynamically evaluate the model ...\n")
 for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
     # ========= 2.a. Setup =========
     # Month to be predicted
-    time_pred = time_span[j + 3]
+    j = args.start_time
+    time_pred = time_span[j + 1]
+
 
     # Create folder if not already exist
     DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
@@ -232,7 +234,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
 
 
     # ========= 2.a.i. Model =========
-    if j == 0:
+    if j == 2:
         # Convert to the appropriate format and save
         train_bert = create_bert_data(x_data = XTrain["Note.Data_ED.Triage.Notes"],
                                         y_data = yTrain,
@@ -269,6 +271,12 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
         # Loss
         criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT])).to(device)
     else:
+        # Get train set (= test set from the last month)
+        _, XTrainOld, _, yTrainOld= time_split(data = EPIC, threshold = time_span[j - 1])
+
+        # Get directory of the previous model
+        OUTPUT_DIR_OLD = FIG_PATH + "dynamic/" + f"{time_span[j]}/" + f"Saved_Checkpoints/{TASK_NAME}/"
+
         # Convert to the appropriate format and save
         train_bert = create_bert_data(x_data = XTrainOld["Note.Data_ED.Triage.Notes"],
                                         y_data = yTrainOld,
@@ -286,14 +294,13 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
         # Load pretrained tokenizer and model
         tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR_OLD + 'vocab.txt', do_lower_case=False)
         model = pickle.load(open(OUTPUT_DIR_OLD + "bert_model.pkl", "rb"))
-        # model = BertModel.from_pretrained(CACHE_DIR, cache_dir=CACHE_DIR).to(device)
-        # model.load_state_dict( torch.load( OUTPUT_DIR_OLD + WEIGHTS_NAME ) )
         # Load entrie model
         prediction_model = pickle.load(open(OUTPUT_DIR_OLD + "entire_model.pkl", "rb"))
-        # prediction_model = BertForSepsis(bert_model = model,
-        #                                 device = device,
-        #                                 hidden_size = model.config.hidden_size).to(device)
-        # prediction_model = prediction_model.load_state_dict( torch.load( OUTPUT_DIR_OLD + "entire_model.pkl" ) )
+        # Load optimizer
+        optimizer = pickle.load(open(OUTPUT_DIR_OLD + "optimizer.pkl", "rb"))
+        # Load loss
+        criterion = pickle.load(open(OUTPUT_DIR_OLD + "loss.pkl", "rb"))
+        # criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT])).to(device)
 
 
 
@@ -328,18 +335,15 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
     # Save model
     pickle.dump(model, open(OUTPUT_DIR + "bert_model.pkl", "wb"))
     pickle.dump(prediction_model, open(OUTPUT_DIR + "entire_model.pkl", "wb"))
+    # Save optimizer and loss
+    pickle.dump(optimizer, open(OUTPUT_DIR + "optimizer.pkl", "wb"))
+    pickle.dump(criterion, open(OUTPUT_DIR + "loss.pkl", "wb"))
+    # Save tokenizer
+    tokenizer.save_vocabulary(OUTPUT_DIR)
     print("Models saved at {} \n".format(OUTPUT_DIR))
-    # save_bert(prediction_model = prediction_model,
-    #             bert_model = model,
-    #             tokenizer = tokenizer,
-    #             OUTPUT_DIR = OUTPUT_DIR,
-    #             WEIGHTS_NAME = WEIGHTS_NAME,
-    #             CONFIG_NAME = CONFIG_NAME)
 
 
     # Prediction
-    # Get tokenizer
-    tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR + 'vocab.txt', do_lower_case=False)
     # Get test data
     eval_examples = processor.get_dev_examples(OUTPUT_DIR)
     eval_features = convert_examples_to_features(eval_examples,
@@ -358,11 +362,11 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
     pred = pd.DataFrame(pred, columns = ["pred_prob"])
     pred.to_csv(REPORTS_DIR + f"predicted_result_{time_pred}.csv", index = False)
 
-    # Save data of this month as train set for the next iteration
-    XTrainOld = XTest
-    yTrainOld = yTest
-    # Save trained model of this month as train set for the next iteration
-    OUTPUT_DIR_OLD = OUTPUT_DIR
+    # # Save data of this month as train set for the next iteration
+    # XTrainOld = XTest
+    # yTrainOld = yTest
+    # # Save trained model of this month as train set for the next iteration
+    # OUTPUT_DIR_OLD = OUTPUT_DIR
 
 
     # ========= 2.b. Evaluation =========
@@ -388,15 +392,16 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
 
 
 # ========= 2.c. Summary plots =========
-print("Saving summary plots ...")
+if args.start_time == 10:
+    print("Saving summary plots ...")
 
-SUMMARY_PLOT_PATH = FIG_PATH + "dynamic/"
-# Subplots of ROCs
-evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, dim = [3, 3], eps = True)
-# Aggregate ROC
-aggregate_summary = evaluator.roc_aggregate(SUMMARY_PLOT_PATH, time_span)
-# Save aggregate summary
-aggregate_summary.to_csv(SUMMARY_PLOT_PATH + "aggregate_summary.csv", index = False)
+    SUMMARY_PLOT_PATH = FIG_PATH + "dynamic/"
+    # Subplots of ROCs
+    evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, dim = [3, 3], eps = True)
+    # Aggregate ROC
+    aggregate_summary = evaluator.roc_aggregate(SUMMARY_PLOT_PATH, time_span)
+    # Save aggregate summary
+    aggregate_summary.to_csv(SUMMARY_PLOT_PATH + "aggregate_summary.csv", index = False)
 
-print("Summary plots saved at {}".format(SUMMARY_PLOT_PATH))
+    print("Summary plots saved at {}".format(SUMMARY_PLOT_PATH))
 print("====================================")
