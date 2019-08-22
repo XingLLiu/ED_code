@@ -3,6 +3,7 @@ from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
 from ED_support_module.NeuralNet import NeuralNet
 
+
 # ----------------------------------------------------
 # ========= 0.i. Supporting functions and classes =========
 # NN model
@@ -16,7 +17,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 MODEL_NAME = "NN"
 RANDOM_SEED = 27
 CLASS_WEIGHT = 3000
-MODE = "e"
+MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
@@ -59,6 +60,7 @@ def setup_parser():
 # Path to save figures
 FIG_PATH = "../../results/neural_net/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+RAW_DATA_PATH = "../../data/EPIC_DATA/EPIC.csv"
 
 
 # Create folder if not already exist
@@ -67,7 +69,7 @@ if not os.path.exists(FIG_PATH):
 
 
 # ----------------------------------------------------
-# ========= 1. Further preprocessing =========
+# ========= 1.i. Further preprocessing =========
 preprocessor = EPICPreprocess.Preprocess(DATA_PATH)
 EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival = preprocessor.streamline()
 
@@ -80,7 +82,48 @@ time_span = EPIC_arrival['Arrived'].unique().tolist()
 
 
 # ----------------------------------------------------
-# ========= 2.a. One-month ahead prediction =========
+# ========= 1.ii. Append arrival date =========
+EPIC_raw = pd.read_csv(RAW_DATA_PATH, encoding = "ISO-8859-1")
+date = pd.to_datetime(EPIC_raw["Arrived"]).loc[EPIC_arrival.index]
+# Change name to differentiate from Arrived
+date = date.rename("Arrived.Date")
+# Append date to EPIC_arrival
+EPIC_arrival = pd.concat([EPIC_arrival, date.dt.day], axis = 1)
+
+
+
+# ----------------------------------------------------
+# ========= 2. Train and test sets for data Shapley =========
+j = 0
+time = 201809
+
+
+# ========= 2.a. Setup =========
+# Month to be predicted
+time_pred = time_span[j + 3]
+
+# Create folder if not already exist
+DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
+if not os.path.exists(DYNAMIC_PATH):
+    os.makedirs(DYNAMIC_PATH)
+
+
+# Prepare train/test sets
+XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival,
+                                        num_cols,
+                                        MODE,
+                                        time_threshold = time,
+                                        test_size = None,
+                                        EPIC_CUI = EPIC_CUI,
+                                        seed = RANDOM_SEED)
+print("Training for data up to {} ...".format(time))
+print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
+            .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+
+
+
+# ----------------------------------------------------
+# ========= 2. One-month ahead prediction =========
 print("====================================")
 print("Dynamically evaluate the model ...\n")
 
@@ -213,3 +256,6 @@ aggregate_summary.to_csv(SUMMARY_PLOT_PATH + "aggregate_summary.csv", index = Fa
 
 print("Summary plots saved at {}".format(SUMMARY_PLOT_PATH))
 print("====================================")
+
+
+

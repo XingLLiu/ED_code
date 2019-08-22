@@ -87,7 +87,6 @@ for j, time in enumerate(time_span[2:-1]):
                                             MODE,
                                             time_threshold = time,
                                             test_size = None,
-                                            valid_size = 0.15,
                                             EPIC_CUI = EPIC_CUI,
                                             seed = RANDOM_SEED)
 
@@ -121,7 +120,7 @@ for j, time in enumerate(time_span[2:-1]):
     _ = plt.figure()
     _ = plt.title("Random Forest Feature Importance (Gini)")
     _ = sns.barplot(y = XTrain.columns[indices][:20], x = importance_vals[indices][:20], xerr = std[indices][:20])
-    _ = plt.yticks(fontsize = 4)
+    _ = plt.yticks(fontsize = 11)
     plt.savefig(DYNAMIC_PATH + f"feature_imp_by_gini_{time_pred}.eps", format = 'eps', dpi = 800)
     plt.close()
 
