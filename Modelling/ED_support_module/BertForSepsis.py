@@ -305,13 +305,17 @@ class BertForSepsis(nn.Module):
                     logits = self(input_ids, segment_ids, input_mask).to(self.device)
                     # Evaluation metric
                     logits = logits.detach().cpu().numpy()
-                    logits = torch.from_numpy(logits[:, 1])
+                    logits = logits[:, 1]
+                    if transformation is not None:
+                        logits = transformation(logits).numpy()
                     label_ids = label_ids.to('cpu').numpy()
                 # Store predicted probabilities
                 if i == 0:
                     output = logits
                 else:
                     output = np.append(output, logits, axis = 0)
+        if transformation is not None:
+            output = transformation(output)
         return output
 
 

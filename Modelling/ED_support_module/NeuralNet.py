@@ -81,7 +81,7 @@ class NeuralNet(nn.Module):
                     outputs = transformation(outputs).detach()
                 # Append probabilities
                 if i == 0:
-                    outputs_vec = np.array(outputs)
+                    outputs_vec = np.array(outputs.cpu())
                 else:
                     outputs_vec = np.append(outputs_vec,
                                             np.array(outputs),
