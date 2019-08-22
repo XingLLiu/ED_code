@@ -47,6 +47,7 @@ def setup_parser():
 # Path to save figures
 FIG_PATH = "../../results/random_forest_c/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}/"
 
 
 # Create folder if not already exist
@@ -77,7 +78,7 @@ for j, time in enumerate(time_span[2:-1]):
     # Month to be predicted
     time_pred = time_span[j + 3]
     # Create folder if not already exist
-    DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
+    DYNAMIC_PATH = FIG_ROOT_PATH + f"{time_pred}/"
     if not os.path.exists(DYNAMIC_PATH):
         os.makedirs(DYNAMIC_PATH)
     
@@ -177,7 +178,7 @@ for j, time in enumerate(time_span[2:-1]):
 # ========= 2.c. Summary plots =========
 print("Saving summary plots ...")
 
-SUMMARY_PLOT_PATH = FIG_PATH + "dynamic/"
+SUMMARY_PLOT_PATH = FIG_ROOT_PATH
 # Subplots of ROCs
 evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, [3, 3])
 # Aggregate ROC

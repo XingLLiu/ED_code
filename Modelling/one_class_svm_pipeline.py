@@ -45,6 +45,7 @@ def setup_parser():
 # Path to save figures
 FIG_PATH = "../../results/ocsvm/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}/"
 
 
 # Create folder if not already exist
@@ -77,7 +78,7 @@ for j, time in enumerate(time_span[2:-1]):
     # Month to be predicted
     time_pred = time_span[j + 3]
     # Create folder if not already exist
-    DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
+    DYNAMIC_PATH = FIG_ROOT_PATH + f"{time_pred}/"
     if not os.path.exists(DYNAMIC_PATH):
         os.makedirs(DYNAMIC_PATH)
 
@@ -103,18 +104,18 @@ for j, time in enumerate(time_span[2:-1]):
     pred = model.predict_transform(XTest)
 
     # ========= 2.a.ii. Feature importance by permutation test =========
-    # # Permutation test
-    # imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
-    #                         predict_method = model.predict_transform,
-    #                         X = np.array(XTest),
-    #                         y = np.array(yTest),
-    #                         metric = sk.metrics.f1_score,
-    #                         num_rounds = 10,
-    #                         seed = RANDOM_SEED)
+    # Permutation test
+    imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
+                            predict_method = model.predict_transform,
+                            X = np.array(XTest),
+                            y = np.array(yTest),
+                            metric = sk.metrics.f1_score,
+                            num_rounds = 10,
+                            seed = RANDOM_SEED)
 
-    # # Save feature importance plot
-    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+    # Save feature importance plot
+    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
 
     # ========= 2.b. Evaluation =========

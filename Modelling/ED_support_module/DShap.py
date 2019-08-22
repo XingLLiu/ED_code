@@ -1,11 +1,10 @@
 import matplotlib
-matplotlib.use('Agg')
 import numpy as np
 import os
 import tensorflow as tf
 import sys
-from shap_utils import *
-from Shapley import ShapNN
+from ED_support_module.shap_utils import *
+from ED_support_module.Shapley import ShapNN
 from scipy.stats import spearmanr
 import shutil
 from sklearn.base import clone
@@ -488,4 +487,4 @@ class DShap(object):
                                              X=self.X_heldout, y=self.y_heldout))
                 else:
                     scores.append(init_score)
-        return np.array(scores)[::-1] 
+        return np.array(scores)[::-1]
