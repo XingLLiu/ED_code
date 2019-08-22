@@ -271,13 +271,16 @@ def vaePredict(loss_train = None, loss_test = None, batch_size = None,
 
 
 # Train-test split by arrival date
-def time_split(data, threshold = 201903, dynamic = True, pred_span = 1):
+def time_split(data, threshold = 201903, dynamic = True, pred_span = 1,
+                keep_time = False):
     '''
     Sort data by the feature 'Arrived' and output train and test sets
     as specified by threshold. This can be used as a special version
     of sk.model_selection.train_test_split.
-    Input : data = EPIC dataset with feature 'Arrived'
+    Input : 
+            data = EPIC dataset with feature 'Arrived'
             threshold = time of the train/test split
+            keep_time = whether to keep 'Arrived' in the returned data
     Output: XTrain, XTest, yTrain, yTest
     '''
     # Sort by arrival date
@@ -304,8 +307,9 @@ def time_split(data, threshold = 201903, dynamic = True, pred_span = 1):
     if any(XTrain['Arrived'] > end_threshold):
         raise Warning('Fture data (after {}) is contained in train set. May be overfitting!'.format(end_threshold))
     # Drop arrival date
-    XTrain = XTrain.drop(['Arrived'], axis = 1)
-    XTest = XTest.drop(['Arrived'], axis = 1)
+    if not keep_time:
+        XTrain = XTrain.drop(['Arrived'], axis = 1)
+        XTest = XTest.drop(['Arrived'], axis = 1)
     return(XTrain, XTest, yTrain, yTest)
 
 
@@ -327,7 +331,7 @@ def dynamic_summary(summary, p_num, n_num):
 
 
 # Downstream function for train/test/(valid) split.
-def splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, keep_cols, mode,
+def splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, mode,
                  cui_cols=None, valid_size=None, pca_components=None, seed=None):
     '''
     Downstream of the train/test/(valid) splitting. For developer's use.
@@ -376,7 +380,8 @@ def splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, keep_cols, mode,
 
 # Split EPIC_enc into train/test/(valid)
 def splitter(EPIC_enc, num_cols, mode, test_size,
-             time_threshold=None, EPIC_CUI=None, valid_size=None, pca_components=None, seed=None):
+             time_threshold=None, EPIC_CUI=None, valid_size=None, pca_components=None, seed=None,
+             keep_time=False):
     '''
     Split EPIC_enc into train/test/(valid) with/without PCA/Sparse PCA (see 'mode'). This can be
     used as a substitute of sklearn.model_selection.TrainTestSplit.
@@ -398,7 +403,8 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
     # Split by time
     if time_threshold is not None:
         if "Arrived" in EPIC_enc.columns:
-            XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True)
+            XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True,
+                                                        keep_time=keep_time)
         else:
             raise ValueError("Feature \'Arrived\' must be in EPIC_enc to split by time.")
     # Add TFIDF
@@ -413,8 +419,8 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
     # Separate input features and target
     y = EPIC_enc['Primary.Dx']
     X = EPIC_enc.drop('Primary.Dx', axis = 1)
-    # Columns that are not transformed
-    keep_cols = [col for col in X.columns if col not in num_cols]
+    # # Columns that are not transformed
+    # keep_cols = [col for col in X.columns if col not in num_cols]
     # Prepare train and test sets
     if time_threshold == None:
         if test_size == None:
@@ -423,12 +429,13 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
                                         random_state=seed, stratify=y)
     else:
         if "Arrived" in EPIC_enc.columns:
-            XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True)
-            # Remove the time column
-            keep_cols.remove("Arrived")
+            XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True,
+                                                        keep_time=keep_time)
+            # # Remove the time column
+            # keep_cols.remove("Arrived")
         else:
             raise ValueError("Feature \'Arrived\' must be in EPIC_enc to split by time.")
-    return splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, keep_cols, mode,
+    return splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, mode,
                                cui_cols=cui_cols, valid_size=valid_size, pca_components=pca_components, seed=seed)
 
 

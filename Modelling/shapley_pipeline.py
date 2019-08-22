@@ -2,6 +2,7 @@ from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
 from ED_support_module.NeuralNet import NeuralNet
+from ED_support_module import LogisticRegression
 
 
 # ----------------------------------------------------
@@ -94,8 +95,9 @@ EPIC_arrival = pd.concat([EPIC_arrival, date.dt.day], axis = 1)
 
 # ----------------------------------------------------
 # ========= 2. Train and test sets for data Shapley =========
-j = 0
-time = 201809
+j = 4
+time = time_span[j]
+FPR_THRESHOLD = 0.2
 
 
 # ========= 2.a. Setup =========
@@ -115,147 +117,136 @@ XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival,
                                         time_threshold = time,
                                         test_size = None,
                                         EPIC_CUI = EPIC_CUI,
-                                        seed = RANDOM_SEED)
+                                        seed = RANDOM_SEED,
+                                        keep_time = True)
 print("Training for data up to {} ...".format(time))
 print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
             .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
 
 
+# Select train/valid sets for data shapley
+yValid = yTrain.loc[XTrain["Arrived.Date"] > 21]
+XValid = XTrain.loc[XTrain["Arrived.Date"] > 21, :]
+
+yTrain = yTrain.loc[XTrain["Arrived.Date"] <= 21]
+XTrain = XTrain.loc[XTrain["Arrived.Date"] <= 21, :]
+
+# Remove date variable
+XValid = XValid.drop(["Arrived.Date"], axis = 1)
+XTrain = XTrain.drop(["Arrived.Date"], axis = 1)
+XTest = XTest.drop(["Arrived.Date"], axis = 1)
+
 
 # ----------------------------------------------------
-# ========= 2. One-month ahead prediction =========
-print("====================================")
-print("Dynamically evaluate the model ...\n")
+# ========= 2.b. One-month ahead prediction =========
+# Get data for each group
+train_dict = {}
+for time in XTrain["Arrived"].unique().tolist():
+    x_gp = (XTrain.loc[XTrain["Arrived"] == time, :])
+    # Remove month variable
+    x_gp = x_gp.drop(["Arrived"], axis = 1)
+    # Append response
+    y_gp = (yTrain.loc[XTrain["Arrived"] == time])
+    train_dict[str(time)] = pd.concat([x_gp, y_gp], axis = 1)
 
 
-for j, time in enumerate(time_span[2:-1]):
-    # ========= 2.a. Setup =========
-    # Month to be predicted
-    time_pred = time_span[j + 3]
+# XTrain1 = (XTrain.loc[XTrain["Arrived"] == time_span[0], :])
+# XTrain2 = (XTrain.loc[XTrain["Arrived"] == time_span[1], :])
+# XTrain3 = (XTrain.loc[XTrain["Arrived"] == time_span[2], :])
 
-    # Create folder if not already exist
-    DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
-    if not os.path.exists(DYNAMIC_PATH):
-        os.makedirs(DYNAMIC_PATH)
+# # Remove month variable
+# XTrain1 = XTrain1.drop(["Arrived"], axis = 1)
+# XTrain2 = XTrain2.drop(["Arrived"], axis = 1)
+# XTrain3 = XTrain3.drop(["Arrived"], axis = 1)
 
-
-    # Prepare train/test sets
-    XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival,
-                                            num_cols,
-                                            MODE,
-                                            time_threshold = time,
-                                            test_size = None,
-                                            EPIC_CUI = EPIC_CUI,
-                                            seed = RANDOM_SEED)
-    print("Training for data up to {} ...".format(time))
-    print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
-                .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+# # Append response
 
 
-    # ========= 2.a.i. Model =========
-    # Initialize the model at the first iteration
-    if j == 0:
-        # Neural net model
-        input_size = XTrain.shape[1]
-        model = NeuralNet(device = device,
-                          input_size = input_size,
-                          drop_prob = DROP_PROB,
-                          hidden_size = HIDDEN_SIZE).to(device)
-
-        # Loss and optimizer
-        # nn.CrossEntropyLoss() computes softmax internally
-        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
-        optimizer = torch.optim.SGD(model.parameters(), lr = LEARNING_RATE)
-
-        # Initialize loss vector
-        loss_vec = np.zeros(NUM_EPOCHS)
-
-        # Construct data loaders
-        train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
-                                                    batch_size = BATCH_SIZE,
-                                                    shuffle = True)
-        test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
-                                                    batch_size = len(yTest),
-                                                    shuffle = False)
-    # Otherwise only update the model on data from the previous month
-    else:
-        train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrainOld, yTrainOld], axis = 1)),
-                                                    batch_size = BATCH_SIZE,
-                                                    shuffle = True)
-        test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest, yTest),
-                                                    batch_size = len(yTest),
-                                                    shuffle = False)
-
-    # Train the model
-    for epoch in trange(NUM_EPOCHS):
-        loss = model.train_model(train_loader,
-                                criterion = criterion,
-                                optimizer = optimizer)
-        loss_vec[epoch] = loss.item()
-
-    # Prediction
-    transformation = nn.Sigmoid()
-    pred = model.eval_model(test_loader = test_loader,
-                            transformation = transformation)[:, 1]
-
-    # Save data of this month as train set for the next iteration
-    XTrainOld = XTest
-    yTrainOld = yTest
-
-    # Save model
-    model_to_save = model.module if hasattr(model, "module") else model
-    torch.save(model_to_save.state_dict(), DYNAMIC_PATH + f"model_{time_pred}.pkl")
+# # Prepare data input into shapley function
+# train_dict = {"201807":gp1, "201808":gp2, "201809":gp3}
 
 
-    # ========= 2.a.ii. Feature importance by permutation test =========
-    # Permutation test
-    imp_means, imp_vars = feature_importance_permutation(
-                            predict_method = model.predict_proba_single,
-                            X = np.array(XTest),
-                            y = np.array(yTest),
-                            metric = true_positive_rate,
-                            fpr_threshold = FPR_THRESHOLD,
-                            num_rounds = 5,
-                            seed = RANDOM_SEED)
-    # Save feature importance plot
-    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+# Remove month variable from validation set
+XValid = XValid.drop(["Arrived"], axis =1)
 
 
-    # ========= 2.b. Evaluation =========
-    evaluator = Evaluation.Evaluation(yTest, pred)
-
-    # Save ROC plot
-    _ = evaluator.roc_plot(plot = False, title = MODEL_NAME, save_path = DYNAMIC_PATH + f"roc_{time_pred}")
-
-    # Save summary
-    summary_data = evaluator.summary()
-    summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
-
-
-    # ========= 2.c. Save predicted results =========
-    pred = pd.DataFrame(pred, columns = ["pred_prob"])
-    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = False)
-
-
-    # ========= End of iteration =========
-    print("Completed evaluation for {}.\n".format(time_pred))
+shapley_val = shapley_exact(model_class = sk.linear_model.LogisticRegression(solver = "liblinear",
+                                                                class_weight = {0:1, 1:3000}),
+                     train_dict = train_dict,
+                     test_data = pd.concat([XValid, yValid], axis = 1),
+                     fpr_threshold = FPR_THRESHOLD,
+                     convergence_tol = 0.01,
+                     performance_tol = 0.01,
+                     max_iter = 50,
+                     benchmark_score = None)
 
 
 
-# ========= 2.c. Summary plots =========
-print("Saving summary plots ...")
 
-SUMMARY_PLOT_PATH = FIG_PATH + "dynamic/"
-# Subplots of ROCs
-evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, dim = [3, 3], eps = True)
-# Aggregate ROC
-aggregate_summary = evaluator.roc_aggregate(SUMMARY_PLOT_PATH, time_span)
-# Save aggregate summary
-aggregate_summary.to_csv(SUMMARY_PLOT_PATH + "aggregate_summary.csv", index = False)
-
-print("Summary plots saved at {}".format(SUMMARY_PLOT_PATH))
-print("====================================")
+# shapley_vec = tmc_shapley(model_class = sk.linear_model.LogisticRegression(solver = "liblinear",
+#                                                                             class_weight = {0:1, 1:3000}),
+#                         train_dict = train_dict,
+#                         test_data = pd.concat([XValid, yValid], axis = 1),
+#                         fpr_threshold = FPR_THRESHOLD,
+#                         convergence_tol = 0.01,
+#                         performance_tol = 0.01,
+#                         max_iter = 50,
+#                         benchmark_score = None)
 
 
+
+# ========= 2.b. Refit without the group with the lowest shapley value =========
+# Get good samples
+data_good = pd.concat([train_dict["201807"],
+                        train_dict["201809"],
+                        train_dict["201810"],
+                        train_dict["201811"]], axis = 0)
+yTrain_good = data_good["Primary.Dx"]
+XTrain_good = data_good.drop(["Primary.Dx"], axis = 1)
+
+
+# Fit with whole data
+XTrain = XTrain.drop(["Arrived"], axis = 1)
+XTest = XTest.drop(["Arrived"], axis = 1)
+
+model_full = sk.linear_model.LogisticRegression(solver = "liblinear",
+                                            class_weight = {0:1, 1:3000}).fit(XTrain, yTrain)
+pred_prob_full = model_full.predict_proba_single(XValid)
+y_pred_full = threshold_predict(pred_prob_full, yValid, fpr = FPR_THRESHOLD)
+tpr_full = true_positive_rate(yValid, y_pred_full)
+
+# Fit with subset
+model_sub = sk.linear_model.LogisticRegression(solver = "liblinear",
+                                            class_weight = {0:1, 1:3000}).fit(XTrain_good, yTrain_good)
+pred_prob_sub = model_sub.predict_proba_single(XValid)
+y_pred_sub = threshold_predict(pred_prob_sub, yValid, fpr = FPR_THRESHOLD)
+tpr_sub = true_positive_rate(yValid, y_pred_sub)
+
+
+# Test on unseen data
+pred_prob_full = model_full.predict_proba_single(XTest)
+y_pred_full = threshold_predict(pred_prob_full, yTest, fpr = FPR_THRESHOLD)
+tpr_full_test = true_positive_rate(yTest, y_pred_full)
+
+
+pred_prob_sub = model_sub.predict_proba_single(XTest)
+y_pred_sub = threshold_predict(pred_prob_sub, yTest, fpr = FPR_THRESHOLD)
+tpr_sub_test = true_positive_rate(yTest, y_pred_sub)
+
+
+(tpr_full_test != tpr_sub_test).sum()
+
+
+print("TPR on valid. full: {}. sub: {}".format(tpr_full, tpr_sub))
+print("TPR on valid. full: {}. sub: {}".format(tpr_full_test, tpr_sub_test))
+
+
+
+evaluator = Evaluation.Evaluation(yTest, pred_prob_full)
+# Save ROC plot
+_ = evaluator.roc_plot(plot = True, title = MODEL_NAME)
+
+evaluator = Evaluation.Evaluation(yTest, pred_prob_sub)
+# Save ROC plot
+_ = evaluator.roc_plot(plot = True, title = MODEL_NAME)
 
