@@ -3,6 +3,7 @@ from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
 from ED_support_module.NeuralNet import NeuralNet
 from ED_support_module import LogisticRegression
+from scipy.special import comb
 
 
 # ----------------------------------------------------
@@ -95,9 +96,9 @@ EPIC_arrival = pd.concat([EPIC_arrival, date.dt.day], axis = 1)
 
 # ----------------------------------------------------
 # ========= 2. Train and test sets for data Shapley =========
-j = 4
+j = 3
 time = time_span[j]
-FPR_THRESHOLD = 0.2
+FPR_THRESHOLD = 0.1
 
 
 # ========= 2.a. Setup =========
@@ -170,7 +171,7 @@ for time in XTrain["Arrived"].unique().tolist():
 XValid = XValid.drop(["Arrived"], axis =1)
 
 
-shapley_val = shapley_exact(model_class = sk.linear_model.LogisticRegression(solver = "liblinear",
+shapley_val = shapley_exact(model_class = sk.linear_model.LogisticRegression(solver = "liblinear", penalty = "l1",
                                                                 class_weight = {0:1, 1:3000}),
                      train_dict = train_dict,
                      test_data = pd.concat([XValid, yValid], axis = 1),
