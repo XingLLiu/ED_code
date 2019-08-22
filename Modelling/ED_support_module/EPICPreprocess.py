@@ -276,7 +276,7 @@ class Preprocess:
 
 
     def streamline(self):
-        # Load data
+        # Load data (specifying encoding for stability)
         EPIC = pd.read_csv(self.path, encoding = 'ISO-8859-1')
         # Separate data
         EPIC, EPIC_CUI, EPIC_arrival = self.SeparateData(EPIC)
@@ -293,12 +293,18 @@ class Preprocess:
         EPIC = EPIC.loc[~outliers]
         EPIC_CUI = EPIC_CUI.loc[~outliers]
         EPIC_arrival = EPIC_arrival.loc[~outliers]
+        # Remove cases wtih missing arrival date and append
+        null_date = self.missing_index(EPIC_arrival, "Arrived")
+        EPIC = EPIC.drop(labels = null_date, axis = 0)
+        EPIC_CUI = EPIC_CUI.drop(labels = null_date, axis = 0)
+        EPIC_arrival = EPIC_arrival.drop(labels = null_date, axis = 0)
         # Simple imputation
         EPIC, catCols, _ = self.SimpleInpute(EPIC)
         # One-hot encode the categorical variables
         EPIC_enc = pd.get_dummies(EPIC, columns = catCols, drop_first = True).copy()
-        # Fill in missing arrival date and append
-        EPIC_arrival = self.DateFillNA(EPIC_arrival)
+        # # Fill in missing arrival date and append
+        # EPIC_arrival = self.DateFillNA(EPIC_arrival)
+        # Append arrival date
         EPIC_arrival = pd.concat([EPIC_enc, EPIC_arrival['Arrived'].astype('int')], axis = 1)
         return EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival
 
@@ -312,6 +318,22 @@ class Preprocess:
         num_cols = data.select_dtypes(include = [np.number]).columns.tolist()
         return num_cols
 
+
+    def missing_index(self, data, col_name):
+        '''
+        Remove cases with missing values in col_name.
+        Input :
+                data = [DataFrame] dataset with arrival date in
+                        pd.datetime format.
+                col_name = [str] name of column in which missing
+                            values are identified.
+        Output:
+                index = [pd.Index] dataset with missing dates removed.
+        '''
+        # Get dates
+        data_col = data[col_name]
+        # Get index of missing dates
+        return data_col.isnull().loc[data_col.isnull()].index
 
 
 

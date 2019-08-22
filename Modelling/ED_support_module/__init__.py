@@ -271,13 +271,16 @@ def vaePredict(loss_train = None, loss_test = None, batch_size = None,
 
 
 # Train-test split by arrival date
-def time_split(data, threshold = 201903, dynamic = True, pred_span = 1):
+def time_split(data, threshold = 201903, dynamic = True, pred_span = 1,
+                keep_time = False):
     '''
     Sort data by the feature 'Arrived' and output train and test sets
     as specified by threshold. This can be used as a special version
     of sk.model_selection.train_test_split.
-    Input : data = EPIC dataset with feature 'Arrived'
+    Input : 
+            data = EPIC dataset with feature 'Arrived'
             threshold = time of the train/test split
+            keep_time = whether to keep 'Arrived' in the returned data
     Output: XTrain, XTest, yTrain, yTest
     '''
     # Sort by arrival date
@@ -304,8 +307,9 @@ def time_split(data, threshold = 201903, dynamic = True, pred_span = 1):
     if any(XTrain['Arrived'] > end_threshold):
         raise Warning('Fture data (after {}) is contained in train set. May be overfitting!'.format(end_threshold))
     # Drop arrival date
-    XTrain = XTrain.drop(['Arrived'], axis = 1)
-    XTest = XTest.drop(['Arrived'], axis = 1)
+    if not keep_time:
+        XTrain = XTrain.drop(['Arrived'], axis = 1)
+        XTest = XTest.drop(['Arrived'], axis = 1)
     return(XTrain, XTest, yTrain, yTest)
 
 
@@ -327,7 +331,7 @@ def dynamic_summary(summary, p_num, n_num):
 
 
 # Downstream function for train/test/(valid) split.
-def splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, keep_cols, mode,
+def splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, mode,
                  cui_cols=None, valid_size=None, pca_components=None, seed=None):
     '''
     Downstream of the train/test/(valid) splitting. For developer's use.
@@ -376,7 +380,8 @@ def splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, keep_cols, mode,
 
 # Split EPIC_enc into train/test/(valid)
 def splitter(EPIC_enc, num_cols, mode, test_size,
-             time_threshold=None, EPIC_CUI=None, valid_size=None, pca_components=None, seed=None):
+             time_threshold=None, EPIC_CUI=None, valid_size=None, pca_components=None, seed=None,
+             keep_time=False):
     '''
     Split EPIC_enc into train/test/(valid) with/without PCA/Sparse PCA (see 'mode'). This can be
     used as a substitute of sklearn.model_selection.TrainTestSplit.
@@ -398,7 +403,8 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
     # Split by time
     if time_threshold is not None:
         if "Arrived" in EPIC_enc.columns:
-            XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True)
+            XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True,
+                                                        keep_time=keep_time)
         else:
             raise ValueError("Feature \'Arrived\' must be in EPIC_enc to split by time.")
     # Add TFIDF
@@ -406,9 +412,6 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
         try:
             EPIC_enc, cui_cols = TFIDF(EPIC_CUI.loc[ pd.concat( [XTrain, XTest], axis=0 ).index, : ],
                                         EPIC_enc.loc [ pd.concat( [XTrain, XTest], axis=0 ).index, : ] )
-            # # Add TFIDF columns to test set
-            # XTest[cui_cols] = 0 * np.zeros([XTest.shape[0], len(cui_cols)])
-            # XTest, _ = TFIDF(EPIC_CUI.loc[XTest.index, :], EPIC_enc.loc[XTest.index, :])
         except:
             raise ValueError("EPIC_CUI must be given when including TF-IDF")
     else:
@@ -416,8 +419,8 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
     # Separate input features and target
     y = EPIC_enc['Primary.Dx']
     X = EPIC_enc.drop('Primary.Dx', axis = 1)
-    # Columns that are not transformed
-    keep_cols = [col for col in X.columns if col not in num_cols]
+    # # Columns that are not transformed
+    # keep_cols = [col for col in X.columns if col not in num_cols]
     # Prepare train and test sets
     if time_threshold == None:
         if test_size == None:
@@ -426,64 +429,13 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
                                         random_state=seed, stratify=y)
     else:
         if "Arrived" in EPIC_enc.columns:
-            XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True)
-            # Remove the time column
-            keep_cols.remove("Arrived")
+            XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True,
+                                                        keep_time=keep_time)
+            # # Remove the time column
+            # keep_cols.remove("Arrived")
         else:
             raise ValueError("Feature \'Arrived\' must be in EPIC_enc to split by time.")
-    return splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, keep_cols, mode,
-                               cui_cols=cui_cols, valid_size=valid_size, pca_components=pca_components, seed=seed)
-
-
-
-# Split EPIC_enc into train/test/(valid)
-def splitter(EPIC_enc, num_cols, mode, test_size,
-             time_threshold=None, EPIC_CUI=None, valid_size=None, pca_components=None, seed=None):
-    '''
-    Split EPIC_enc into train/test/(valid) with/without PCA/Sparse PCA (see 'mode'). This can be
-    used as a substitute of sklearn.model_selection.TrainTestSplit.
-    Input : num_cols = [list or pd.Index] names of numerical cols to be transformed.
-            cui_cols = [list or pd.Index] names of CUI cols to be transformed if
-                       EPIC_CUI is not None.
-            test_size = [float] must be None if time_threshold is give.
-            valid_size = [float] proportion of train set to be split into valid set by stratified
-                         sampling. None if no validation is required.
-            mode = [str] must be one of the following:
-                            a -- No PCA, no TF-IDF
-                            b -- PCA, no TF-IDF
-                            c -- No PCA, TF-IDF
-                            d -- PCA, but not on TF-IDF
-                            e -- PCA, TF-IDF
-                            f -- Sparse PCA, TF-IDF
-    Output: XTrain, XTest, (XValid), yTrain, yTest, (yValid)
-    '''
-    # Prepare taining set
-    if mode not in ['a', 'b']:
-        try:
-            EPIC_enc, cui_cols = TFIDF(EPIC_CUI, EPIC_enc)
-        except:
-            raise ValueError("EPIC_CUI must be given when including TF-IDF")
-    else:
-        cui_cols = None
-    # Separate input features and target
-    y = EPIC_enc['Primary.Dx']
-    X = EPIC_enc.drop('Primary.Dx', axis = 1)
-    # Columns that are not transformed
-    keep_cols = [col for col in X.columns if col not in num_cols]
-    # Prepare train and test sets
-    if time_threshold == None:
-        if test_size == None:
-            raise ValueError("test_size cannot be None for stratified train/test split.")
-        XTrain, XTest, yTrain, yTest = sk.model_selection.train_test_split(X, y, test_size=test_size,
-                                        random_state=seed, stratify=y)
-    else:
-        if "Arrived" in EPIC_enc.columns:
-            XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True)
-            # Remove the time column
-            keep_cols.remove("Arrived")
-        else:
-            raise ValueError("Feature \'Arrived\' must be in EPIC_enc to split by time.")
-    return splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, keep_cols, mode,
+    return splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, mode,
                                cui_cols=cui_cols, valid_size=valid_size, pca_components=pca_components, seed=seed)
 
 
@@ -495,6 +447,9 @@ def threshold_predict(pred_prob, y_data, fpr=0.05):
             y_data = [Series] true response vector.
     '''
     # Initialization
+    if pred_prob.shape != y_data.shape:
+        raise Warning("Shapes of predicted probs ({}) do not agree with the true data {}."
+                        .format(pred_prob.shape, y_data.shape))
     num_fp = int( np.round( len( y_data ) * fpr ) )
     y_data = pd.Series(y_data)
     fprLst, tprLst = [], []
