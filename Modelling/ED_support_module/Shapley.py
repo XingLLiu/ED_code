@@ -45,7 +45,7 @@ def main():
     # y_pred = threshold_predict(pred_prob, y_test, 0.5)
     # true_positive_rate(y_test, y_pred)
 
-    shapley_vec = tmc_shapley(model_class = sk.linear_model.LogisticRegression(solver = "liblinear"),
+    shapley_vec = shapley(model_class = sk.linear_model.LogisticRegression(solver = "liblinear"),
                         train_dict = train_dict,
                         test_data = test_data,
                         fpr_threshold = 0.5,
@@ -75,7 +75,7 @@ def main():
 
 
 
-def tmc_shapley(model_class, train_dict, test_data, fpr_threshold,
+def shapley(model_class, train_dict, test_data, fpr_threshold,
             convergence_tol, performance_tol, max_iter, benchmark_score):
     '''
     iter_ind = t

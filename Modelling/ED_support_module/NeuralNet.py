@@ -5,17 +5,21 @@ class NeuralNet(nn.Module):
         super(NeuralNet, self).__init__()
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.ac1 = nn.LeakyReLU()
-        self.fc2 = nn.Linear(hidden_size, num_classes)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.ac2 = nn.LeakyReLU()
+        self.classification = nn.Linear(hidden_size, num_classes)
         self.dp_layer1 = nn.Dropout(drop_prob)
         self.dp_layer2 = nn.Dropout(drop_prob)
         self.device = device
-        nn.init.xavier_normal_(self.fc2.weight)
+        nn.init.xavier_normal_(self.fc1.weight)
     def forward(self, x):
         h = self.dp_layer1(x)
         h = self.fc1(h)
         h = self.ac1(h)
+        h = self.fc2(h)
+        h = self.ac2(h)
         h = self.dp_layer2(h)
-        return self.fc2(h)
+        return self.classification(h)
     def train_model(self, train_loader, criterion, optimizer):
         '''
         Train and back-propagate the neural network model. Note that
@@ -97,5 +101,5 @@ class NeuralNet(nn.Module):
         test_loader = torch.utils.data.DataLoader(dataset = np.array(x_data),
                                                 batch_size = len(x_data),
                                                 shuffle = False)
-        return self.eval_model(test_loader, transformation=None)
+        return self.eval_model(test_loader, transformation=None)[:, 1]
         

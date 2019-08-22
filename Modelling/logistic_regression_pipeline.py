@@ -7,7 +7,7 @@ from ED_support_module import LogisticRegression
 # ----------------------------------------------------
 # ========= 0. Preliminary seetings =========
 MODEL_NAME = "LR"
-RANDOM_SEED = 27
+RANDOM_SEED = 50
 MODE = "e"
 FPR_THRESHOLD = 0.1
 
@@ -181,7 +181,7 @@ print("Saving summary plots ...")
 
 summary_plot_path = FIG_PATH + "dynamic/"
 # Subplots of ROCs
-evaluator.roc_subplot(summary_plot_path, time_span, [3, 3])
+evaluator.roc_subplot(summary_plot_path, time_span, [3, 3], eps = True)
 # Aggregate ROC
 aggregate_summary = evaluator.roc_aggregate(summary_plot_path, time_span, eps = True)
 # Save aggregate summary
