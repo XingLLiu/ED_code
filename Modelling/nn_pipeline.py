@@ -16,16 +16,16 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 MODEL_NAME = "NN"
 RANDOM_SEED = 27
 CLASS_WEIGHT = 3000
-MODE = "a"
+MODE = "e"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 5000
-BATCH_SIZE = 256
+NUM_EPOCHS = 3000
+BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
-DROP_PROB = 0.1
-HIDDEN_SIZE = 400
+DROP_PROB = 0.4
+HIDDEN_SIZE = 1000
 
 
 

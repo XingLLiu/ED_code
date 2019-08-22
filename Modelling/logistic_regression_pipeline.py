@@ -55,7 +55,7 @@ def setup_parser():
 
 # ----------------------------------------------------
 # Path to save figures
-FIG_PATH = "../../results/logistic_regression/"
+FIG_PATH = "../../results/logistic_regression_e/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 
 

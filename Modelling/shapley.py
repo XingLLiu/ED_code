@@ -5,7 +5,7 @@ from scipy.special import comb
 
 from ED_support_module import *
 
-np.random.seed(40)
+np.random.seed(10)
 
 gp1 = np.random.normal(0, 1, [25, 3])
 gp2 = np.random.normal(0, 2, [25, 3])
@@ -49,7 +49,7 @@ for which in ["0", "1", "2"]:
     _ = sns.scatterplot(range(shapley_vec.shape[0]), shapley_vec.loc[:, which], label = which)
 
 
-plt.legend()
+_ = plt.legend()
 plt.show()
 
 
@@ -161,13 +161,6 @@ def shapley_exact(model_class, train_dict, test_data, fpr_threshold,
                 shapley += summand
         shapley_vec[current_gp] = shapley
     return shapley_vec
-
-
-    
-
-
-
-
 
 
 
