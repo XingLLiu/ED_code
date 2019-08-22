@@ -495,6 +495,9 @@ def threshold_predict(pred_prob, y_data, fpr=0.05):
             y_data = [Series] true response vector.
     '''
     # Initialization
+    if pred_prob.shape != y_data.shape:
+        raise Warning("Shapes of predicted probs ({}) do not agree with the true data {}."
+                        .format(pred_prob.shape, y_data.shape))
     num_fp = int( np.round( len( y_data ) * fpr ) )
     y_data = pd.Series(y_data)
     fprLst, tprLst = [], []
