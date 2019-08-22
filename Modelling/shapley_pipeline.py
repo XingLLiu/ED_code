@@ -200,7 +200,7 @@ shapley_val = shapley_exact(model_class = sk.linear_model.LogisticRegression(sol
 data_good = pd.concat([train_dict["201807"],
                         train_dict["201809"],
                         train_dict["201810"],
-                        train_dict["201811"]], axis = 0)
+                        train_dict["201808"]], axis = 0)
 yTrain_good = data_good["Primary.Dx"]
 XTrain_good = data_good.drop(["Primary.Dx"], axis = 1)
 
