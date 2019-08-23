@@ -3,7 +3,8 @@ from ED_support_module import *
 class NeuralNet(nn.Module):
     def __init__(self, device, input_size=61, hidden_size=500, num_classes=2, drop_prob=0):
         super(NeuralNet, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size * 2)
+        self.input_size = input_size
+        self.fc1 = nn.Linear(self.input_size, hidden_size * 2)
         self.ac1 = nn.LeakyReLU()
         self.fc2 = nn.Linear(hidden_size * 2, hidden_size)
         self.ac2 = nn.LeakyReLU()
@@ -102,8 +103,7 @@ class NeuralNet(nn.Module):
                                                 batch_size = len(x_data),
                                                 shuffle = False)
         return self.eval_model(test_loader, transformation=None)[:, 1]
-        
-    def fit(self, x_data, y_data, num_epochs, batch_size, optimizer, criterion):
+    def fit_model(self, x_data, y_data, num_epochs, batch_size, optimizer, criterion):
         '''
         Fit the model on x_data and y_data
         Input :
@@ -126,4 +126,17 @@ class NeuralNet(nn.Module):
                                     optimizer = optimizer)
             loss_vec[epoch] = loss.item()
         return self, loss_vec
+    def save_model(self, save_path):
+        '''
+        Save the parameters of the model to save_path
+
+        Input :
+                save_path = [str] path to save the model parameters.
+        Output:
+                None
+        '''
+        # Save model
+        model_to_save = self.module if hasattr(sekf, "module") else self
+        torch.save(model_to_save.state_dict(), save_path)
+
 

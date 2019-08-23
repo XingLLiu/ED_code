@@ -8,7 +8,101 @@ from scipy.special import comb
 
 # ----------------------------------------------------
 # ========= 0.i. Supporting functions and classes =========
-# NN model
+def shapley_exact(model_class, train_dict, test_data, fpr_threshold,
+                convergence_tol, performance_tol, max_iter, benchmark_score,
+                model_name, num_epochs, batch_size, optimizer, criterion, device):
+    groups = list( train_dict.keys() )
+    power_set = list_powerset(groups)
+    power_set.remove([])
+    # Initialize shapley
+    shapley_vec = pd.DataFrame(0, index = range(1), columns = groups)
+    # Separate test data
+    x_test = test_data.iloc[:, :-1]
+    y_test = test_data.iloc[:, -1]
+    for current_gp in groups:
+        print("Computing Shapley for {}".format(current_gp))
+        shapley = 0
+        for subgp in power_set:
+            if current_gp not in subgp:
+                input_size = x_test.shape[1]
+                DROP_PROB = 0.4
+                HIDDEN_SIZE = 500
+                BATCH_SIZE = 128
+                NUM_EPOCHS = 100
+                LEARNING_RATE = 1e-3
+                CLASS_WEIGHT = 3000
+                model_class = NeuralNet(device = device,
+                                        input_size = input_size,
+                                        drop_prob = DROP_PROB,
+                                        hidden_size = HIDDEN_SIZE).to(device)
+                criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
+                optimizer = torch.optim.SGD(model_class.parameters(), lr = LEARNING_RATE)
+                summand = shapley_summand(model_class,
+                                            subgp = subgp,
+                                            current_gp = current_gp,
+                                            train_dict = train_dict,
+                                            x_test = x_test,
+                                            y_test = y_test,
+                                            fpr_threshold = fpr_threshold,
+                                            model_name = model_name,
+                                            num_epochs = num_epochs,
+                                            batch_size = batch_size,
+                                            optimizer = optimizer,
+                                            criterion = criterion,
+                                            device = device)
+                shapley += summand
+        shapley_vec[current_gp] = shapley
+    return shapley_vec
+
+
+
+def shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, fpr_threshold,
+                    model_name, num_epochs, batch_size, optimizer, criterion, device):
+    '''
+    Compute the summand.
+    '''
+    # Retrieve train data upto pi(j) as in the paper
+    train_data = train_dict[subgp[0]]
+    if len(subgp) > 1:
+        for name in subgp[1:]:
+            train_data = pd.concat( [ train_data, train_dict[name] ], axis = 0 )
+    # S union i
+    train_data_large = pd.concat( [ train_data, train_dict[current_gp] ], axis = 0 )
+    # Evaluate metrics
+    scores = [0, 0]
+    for k, data in enumerate([train_data, train_data_large]):
+        # Get design matrix
+        x_train = data.iloc[:, :-1]
+        # Get labels
+        y_train = data.iloc[:, -1]
+        # Fit model and evaluate metric
+        if model_name == "logistic":
+            model = model_class.fit(x_train, y_train)
+            pred_prob = model.predict_proba(x_test)[:, 1]
+        elif model_name == "nn":
+            model, _ = model_class.fit_model(x_data = x_train,
+                                    y_data = y_train,
+                                    num_epochs = num_epochs,
+                                    batch_size = batch_size,
+                                    optimizer = optimizer,
+                                    criterion = criterion)
+            pred_prob = model.predict_proba_single(x_test)
+        # y_pred = pred_prob > 0.5
+        # scores[k] = sk.metrics.accuracy_score(y_test, y_pred)
+        y_pred = threshold_predict(pred_prob, y_test, fpr_threshold)
+        scores[k] = true_positive_rate(y_test, y_pred)
+    
+    return (scores[1] - scores[0]) / comb( len( train_dict ) - 1, len( subgp ) )
+
+
+
+def list_powerset(lst):
+    # the power set of the empty set has one element, the empty set
+    result = [[]]
+    for x in lst:
+        result.extend([subset + [x] for subset in result])
+    return result
+ 
    
 
 # ----------------------------------------------------
@@ -33,30 +127,6 @@ HIDDEN_SIZE = 1000
 
 
 
-
-# Arguments
-def setup_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--random_seed",
-                        default=27,
-                        required=True,
-                        type=int,
-                        help="Random seed.")
-    parser.add_argument("---dynamic",
-                        default=True,
-                        required=True,
-                        type=bool,
-                        help="If using one-month ahead prediction.")
-    parser.add_argument("--path",
-                        required=True,
-                        type=str,
-                        help="Path to save figures.")
-    return parser
-
-
-# Parser arguements
-# parser = setup_parser()
-# args = parser.parse_args()
 
 
 # Path to save figures
@@ -188,10 +258,7 @@ input_size = XTrain.shape[1]
 DROP_PROB = 0.4
 HIDDEN_SIZE = 500
 BATCH_SIZE = 128
-NUM_EPOCHS = 100
-
-criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
-optimizer = torch.optim.SGD(model.parameters(), lr = LEARNING_RATE)
+NUM_EPOCHS = 1000
 
 
 model = NeuralNet(device = device,
@@ -199,7 +266,10 @@ model = NeuralNet(device = device,
                           drop_prob = DROP_PROB,
                           hidden_size = HIDDEN_SIZE).to(device)
 
-shapley_val = shapley_exact(model_class = NeuralNet,
+criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
+optimizer = torch.optim.SGD(model.parameters(), lr = LEARNING_RATE)
+
+shapley_val = shapley_exact(model_class = model,
                      train_dict = train_dict,
                      test_data = pd.concat([XValid, yValid], axis = 1),
                      fpr_threshold = FPR_THRESHOLD,
@@ -211,7 +281,9 @@ shapley_val = shapley_exact(model_class = NeuralNet,
                      batch_size = BATCH_SIZE,
                      num_epochs = NUM_EPOCHS,
                      optimizer = optimizer,
-                     criterion = criterion)
+                     criterion = criterion,
+                     device = device)
+
 
 
 # shapley_vec = tmc_shapley(model_class = sk.linear_model.LogisticRegression(solver = "liblinear",
@@ -226,7 +298,82 @@ shapley_val = shapley_exact(model_class = NeuralNet,
 
 
 
+
+
+
+
+
+
+
+
 # ========= 2.b. Refit without the group with the lowest shapley value =========
+# Get good samples
+data_good = pd.concat([train_dict["201807"],
+                        train_dict["201808"]], axis = 0)
+yTrain_good = data_good["Primary.Dx"]
+XTrain_good = data_good.drop(["Primary.Dx"], axis = 1)
+
+
+# Fit with whole data
+XTrain = XTrain.drop(["Arrived"], axis = 1)
+XTest = XTest.drop(["Arrived"], axis = 1)
+
+# Pred with full data
+model_full = NeuralNet(device = device,
+                          input_size = XTrain.shape[1],
+                          drop_prob = DROP_PROB,
+                          hidden_size = HIDDEN_SIZE).to(device)
+
+criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
+optimizer = torch.optim.Adam(model_full.parameters(), lr = LEARNING_RATE)
+
+model_full, loss = model_full.fit_model(XTrain, yTrain, NUM_EPOCHS, BATCH_SIZE, optimizer, criterion)
+pred_prob_full = model_full.predict_proba_single(XTest)
+y_pred_full = threshold_predict(pred_prob_full, yTest, fpr = FPR_THRESHOLD)
+tpr_full = true_positive_rate(yTest, y_pred_full)
+
+
+
+# Fit with subset
+model_sub = NeuralNet(device = device,
+                          input_size = XTrain_good.shape[1],
+                          drop_prob = DROP_PROB,
+                          hidden_size = HIDDEN_SIZE).to(device)
+
+criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
+
+model_sub, loss = model_sub.fit_model(XTrain_good, yTrain_good, NUM_EPOCHS, BATCH_SIZE, optimizer, criterion)
+pred_prob_sub = model_sub.predict_proba_single(XTest)
+y_pred_sub = threshold_predict(pred_prob_sub, yTest, fpr = FPR_THRESHOLD)
+tpr_sub = true_positive_rate(yTest, y_pred_sub)
+
+# Summary
+print("TPR on valid. full: {}. sub: {}".format(tpr_full, tpr_sub))
+
+
+
+evaluator = Evaluation.Evaluation(yTest, pred_prob_full)
+# Save ROC plot
+_ = evaluator.roc_plot(plot = True, title = MODEL_NAME)
+
+evaluator = Evaluation.Evaluation(yTest, pred_prob_sub)
+# Save ROC plot
+_ = evaluator.roc_plot(plot = True, title = MODEL_NAME)
+
+
+
+
+
+
+
+
+
+
+
+
+# ========= 2.b. Refit without the group with the lowest shapley value =========
+# Logistic regression
 # Get good samples
 data_good = pd.concat([train_dict["201807"],
                         train_dict["201809"],
@@ -286,84 +433,5 @@ _ = evaluator.roc_plot(plot = True, title = MODEL_NAME)
 
 
 
-# # ----------------------------------------------------
-# # ========= 2.b. Built-in Shapley =========
-# import os
-# import sys
-# import time
-# import numpy as np
-# import matplotlib.pyplot as plt
-# import sklearn
-# from ED_support_module.Shapley import ShapNN
-# from ED_support_module.DShap import DShap
-# from ED_support_module.shap_utils import *
-
-# problem, model = 'classification', 'logistic'
-# hidden_units = [] # Empty list in the case of logistic regression.
-# train_size = 100
 
 
-# d, difficulty = 50, 1
-# num_classes = 2
-# tol = 0.03
-# target_accuracy = 0.7
-# important_dims = 5
-# clf = return_model(model, solver='liblinear', hidden_units=tuple(hidden_units))
-# _param = 1.0
-# for _ in range(100):
-#     X_raw = np.random.multivariate_normal(mean=np.zeros(d), cov = np.eye(d), 
-#                                           size=train_size + 5000)
-#     _, y_raw, _, _ = label_generator(
-#         problem, X_raw, param = _param,  difficulty = difficulty, important=important_dims)
-#     clf.fit(X_raw[:train_size], y_raw[:train_size])
-#     test_acc = clf.score(X_raw[train_size:], y_raw[train_size:])
-#     if test_acc>target_accuracy:
-#         break
-#     _param *= 1.1
-
-
-# print('Performance using the whole training set = {0:.2f}'.format(test_acc))
-
-
-# # Runing
-# X, y = X_raw[:train_size], y_raw[:train_size]
-# X_test, y_test = X_raw[train_size:], y_raw[train_size:]
-# model = 'logistic'
-# problem = 'classification'
-# num_test = 1000
-# directory = './temp'
-# sources = None
-# dshap = DShap(X, y, X_test, y_test, num_test, sources=sources, model_family=model, metric='accuracy',
-#               directory=directory, seed=0)
-# dshap.run(100, 0.1)
-
-# X, y = X_raw[:100], y_raw[:100]
-# X_test, y_test = X_raw[100:], y_raw[100:]
-# model = 'logistic'
-# problem = 'classification'
-# num_test = 1000
-# directory = './temp'
-# dshap = DShap(X, y, X_test, y_test, num_test, model_family=model, metric='accuracy',
-#               directory=directory, seed=1)
-# dshap.run(100, 0.1)
-
-# X, y = X_raw[:100], y_raw[:100]
-# X_test, y_test = X_raw[100:], y_raw[100:]
-# model = 'logistic'
-# problem = 'classification'
-# num_test = 1000
-# directory = './temp'
-# dshap = DShap(X, y, X_test, y_test, num_test, model_family=model, metric='accuracy',
-#               directory=directory, seed=2)
-# dshap.run(100, 0.1)
-
-
-# # Merge results
-# dshap.merge_results()
-
-# convergence_plots(dshap.marginals_tmc)
-
-# convergence_plots(dshap.marginals_g)
-
-# dshap.performance_plots([dshap.vals_tmc, dshap.vals_g, dshap.vals_loo], num_plot_markers=20,
-#                        sources=dshap.sources)

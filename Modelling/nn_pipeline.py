@@ -15,12 +15,13 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 MODEL_NAME = "NN"
 RANDOM_SEED = 27
-CLASS_WEIGHT = 3000
-MODE = "a"
+CLASS_WEIGHT = 300000
+NORMAL_CLASS_WEIGHT = 100
+MODE = "e"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 750
+NUM_EPOCHS = 1000
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
@@ -123,7 +124,7 @@ for j, time in enumerate(time_span[2:-1]):
         # Loss and optimizer
         # nn.CrossEntropyLoss() computes softmax internally
         criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
-        optimizer = torch.optim.SGD(model.parameters(), lr = LEARNING_RATE)
+        optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
 
         # Initialize loss vector
         loss_vec = np.zeros(NUM_EPOCHS)
@@ -143,6 +144,17 @@ for j, time in enumerate(time_span[2:-1]):
         test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest, yTest),
                                                     batch_size = len(yTest),
                                                     shuffle = False)
+        # Load model
+        time_old = time_span[j + 2]
+        input_size = XTrainOld.shape[1]
+        model = NeuralNet(device = device,
+                          input_size = input_size,
+                          drop_prob = DROP_PROB,
+                          hidden_size = HIDDEN_SIZE).to(device)
+        model = torch.load(FIG_ROOT_PATH + f"{time_old}/" + f"model_{time_old}.ckpt")
+        model.load_state_dict(torch.load(FIG_ROOT_PATH + f"{time_old}/" + f"model_{time_old}.pkl"))
+
+
 
     # Train the model
     for epoch in trange(NUM_EPOCHS):
@@ -162,7 +174,7 @@ for j, time in enumerate(time_span[2:-1]):
 
     # Save model
     model_to_save = model.module if hasattr(model, "module") else model
-    torch.save(model_to_save.state_dict(), DYNAMIC_PATH + f"model_{time_pred}.pkl")
+    torch.save(model_to_save, DYNAMIC_PATH + f"model_{time_pred}.ckpt")
 
 
     # ========= 2.a.ii. Feature importance by permutation test =========
