@@ -93,8 +93,10 @@ for j, time in enumerate(time_span[2:-1]):
 
     # Create folder if not already exist
     DYNAMIC_PATH = FIG_ROOT_PATH + f"{time_pred}/"
-    if not os.path.exists(DYNAMIC_PATH):
-        os.makedirs(DYNAMIC_PATH)
+    MONTH_DATA_PATH = DYNAMIC_PATH + "data/"
+    for path in [DYNAMIC_PATH, MONTH_DATA_PATH]:
+        if not os.path.exists(path):
+            os.makedirs(path)
 
 
     # Prepare train/test sets
@@ -137,8 +139,11 @@ for j, time in enumerate(time_span[2:-1]):
         #                                             shuffle = False)
     # Otherwise only update the model on data from the previous month
     else:
-        XTrain = XTrainOld
-        yTrain = yTrainOld
+        # XTrain = XTrainOld
+        # yTrain = yTrainOld
+        # Read data. Train sets for this month is the test sets for last month
+        XTrain = pd.read_csv(MONTH_DATA_PATH + f"x_test_{time}.csv")
+        yTrain = pd.read_csv(MONTH_DATA_PATH + f"y_test_{time}.csv")
         # train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrainOld, yTrainOld], axis = 1)),
         #                                             batch_size = BATCH_SIZE,
         #                                             shuffle = True)
@@ -146,13 +151,12 @@ for j, time in enumerate(time_span[2:-1]):
         #                                             batch_size = len(yTest),
         #                                             shuffle = False)
         # Load model
-        time_old = time_span[j + 2]
-        input_size = XTrainOld.shape[1]
-        model = NeuralNet(device = device,
-                          input_size = input_size,
-                          drop_prob = DROP_PROB,
-                          hidden_size = HIDDEN_SIZE).to(device)
-        model = torch.load(FIG_ROOT_PATH + f"{time_old}/" + f"model_{time_old}.ckpt")
+        input_size = XTrain.shape[1]
+        # model = NeuralNet(device = device,
+        #                   input_size = input_size,
+        #                   drop_prob = DROP_PROB,
+        #                   hidden_size = HIDDEN_SIZE).to(device)
+        model = torch.load(FIG_ROOT_PATH + f"{time}/" + f"model_{time}.ckpt")
 
 
 
@@ -163,8 +167,8 @@ for j, time in enumerate(time_span[2:-1]):
     #                             optimizer = optimizer)
     #     loss_vec[epoch] = loss.item()
 
-    model, loss_vec = model.fit(x_data = XTrainOld,
-                                y_data = yTrainOld,
+    model, loss_vec = model.fit(x_data = XTrain,
+                                y_data = yTrain,
                                 num_epochs = NUM_EPOCHS,
                                 batch_size = BATCH_SIZE,
                                 optimizer = optimizer,
@@ -178,9 +182,15 @@ for j, time in enumerate(time_span[2:-1]):
                                         transformation = transformation)
     
 
-    # Save data of this month as train set for the next iteration
-    XTrainOld = XTest
-    yTrainOld = yTest
+    # # Save data of this month as train set for the next iteration
+    # XTrainOld = XTest
+    # yTrainOld = yTest
+
+    # Save data
+    XTrain.to_csv(MONTH_DATA_PATH + f"x_train_{time}.csv", index = False)
+    yTrain.to_csv(MONTH_DATA_PATH + f"y_train_{time}.csv", index = False)
+    XTest.to_csv(MONTH_DATA_PATH + f"x_test_{time_pred}.csv", index = False)
+    yTest.to_csv(MONTH_DATA_PATH + f"y_test_{time_pred}.csv", index = False)
 
     # Save model
     # model_to_save = model.module if hasattr(model, "module") else model
