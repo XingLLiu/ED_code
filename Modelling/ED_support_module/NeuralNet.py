@@ -66,7 +66,7 @@ class NeuralNet(nn.Module):
                 transformation = [Function] function for evaluatin
                                  transforming the output. If not given,
                                  raw output is return.
-        Output: 
+        Output:
                 outputs = output from the model (after transformation).
         '''
         self.eval()
@@ -88,24 +88,29 @@ class NeuralNet(nn.Module):
                                             np.array(outputs),
                                             axis = 0)
         return outputs_vec
-    def predict_proba_single(self, x_data):
+    def predict_proba_single(self, x_data, batch_size, transformation):
         '''
         Transform x_data into dataloader and return predicted scores
         for being of class 1.
         Input :
                 x_data = [DataFrame or array] train set. Must not contain
                          the response.
+                batch_size = [int] batch size used to construct data loader.
+                transformation = [Function] function for evaluatin
+                                 transforming the output. If not given,
+                                 raw output is returned.
         Output:
                 pred_prob = [array] predicted probability for being
                             of class 1.
         '''
         test_loader = torch.utils.data.DataLoader(dataset = np.array(x_data),
-                                                batch_size = len(x_data),
+                                                batch_size = batch_size,
                                                 shuffle = False)
-        return self.eval_model(test_loader, transformation=None)[:, 1]
-    def fit_model(self, x_data, y_data, num_epochs, batch_size, optimizer, criterion):
+        return self.eval_model(test_loader, transformation)[:, 1]
+    def fit(self, x_data, y_data, num_epochs, batch_size, optimizer, criterion):
         '''
-        Fit the model on x_data and y_data
+        Fit the model on x_data and y_data.
+        ##
         Input :
                 x_data = [DataFrame] x data
                 y_data = [Series] labels
@@ -128,7 +133,7 @@ class NeuralNet(nn.Module):
         return self, loss_vec
     def save_model(self, save_path):
         '''
-        Save the parameters of the model to save_path
+        Save the model to save_path
 
         Input :
                 save_path = [str] path to save the model parameters.
@@ -136,7 +141,7 @@ class NeuralNet(nn.Module):
                 None
         '''
         # Save model
-        model_to_save = self.module if hasattr(sekf, "module") else self
-        torch.save(model_to_save.state_dict(), save_path)
+        model_to_save = self.module if hasattr(self, "module") else self
+        torch.save(model_to_save, save_path)
 
 

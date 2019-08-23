@@ -80,7 +80,7 @@ def shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, 
             model = model_class.fit(x_train, y_train)
             pred_prob = model.predict_proba(x_test)[:, 1]
         elif model_name == "nn":
-            model, _ = model_class.fit_model(x_data = x_train,
+            model, _ = model_class.fit(x_data = x_train,
                                     y_data = y_train,
                                     num_epochs = num_epochs,
                                     batch_size = batch_size,
@@ -327,7 +327,7 @@ model_full = NeuralNet(device = device,
 criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
 optimizer = torch.optim.Adam(model_full.parameters(), lr = LEARNING_RATE)
 
-model_full, loss = model_full.fit_model(XTrain, yTrain, NUM_EPOCHS, BATCH_SIZE, optimizer, criterion)
+model_full, loss = model_full.fit(XTrain, yTrain, NUM_EPOCHS, BATCH_SIZE, optimizer, criterion)
 pred_prob_full = model_full.predict_proba_single(XTest)
 y_pred_full = threshold_predict(pred_prob_full, yTest, fpr = FPR_THRESHOLD)
 tpr_full = true_positive_rate(yTest, y_pred_full)
@@ -343,7 +343,7 @@ model_sub = NeuralNet(device = device,
 criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
 
-model_sub, loss = model_sub.fit_model(XTrain_good, yTrain_good, NUM_EPOCHS, BATCH_SIZE, optimizer, criterion)
+model_sub, loss = model_sub.fit(XTrain_good, yTrain_good, NUM_EPOCHS, BATCH_SIZE, optimizer, criterion)
 pred_prob_sub = model_sub.predict_proba_single(XTest)
 y_pred_sub = threshold_predict(pred_prob_sub, yTest, fpr = FPR_THRESHOLD)
 tpr_sub = true_positive_rate(yTest, y_pred_sub)
