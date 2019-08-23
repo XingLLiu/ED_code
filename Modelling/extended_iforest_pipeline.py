@@ -45,7 +45,7 @@ def setup_parser():
 # Path to save figures
 FIG_PATH = "../../results/extended_iforest/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
-FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}/"
+FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}_{N_ESTIMATORS}estimators/"
 
 
 # Create folder if not already exist

@@ -213,7 +213,7 @@ def shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, 
             model = model_class.fit(x_train, y_train)
             pred_prob = model.predict_proba(x_test)[:, 1]
         elif model_name == "nn":
-            model = model_class.fit_model(self = model_class, x_data = x_train,
+            model = model_class.fit(self = model_class, x_data = x_train,
                                     y_data = y_train,
                                     num_epochs = num_epochs,
                                     batch_size = batch_size,
