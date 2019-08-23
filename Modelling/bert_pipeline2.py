@@ -47,12 +47,6 @@ BERT_MODEL = 'clinical_bert'
 # The name of the task to train.I'm going to name this 'yelp'.
 TASK_NAME = 'epic_task'
 
-# The output directory where the fine-tuned model and checkpoints will be written.
-OUTPUT_DIR = SAVE_DIR + f'Saved_Checkpoints/{TASK_NAME}/'
-
-# The directory where the evaluation reports will be written to.
-REPORTS_DIR = SAVE_DIR + f'Reports/{TASK_NAME}_evaluation_report/'
-
 # This is where BERT will look for pre-trained models to load parameters from.
 CACHE_DIR = '../../ClinicalBert/pretrained_bert_tf/biobert_pretrain_output_all_notes_150000/'
 
@@ -67,7 +61,7 @@ WEIGHT2 = 16
 TRAIN_BATCH_SIZE = 6
 EVAL_BATCH_SIZE = 8
 LEARNING_RATE = 1e-3
-NUM_TRAIN_EPOCHS = 1
+NUM_TRAIN_EPOCHS = 6
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
 WARMUP_PROPORTION = 0.1
@@ -405,13 +399,10 @@ trainData = processor.get_train_examples(OUTPUT_DIR)
 labelList = processor.get_labels()
 
 num_train_optimization_steps = int(
-    len(trainData) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
+    len(trainData) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS * 10
 
 # Load pretrained model tokenizer (vocabulary)
 tokenizer = BertTokenizer.from_pretrained(CACHE_DIR, do_lower_case=False)
-
-# labelMap = {label: i for i, label in enumerate(labelList)}
-# trainForProcessing = [(example, labelMap, MAX_SEQ_LENGTH, tokenizer, OUTPUT_MODE) for example in trainData]
 
 # Convert tokens to features. Load model if exists
 if "train_features.pkl" not in os.listdir(OUTPUT_DIR):
@@ -428,7 +419,6 @@ else:
 
 
 # ----------------------------------------------------
-
 # Fine-tuning
 
 # Set optimizer and data loader
@@ -437,20 +427,6 @@ model = BertModel.from_pretrained(CACHE_DIR, cache_dir=CACHE_DIR).to(device)
 # Update weights of all embedding layers
 for p in model.parameters():
     p.requires_grad = True
-
-
-# Optimizers
-# param_optimizer = list(model.named_parameters())
-# no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-# optimizer_grouped_parameters = [
-#     {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-#     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-# ]
-
-# optimizer = BertAdam(optimizer_grouped_parameters,
-#                     lr=LEARNING_RATE,
-#                     warmup=WARMUP_PROPORTION,
-#                     t_total=num_train_optimization_steps)
 
 
 
@@ -552,6 +528,17 @@ _ = plt.title("Clinical BERT Train Loss")
 plt.savefig(REPORTS_DIR + "train_loss.eps", format="eps", dpi=1000)
 
 
+# Tar model files
+# import tarfile
+# BERT_MODEL = OUTPUT_DIR + f"{TASK_NAME}.tar.gz"
+# tf = tarfile.open(BERT_MODEL, mode = "w:gz")
+# tf.add(output_config_file)
+# tf.add(output_model_file)
+# tf.close()
+
+import subprocess
+P = subprocess.check_call(["./tar_bert_models.sh", OUTPUT_DIR, TASK_NAME, CONFIG_NAME, WEIGHTS_NAME])
+
 
 # ----------------------------------------------------
 # ----------------------------------------------------
@@ -564,7 +551,7 @@ processor = BinaryClassificationProcessor()
 
 # Testing
 # Set test set loaders
-eval_examples = processor.get_dev_examples(PROCESSED_SAVE_DIR)
+eval_examples = processor.get_dev_examples(OUTPUT_DIR)
 eval_features = convert_examples_to_features(eval_examples,
                     labelList, MAX_SEQ_LENGTH, tokenizer)
 # logger.info("***** Running evaluation *****")
@@ -584,10 +571,10 @@ eval_dataloader = torch.utils.data.DataLoader(eval_data, sampler=eval_sampler, b
 
 # Load fine-tuned model (weights)
 model = BertModel.from_pretrained(OUTPUT_DIR + f"{TASK_NAME}.tar.gz",cache_dir=OUTPUT_DIR)
-model.load_state_dict( torch.load(OUTPUT_DIR + WEIGHTS_NAME) )
+# model.load_state_dict( torch.load(OUTPUT_DIR + WEIGHTS_NAME) )
 _ = model.to(device)
 _ = model.eval()
-print("fine-tuned:", model.state_dict())
+
 
 prediction_head = NoteClassificationHead(hidden_size=model.config.hidden_size)
 prediction_head.load_state_dict( torch.load(OUTPUT_DIR + PREDICTION_HEAD_NAME) )
@@ -610,7 +597,6 @@ for i, batch in enumerate(tqdm(eval_dataloader, desc="Evaluating")):
         _, pooled_output = model(input_ids, segment_ids, input_mask)
         pooled_output = pooled_output.to(device)
         logits = prediction_head(pooled_output)
-        print(logits)
         # Evaluation metric
         logits = logits.detach().cpu().numpy()
         logits = torch.from_numpy(logits[:, 1])
@@ -620,8 +606,6 @@ for i, batch in enumerate(tqdm(eval_dataloader, desc="Evaluating")):
     begin_ind = EVAL_BATCH_SIZE * i
     end_ind = np.min( [ EVAL_BATCH_SIZE * (i + 1), len(eval_data) ] )
     prob[begin_ind:end_ind] = pred_prob
-    if i == 10:
-        break
 
 
 # Save predicted probabilities

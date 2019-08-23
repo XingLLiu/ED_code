@@ -9,6 +9,7 @@ sys.path.append("../ClinicalNotePreProcessing")
 from extract_dates_script import findDates
 import csv
 import logging
+import subprocess
 from tqdm import tqdm, trange
 from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM, BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
@@ -102,12 +103,6 @@ BERT_MODEL = 'clinical_bert'
 
 # The name of the task to train.I'm going to name this 'yelp'.
 TASK_NAME = 'epic_task'
-
-# # The output directory where the fine-tuned model and checkpoints will be written.
-# OUTPUT_DIR = SAVE_DIR + f'Saved_Checkpoints/{TASK_NAME}/'
-
-# # The directory where the evaluation reports will be written to.
-# REPORTS_DIR = SAVE_DIR + f'Reports/{TASK_NAME}_evaluation_report/'
 
 # This is where BERT will look for pre-trained models to load parameters from.
 CACHE_DIR = '../../ClinicalBert/pretrained_bert_tf/biobert_pretrain_output_all_notes_150000/'
@@ -250,7 +245,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
         label_list = processor.get_labels()
         # Optimization step
         num_train_optimization_steps = int(
-            len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
+            len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS * 10
         # Load pretrained model tokenizer (vocabulary)
         tokenizer = BertTokenizer.from_pretrained(CACHE_DIR, do_lower_case=False)
         # Load model
@@ -292,11 +287,11 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
         label_list = processor.get_labels()
         # Optimization step
         num_train_optimization_steps = int(
-            len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
+            len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS * 10
         # Load pretrained tokenizer and model
         tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR_OLD + 'vocab.txt', do_lower_case=False)
-        model = pickle.load(open(OUTPUT_DIR_OLD + "bert_model.pkl", "rb"))
-        # Load entrie model
+        model = BertModel.from_pretrained(OUTPUT_DIR + f"{TASK_NAME}.tar.gz",cache_dir=OUTPUT_DIR)
+        # Load entire model
         prediction_model = pickle.load(open(OUTPUT_DIR_OLD + "entire_model.pkl", "rb"))
         # Load optimizer
         optimizer = pickle.load(open(OUTPUT_DIR_OLD + "optimizer.pkl", "rb"))
@@ -342,6 +337,8 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
     pickle.dump(criterion, open(OUTPUT_DIR + "loss.pkl", "wb"))
     # Save tokenizer
     tokenizer.save_vocabulary(OUTPUT_DIR)
+    # Tar files
+    P = subprocess.check_call(["./tar_bert_models.sh", OUTPUT_DIR, TASK_NAME, CONFIG_NAME, WEIGHTS_NAME])
     print("Models saved at {} \n".format(OUTPUT_DIR))
 
 
@@ -359,7 +356,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
                                         batch_size = EVAL_BATCH_SIZE,
                                         transformation = transformation)
 
-eval_model(prediction_model, test_loader, EVAL_BATCH_SIZE, transformation)
+
     # Save predicted probabilities
     pred = pd.DataFrame(pred, columns = ["pred_prob"])
     pred.to_csv(REPORTS_DIR + f"predicted_result_{time_pred}.csv", index = False)

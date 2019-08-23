@@ -1,7 +1,7 @@
 # Run clinical BERT
 # ----------- MASTER SHELL FOR ED BERT TRAINING/TESING ----------- #
 
-OUTPUT_DIR=${HOME}/Documents/ED/data/EPIC_DATA/EPIC_for_Bert/Saved_Checkpoints/epic_task
+OUTPUT_DIR=${HOME}/Documents/ED/data/EPIC_DATA/EPIC_with_Bert/Saved_Checkpoints/epic_task
 CODE_DIR=$(pwd)
 
 echo "$(tput setaf 1)Contents of output directory:$(tput sgr 0)"
