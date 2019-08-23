@@ -96,7 +96,7 @@ EPIC_arrival = pd.concat([EPIC_arrival, date.dt.day], axis = 1)
 
 # ----------------------------------------------------
 # ========= 2. Train and test sets for data Shapley =========
-j = 3
+j = 2
 time = time_span[j]
 FPR_THRESHOLD = 0.1
 
@@ -171,17 +171,47 @@ for time in XTrain["Arrived"].unique().tolist():
 XValid = XValid.drop(["Arrived"], axis =1)
 
 
-shapley_val = shapley_exact(model_class = sk.linear_model.LogisticRegression(solver = "liblinear", penalty = "l1",
-                                                                class_weight = {0:1, 1:3000}),
+# shapley_val = shapley_exact(model_class = sk.linear_model.LogisticRegression(solver = "liblinear", penalty = "l1",
+#                                                                 class_weight = {0:1, 1:3000}),
+#                      train_dict = train_dict,
+#                      test_data = pd.concat([XValid, yValid], axis = 1),
+#                      fpr_threshold = FPR_THRESHOLD,
+#                      convergence_tol = 0.01,
+#                      performance_tol = 0.01,
+#                      max_iter = 50,
+#                      benchmark_score = None)
+
+
+
+# NN model
+input_size = XTrain.shape[1]
+DROP_PROB = 0.4
+HIDDEN_SIZE = 500
+BATCH_SIZE = 128
+NUM_EPOCHS = 100
+
+criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
+optimizer = torch.optim.SGD(model.parameters(), lr = LEARNING_RATE)
+
+
+model = NeuralNet(device = device,
+                          input_size = input_size,
+                          drop_prob = DROP_PROB,
+                          hidden_size = HIDDEN_SIZE).to(device)
+
+shapley_val = shapley_exact(model_class = NeuralNet,
                      train_dict = train_dict,
                      test_data = pd.concat([XValid, yValid], axis = 1),
                      fpr_threshold = FPR_THRESHOLD,
                      convergence_tol = 0.01,
                      performance_tol = 0.01,
                      max_iter = 50,
-                     benchmark_score = None)
-
-
+                     benchmark_score = None,
+                     model_name = "nn",
+                     batch_size = BATCH_SIZE,
+                     num_epochs = NUM_EPOCHS,
+                     optimizer = optimizer,
+                     criterion = criterion)
 
 
 # shapley_vec = tmc_shapley(model_class = sk.linear_model.LogisticRegression(solver = "liblinear",

@@ -151,7 +151,8 @@ def shapley(model_class, train_dict, test_data, fpr_threshold,
 
 
 def shapley_exact(model_class, train_dict, test_data, fpr_threshold,
-                convergence_tol, performance_tol, max_iter, benchmark_score):
+                convergence_tol, performance_tol, max_iter, benchmark_score,
+                model_name, num_epochs, batch_size, optimizer, criterion):
     groups = list( train_dict.keys() )
     power_set = list_powerset(groups)
     power_set.remove([])
@@ -165,14 +166,17 @@ def shapley_exact(model_class, train_dict, test_data, fpr_threshold,
         shapley = 0
         for subgp in power_set:
             if current_gp not in subgp:
-                summand = shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, fpr_threshold)
+                summand = shapley_summand(model_class, subgp, current_gp, train_dict,
+                                            x_test, y_test, fpr_threshold,
+                                            model_name, num_epochs, batch_size, optimizer, criterion)
                 shapley += summand
         shapley_vec[current_gp] = shapley
     return shapley_vec
 
 
 
-def shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, fpr_threshold):
+def shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, fpr_threshold,
+                    model_name, num_epochs, batch_size, optimizer, criterion):
     '''
     Compute the summand.
     '''
@@ -195,7 +199,7 @@ def shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, 
             model = model_class.fit(x_train, y_train)
             pred_prob = model.predict_proba(x_test)[:, 1]
         elif model_name == "nn":
-            model = model_class.fit(x_train, y_train)
+            model = model_class.fit(x_train, y_train, num_epochs, batch_size, optimizer, criterion)
             pred_prob = model.predict_proba(x_test)[:, 1]
         # y_pred = pred_prob > 0.5
         # scores[k] = sk.metrics.accuracy_score(y_test, y_pred)

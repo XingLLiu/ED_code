@@ -103,3 +103,27 @@ class NeuralNet(nn.Module):
                                                 shuffle = False)
         return self.eval_model(test_loader, transformation=None)[:, 1]
         
+    def fit(self, x_data, y_data, num_epochs, batch_size, optimizer, criterion):
+        '''
+        Fit the model on x_data and y_data
+        Input :
+                x_data = [DataFrame] x data
+                y_data = [Series] labels
+                num_epochs = [int] number of epochs
+                batch_size = [int] batch size
+                optimizer = [pytorch function] optimizer for training
+                criterion = [pytorch function] loss function
+        Output: trained model, train loss
+        '''
+        train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([x_data, y_data], axis = 1)),
+                                                    batch_size = batch_size,
+                                                    shuffle = True)
+        # Train the model
+        loss_vec = np.zeros(num_epochs)
+        for epoch in trange(num_epochs):
+            loss = self.train_model(train_loader,
+                                    criterion = criterion,
+                                    optimizer = optimizer)
+            loss_vec[epoch] = loss.item()
+        return self, loss_vec
+
