@@ -129,7 +129,7 @@ HIDDEN_SIZE = 1000
 
 
 
-# Path to save figures
+# Path set-up
 FIG_PATH = "../../results/neural_net/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 RAW_DATA_PATH = "../../data/EPIC_DATA/EPIC.csv"
@@ -192,7 +192,7 @@ XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival,
                                         keep_time = True)
 print("Training for data up to {} ...".format(time))
 print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
-            .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+            .format( yTrain.shape, yTest.shape, yTrain.sum(), yTest.sum() ) )
 
 
 # Select train/valid sets for data shapley

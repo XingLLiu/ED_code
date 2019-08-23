@@ -3,7 +3,7 @@
 
 CODE_DIR=$(pwd)
 
-echo "$(tput setaf 1)Contents of output directory:$(tput sgr 0)"
+echo "$(tput setaf 1)Running BERT pipeline...$(tput sgr 0)"
 
 # Fine-tune and save model
 for j in 2 3 4 5 6 7 8 9 10
@@ -15,12 +15,6 @@ for j in 2 3 4 5 6 7 8 9 10
         --start_time=$j
         echo "$(tput setaf 1) $j completed.\n$(tput sgr 0)"
 
-        # Zip file for the next iteration
-
     done
 
-
-
-cd ../../results/bert/dynamic/201808/Saved_Checkpoints/epic_task/
-tar -czvf epic_task.tar.gz bert_config.json pytorch_model.bin
 

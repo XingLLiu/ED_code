@@ -42,7 +42,7 @@ def setup_parser():
 # args = parser.parse_args()
 
 
-# Path to save figures
+# Path set-up
 FIG_PATH = "../../results/extended_iforest/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}_{N_ESTIMATORS}estimators/"
@@ -92,7 +92,7 @@ for j, time in enumerate(time_span[2:-1]):
 
     print("Training for data up to {} ...".format(time))
     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
-                .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+                .format( yTrain.shape, yTest.shape, yTrain.sum(), yTest.sum() ) )
 
     # ========= 2.a.i. Model =========
     # Fit model
