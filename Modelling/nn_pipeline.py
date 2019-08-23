@@ -3,13 +3,9 @@ from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
 from ED_support_module.NeuralNet import NeuralNet
 
-# ----------------------------------------------------
-# ========= 0.i. Supporting functions and classes =========
-# NN model
-   
 
 # ----------------------------------------------------
-# ========= 0.ii. Preliminary seetings =========
+# ========= 0. Preliminary seetings =========
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -21,13 +17,11 @@ MODE = "e"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 1000
+NUM_EPOCHS = 50
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 DROP_PROB = 0.4
 HIDDEN_SIZE = 500
-
-
 
 
 
@@ -175,10 +169,11 @@ for j, time in enumerate(time_span[2:-1]):
                                 criterion = criterion)
 
     # Prediction
-    transformation = nn.Sigmoid()
+    transformation = nn.Sigmoid().to(device)
     # pred = model.eval_model(test_loader = test_loader,
     #                         transformation = transformation)[:, 1]
-    pred = model.predict_proba_singel(x_data = XTest, batch_size = BATCH_SIZE,
+    pred = model.predict_proba_single(x_data = XTest,
+                                        batch_size = BATCH_SIZE,
                                         transformation = transformation)
     
 

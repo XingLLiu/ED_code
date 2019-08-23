@@ -85,7 +85,7 @@ class NeuralNet(nn.Module):
                     outputs_vec = np.array(outputs.cpu())
                 else:
                     outputs_vec = np.append(outputs_vec,
-                                            np.array(outputs),
+                                            np.array(outputs.cpu()),
                                             axis = 0)
         return outputs_vec
     def predict_proba_single(self, x_data, batch_size, transformation):
