@@ -191,8 +191,12 @@ def shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, 
         # Get labels
         y_train = data.iloc[:, -1]
         # Fit model and evaluate metric
-        model = model_class.fit(x_train, y_train)
-        pred_prob = model.predict_proba(x_test)[:, 1]
+        if model_name == "logistic":
+            model = model_class.fit(x_train, y_train)
+            pred_prob = model.predict_proba(x_test)[:, 1]
+        elif model_name == "nn":
+            model = model_class.fit(x_train, y_train)
+            pred_prob = model.predict_proba(x_test)[:, 1]
         # y_pred = pred_prob > 0.5
         # scores[k] = sk.metrics.accuracy_score(y_test, y_pred)
         y_pred = threshold_predict(pred_prob, y_test, fpr_threshold)
