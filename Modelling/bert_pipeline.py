@@ -91,9 +91,9 @@ logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(messa
                     level = logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Parser arguements
-parser = setup_parser()
-args = parser.parse_args()
+# # Parser arguements
+# parser = setup_parser()
+# args = parser.parse_args()
 
 # Bert pre-trained model selected in the list: bert-base-uncased, 
 # bert-large-uncased, bert-base-cased, bert-large-cased, bert-base-multilingual-uncased,
@@ -212,6 +212,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
     # ========= 2.a. Setup =========
     # Month to be predicted
     j = args.start_time
+    time = time_span[j]
     time_pred = time_span[j + 1]
 
 
@@ -358,7 +359,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
                                         batch_size = EVAL_BATCH_SIZE,
                                         transformation = transformation)
 
-
+eval_model(prediction_model, test_loader, EVAL_BATCH_SIZE, transformation)
     # Save predicted probabilities
     pred = pd.DataFrame(pred, columns = ["pred_prob"])
     pred.to_csv(REPORTS_DIR + f"predicted_result_{time_pred}.csv", index = False)

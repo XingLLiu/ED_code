@@ -20,9 +20,9 @@ MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 750
+NUM_EPOCHS = 1000
 BATCH_SIZE = 128
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 5e-3
 # SAMPLE_WEIGHT = 15
 DROP_PROB = 0.4
 HIDDEN_SIZE = 500
@@ -123,7 +123,7 @@ for j, time in enumerate(time_span[2:-1]):
         # Loss and optimizer
         # nn.CrossEntropyLoss() computes softmax internally
         criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
-        optimizer = torch.optim.SGD(model.parameters(), lr = LEARNING_RATE)
+        optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
 
         # Initialize loss vector
         loss_vec = np.zeros(NUM_EPOCHS)

@@ -197,6 +197,15 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
             tokens += tokens_b + ["[SEP]"]
             segment_ids += [1] * (len(tokens_b) + 1)
         input_ids = tokenizer.convert_tokens_to_ids(tokens)
+        # # Segment id
+        # counter=0
+        # segment_ids=[]
+        # for i, id in enumerate(input_ids):
+        #     if id == 102:
+        #         #'[SEP]'==102
+        #         print('["SEP"]')
+        #         counter+=1
+        #     segment_ids.append(counter)
         # The mask has 1 for real tokens and 0 for padding tokens. Only real
         # tokens are attended to.
         input_mask = [1] * len(input_ids)
@@ -297,25 +306,26 @@ class BertForSepsis(nn.Module):
         self.bert.eval()
         with torch.no_grad():
             for i, batch in enumerate(tqdm(test_loader, desc="Evaluating")):
+                if i == 10:
+                    break
                 # Get batch
                 batch = tuple( t.to( self.device ) for t in batch )
                 input_ids, input_mask, segment_ids, label_ids = batch
                 # Evaluate loss
-                with torch.no_grad():
-                    logits = self(input_ids, segment_ids, input_mask).to(self.device)
-                    # Evaluation metric
-                    logits = logits.detach().cpu().numpy()
-                    logits = logits[:, 1]
-                    if transformation is not None:
-                        logits = transformation(logits).numpy()
-                    label_ids = label_ids.to('cpu').numpy()
+                print("input_ids:", input_ids)
+                logits = self(input_ids, segment_ids, input_mask).to(self.device)
+                # Evaluation metric
+                logits = logits.detach().cpu()
+                logits = logits[:, 1]
+                print("logits:", logits)
+                if transformation is not None:
+                    logits = transformation(logits)
+                label_ids = label_ids.to('cpu').numpy()
                 # Store predicted probabilities
                 if i == 0:
                     output = logits
                 else:
-                    output = np.append(output, logits, axis = 0)
-        if transformation is not None:
-            output = transformation(output)
+                    output = torch.cat([output, logits], dim = 0)
         return output
 
 
