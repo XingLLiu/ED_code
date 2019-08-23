@@ -23,7 +23,7 @@ from ED_support_module.BertForSepsis import *
 # Path to save figures
 FIG_PATH = "../../results/bert/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
-TEXT_DATA_PATH = "../../data/EPIC_DATA/EPIC.csv"
+RAW_TEXT_PATH = "../../data/EPIC_DATA/EPIC.csv"
 RAW_SAVE_DIR = FIG_PATH + "Raw_Notes/"
 
 
@@ -118,7 +118,7 @@ WEIGHT2 = 16
 TRAIN_BATCH_SIZE = 6
 EVAL_BATCH_SIZE = 8
 LEARNING_RATE = 1e-3
-NUM_TRAIN_EPOCHS = 1
+NUM_TRAIN_EPOCHS = 6
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
 WARMUP_PROPORTION = 0.1
@@ -149,8 +149,8 @@ if not os.path.exists(RAW_SAVE_DIR):
 # ----------------------------------------------------
 # Prepare train and test sets
 # Load file
-EPIC_original = pd.read_csv(TEXT_DATA_PATH, encoding = 'ISO-8859-1')
-preprocessor = EPICPreprocess.Preprocess(path = TEXT_DATA_PATH)
+EPIC_original = pd.read_csv(RAW_TEXT_PATH, encoding = 'ISO-8859-1')
+preprocessor = EPICPreprocess.Preprocess(path = RAW_TEXT_PATH)
 EPIC_original = preprocessor.BinarizeSepsis(EPIC_original)
 
 
@@ -212,11 +212,12 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
 
 
     # Create folder if not already exist
-    FIG_ROOT_PATH = FIG_PATH + "dynamic/"
+    FIG_ROOT_PATH = FIG_PATH + f"dynamic/{TASK_NAME}/"
     DYNAMIC_PATH = FIG_ROOT_PATH + f"{time_pred}/"
-    OUTPUT_DIR = DYNAMIC_PATH + f'Saved_Checkpoints/{TASK_NAME}/'
-    REPORTS_DIR = DYNAMIC_PATH + f'Reports/{TASK_NAME}_evaluation_report/'
-    for path in [DYNAMIC_PATH, OUTPUT_DIR, REPORTS_DIR]:
+    OUTPUT_DIR = DYNAMIC_PATH + f'Saved_Checkpoints/'
+    REPORTS_DIR = DYNAMIC_PATH + "Reports/"
+    PROCESSED_NOTES_DIR = DYNAMIC_PATH + f"Processed_Texts/"
+    for path in [DYNAMIC_PATH, OUTPUT_DIR, REPORTS_DIR, PROCESSED_NOTES_DIR]:
         if not os.path.exists(path):
             os.makedirs(path)
 
@@ -235,17 +236,17 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
         # Convert to the appropriate format and save
         train_bert = create_bert_data(x_data = XTrain["Note.Data_ED.Triage.Notes"],
                                         y_data = yTrain,
-                                        save_path = OUTPUT_DIR + "train.tsv")
+                                        save_path = PROCESSED_NOTES_DIR + "train.tsv")
         test_bert = create_bert_data(x_data = XTest["Note.Data_ED.Triage.Notes"],
                                         y_data = yTest,
-                                        save_path = OUTPUT_DIR + "dev.tsv")
+                                        save_path = PROCESSED_NOTES_DIR + "dev.tsv")
         # Load data. Necessary for feeding in BERT
         processor = BinaryClassificationProcessor()
-        train_data = processor.get_train_examples(OUTPUT_DIR)
+        train_data = processor.get_train_examples(PROCESSED_NOTES_DIR)
         label_list = processor.get_labels()
         # Optimization step
         num_train_optimization_steps = int(
-            len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS * 10
+            len(XTrain) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS * 10
         # Load pretrained model tokenizer (vocabulary)
         tokenizer = BertTokenizer.from_pretrained(CACHE_DIR, do_lower_case=False)
         # Load model
@@ -270,33 +271,36 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
     else:
         # Get train set (= test set from the last month)
         _, XTrainOld, _, yTrainOld= time_split(data = EPIC, threshold = time_span[j - 1])
-
         # Get directory of the previous model
-        OUTPUT_DIR_OLD = FIG_PATH + "dynamic/" + f"{time_span[j]}/" + f"Saved_Checkpoints/{TASK_NAME}/"
-
+        OUTPUT_DIR_OLD = FIG_PATH + "dynamic/" + f"{TASK_NAME}/{time}/" + f"Saved_Checkpoints/"
         # Convert to the appropriate format and save
         train_bert = create_bert_data(x_data = XTrainOld["Note.Data_ED.Triage.Notes"],
                                         y_data = yTrainOld,
-                                        save_path = OUTPUT_DIR + "train.tsv")
+                                        save_path = PROCESSED_NOTES_DIR + "train.tsv")
         test_bert = create_bert_data(x_data = XTest["Note.Data_ED.Triage.Notes"],
                                         y_data = yTest,
-                                        save_path = OUTPUT_DIR + "dev.tsv")
+                                        save_path = PROCESSED_NOTES_DIR + "dev.tsv")
         # Load data. Necessary for feeding in BERT
         processor = BinaryClassificationProcessor()
-        train_data = processor.get_train_examples(OUTPUT_DIR)
+        train_data = processor.get_train_examples(PROCESSED_NOTES_DIR)
         label_list = processor.get_labels()
         # Optimization step
         num_train_optimization_steps = int(
             len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS * 10
         # Load pretrained tokenizer and model
         tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR_OLD + 'vocab.txt', do_lower_case=False)
-        model = BertModel.from_pretrained(OUTPUT_DIR + f"{TASK_NAME}.tar.gz",cache_dir=OUTPUT_DIR)
+        model = BertModel.from_pretrained(OUTPUT_DIR_OLD + f"{TASK_NAME}.tar.gz",cache_dir=OUTPUT_DIR)
         # Load entire model
-        prediction_model = pickle.load(open(OUTPUT_DIR_OLD + "entire_model.pkl", "rb"))
+        # prediction_model = pickle.load(open(OUTPUT_DIR_OLD + "entire_model.pkl", "rb"))
+        # prediction_model = BertForSepsis(bert_model = model,
+        #                                 device = device,
+        #                                 hidden_size = model.config.hidden_size).to(device)
+        # prediction_model.load_state_dict( torch.load(OUTPUT_DIR_OLD + "entire_model.ckpt") )
+        prediction_model = torch.load(OUTPUT_DIR_OLD + "entire_model.ckpt")
         # Load optimizer
-        optimizer = pickle.load(open(OUTPUT_DIR_OLD + "optimizer.pkl", "rb"))
+        optimizer = pickle.load(open(OUTPUT_DIR_OLD + "optimizer.ckpt", "rb"))
         # Load loss
-        criterion = pickle.load(open(OUTPUT_DIR_OLD + "loss.pkl", "rb"))
+        criterion = pickle.load(open(OUTPUT_DIR_OLD + "loss.ckpt", "rb"))
         # criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT])).to(device)
 
 
@@ -329,14 +333,18 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
             loss_vec = np.append(loss_vec, loss)
 
 
-    # Save model
-    pickle.dump(model, open(OUTPUT_DIR + "bert_model.pkl", "wb"))
-    pickle.dump(prediction_model, open(OUTPUT_DIR + "entire_model.pkl", "wb"))
+    # Save bert model
+    # pickle.dump(model, open(OUTPUT_DIR + "bert_model.pkl", "wb"))
+    # pickle.dump(prediction_model, open(OUTPUT_DIR + "entire_model.pkl", "wb"))
+    save_bert(model, tokenizer, OUTPUT_DIR)
+    # Save entire model
+    torch.save(prediction_model, OUTPUT_DIR + "entire_model.ckpt")
     # Save optimizer and loss
-    pickle.dump(optimizer, open(OUTPUT_DIR + "optimizer.pkl", "wb"))
-    pickle.dump(criterion, open(OUTPUT_DIR + "loss.pkl", "wb"))
-    # Save tokenizer
-    tokenizer.save_vocabulary(OUTPUT_DIR)
+    pickle.dump(optimizer, open(OUTPUT_DIR + "optimizer.ckpt", "wb"))
+    pickle.dump(criterion, open(OUTPUT_DIR + "loss.ckpt", "wb"))
+    # # Save tokenizer
+    # tokenizer.save_vocabulary(OUTPUT_DIR)
+
     # Tar files
     P = subprocess.check_call(["./tar_bert_models.sh", OUTPUT_DIR, TASK_NAME, CONFIG_NAME, WEIGHTS_NAME])
     print("Models saved at {} \n".format(OUTPUT_DIR))
@@ -344,7 +352,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
 
     # Prediction
     # Get test data
-    eval_examples = processor.get_dev_examples(OUTPUT_DIR)
+    eval_examples = processor.get_dev_examples(PROCESSED_NOTES_DIR)
     eval_features = convert_examples_to_features(eval_examples,
                                                 label_list, MAX_SEQ_LENGTH, tokenizer)
     test_loader = feature_to_loader(eval_features, EVAL_BATCH_SIZE)

@@ -610,6 +610,8 @@ for i, batch in enumerate(tqdm(eval_dataloader, desc="Evaluating")):
 
 # Save predicted probabilities
 pickle.dump(prob, open(REPORTS_DIR + "predicted_probs.pkl", 'wb'))
+prob = pd.DataFrame(prob, columns = ["pred_prob"])
+prob.to_csv(REPORTS_DIR + "predicted_probs.csv", index = False)
 
 roc = lr_roc_plot(yTest, prob, save_path = REPORTS_DIR + f'roc.eps', plot = True)
 

@@ -32,20 +32,6 @@ abbrevs = {'hrs':'hours', 'mins':'minutes',
 
 
 # ----------------------------------------------------
-#a list of common abbreviations that do not have other potential meanings
-abbrevs = {'hrs':'hours', 'mins':'minutes',
-           'S&S':'signs and symptoms', 
-           'bc':'because', 'b/c':'because', 
-           'wo':'without', 'w/o':'without', 
-           'yo':'year old', 'y.o':'year old', 'wk':'weeks',
-           'm.o':'month old', 'mo':'months', 'mos':'months', 
-           'b4':'before', 'pt':'patient',
-           'ro':'rule out', 'w/':'with', 
-           'o/n':'overnight', 'f/u':'follow up',
-           'M':'male', 'F':'female'}
-
-
-# ----------------------------------------------------
 # Text to feature classes
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
@@ -218,16 +204,16 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
         assert len(input_mask) == max_seq_length
         assert len(segment_ids) == max_seq_length
         label_id = label_map[example.label]
-        if ex_index < 3:
-            logger.info("*** Example ***")
-            logger.info("guid: %s" % (example.guid))
-            logger.info("tokens: %s" % " ".join(
-                    [str(x) for x in tokens]))
-            logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-            logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-            logger.info(
-                    "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-            logger.info("label: %s (id = %d)" % (example.label, label_id))
+        # if ex_index < 3:
+        #     logger.info("*** Example ***")
+        #     logger.info("guid: %s" % (example.guid))
+        #     logger.info("tokens: %s" % " ".join(
+        #             [str(x) for x in tokens]))
+        #     logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
+        #     logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
+        #     logger.info(
+        #             "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+        #     logger.info("label: %s (id = %d)" % (example.label, label_id))
         features.append(
                 InputFeatures(input_ids=input_ids,
                                 input_mask=input_mask,
@@ -306,18 +292,14 @@ class BertForSepsis(nn.Module):
         self.bert.eval()
         with torch.no_grad():
             for i, batch in enumerate(tqdm(test_loader, desc="Evaluating")):
-                if i == 10:
-                    break
                 # Get batch
                 batch = tuple( t.to( self.device ) for t in batch )
                 input_ids, input_mask, segment_ids, label_ids = batch
                 # Evaluate loss
-                print("input_ids:", input_ids)
                 logits = self(input_ids, segment_ids, input_mask).to(self.device)
                 # Evaluation metric
                 logits = logits.detach().cpu()
                 logits = logits[:, 1]
-                print("logits:", logits)
                 if transformation is not None:
                     logits = transformation(logits)
                 label_ids = label_ids.to('cpu').numpy()
@@ -326,7 +308,7 @@ class BertForSepsis(nn.Module):
                     output = logits
                 else:
                     output = torch.cat([output, logits], dim = 0)
-        return output
+        return np.array(output)
 
 
 # Function that cleans the text
@@ -465,22 +447,19 @@ def feature_to_loader(train_features, batch_size):
     return train_dataloader
 
 
-
-
-def save_bert(prediction_model, bert_model, tokenizer, OUTPUT_DIR, WEIGHTS_NAME, CONFIG_NAME,
-                entire_model_name="entire_model.bin"):
+def save_bert(bert_model, tokenizer, OUTPUT_DIR):
     '''
-    Save BERT with prediction head layer.
+    Save the parameters and configuration of BERT and the tokenizer.
     '''
     model_to_save = bert_model.module if hasattr(bert_model, "module") else bert_model
-    entire_model_to_save = prediction_model.module if hasattr(prediction_model, "module") else prediction_model
     # Save using the predefined names so that one can load using `from_pretrained`
-    output_model_file = os.path.join(OUTPUT_DIR, WEIGHTS_NAME)
-    output_config_file = os.path.join(OUTPUT_DIR, CONFIG_NAME)
-    output_entire_file = os.path.join(OUTPUT_DIR, entire_model_name)
+    output_model_file = os.path.join(OUTPUT_DIR, "pytorch_model.bin")
+    output_config_file = os.path.join(OUTPUT_DIR, "bert_config.json")
     # Save
-    torch.save(entire_model_to_save.state_dict(), output_entire_file)
     torch.save(model_to_save.state_dict(), output_model_file)
     model_to_save.config.to_json_file(output_config_file)
     tokenizer.save_vocabulary(OUTPUT_DIR)
+
+
+
 
