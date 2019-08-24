@@ -308,8 +308,8 @@ shapley_val = shapley_exact(model_class = model,
 
 # ========= 2.b. Refit without the group with the lowest shapley value =========
 # Get good samples
-data_good = pd.concat([train_dict["201807"],
-                        train_dict["201808"]], axis = 0)
+data_good = pd.concat([train_dict["201808"],
+                        train_dict["201809"]], axis = 0)
 yTrain_good = data_good["Primary.Dx"]
 XTrain_good = data_good.drop(["Primary.Dx"], axis = 1)
 
