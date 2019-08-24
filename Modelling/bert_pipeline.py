@@ -314,7 +314,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
     pickle.dump(optimizer, open( OUTPUT_DIR + "optimizer.ckpt", "wb" ) )
     pickle.dump(criterion, open( OUTPUT_DIR + "loss.ckpt", "wb" ) )
     # Save loss vector
-    loss_vec = pd.Series(loss_vec, name = "loss", index = False)
+    loss_vec = pd.Series(loss_vec, name = "loss")
     loss_vec.to_csv(OUTPUT_DIR + "loss_vec.csv")
 
     # Tar files
@@ -344,7 +344,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
                                                         batch_size = EVAL_BATCH_SIZE,
                                                         transformation = transformation)
     pred_train = pd.DataFrame(pred_train, columns = ["pred_prob"])
-    pred_train.to_csv(DYNAMIC_PATH + f"predicted_result_train_{time_pred}.csv", index = True)   
+    pred_train.to_csv(DYNAMIC_PATH + f"predicted_result_train_{time_pred}.csv", index = False)   
 
 
     # ========= 2.b. Evaluation =========
