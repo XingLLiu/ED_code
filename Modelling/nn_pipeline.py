@@ -108,16 +108,15 @@ for j, time in enumerate(time_span[2:-1]):
 
     # ========= 2.a.i. Model =========
     # Initialize the model at all iterations
-    if j >= 0:
-        # Neural net model
-        input_size = XTrain.shape[1]
-        model = NeuralNet(device = device,
-                          input_size = input_size,
-                          drop_prob = DROP_PROB,
-                          hidden_size = HIDDEN_SIZE).to(device)
-        # Loss and optimizer
-        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([CLASS_WEIGHT0, CLASS_WEIGHT1])).to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
+    # Neural net model
+    input_size = XTrain.shape[1]
+    model = NeuralNet(device = device,
+                        input_size = input_size,
+                        drop_prob = DROP_PROB,
+                        hidden_size = HIDDEN_SIZE).to(device)
+    # Loss and optimizer
+    criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([CLASS_WEIGHT0, CLASS_WEIGHT1])).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
 
 
     # Train the model

@@ -39,6 +39,7 @@ class NeuralNet(nn.Module):
         Output: loss
         '''
         self.train()
+        loss_sum = 0
         for i, x in enumerate(train_loader):
             x = x.to(self.device)
             # Retrieve design matrix and labels
@@ -51,6 +52,8 @@ class NeuralNet(nn.Module):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            # Add loss
+            loss_sum += loss.item()
         return loss
     def eval_model(self, test_loader, transformation=None):
         '''
