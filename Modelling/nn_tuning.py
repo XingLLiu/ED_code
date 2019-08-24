@@ -127,42 +127,6 @@ print( "Train size: {}. Test size: {}. Validation size: {}. Sepsis cases in [tra
 # ========= 2.a.i. Model =========
 # Initialize the model at the first iteration
 
-# # Neural net model
-# input_size = XTrain.shape[1]
-# model = NeuralNet(device = device,
-#                     input_size = input_size,
-#                     drop_prob = DROP_PROB,
-#                     hidden_size = HIDDEN_SIZE).to(device)
-
-# # Loss and optimizer
-# # nn.CrossEntropyLoss() computes softmax internally
-# criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
-# optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
-
-# # Initialize loss vector
-# loss_vec = np.zeros(NUM_EPOCHS)
-# loss_vec_valid = np.zeros(NUM_EPOCHS)
-
-# # Construct data loaders
-# train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
-#                                             batch_size = BATCH_SIZE,
-#                                             shuffle = True)
-# test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
-#                                             batch_size = len(yTest),
-#                                             shuffle = False)
-# valid_loader = torch.utils.data.DataLoader(dataset = np.array(XValid),
-#                                             batch_size = len(yValid),
-#                                             shuffle = False)
-# # Otherwise only update the model on data from the previous month
-# # else:
-# # train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrainOld, yTrainOld], axis = 1)),
-# #                                             batch_size = BATCH_SIZE,
-# #                                             shuffle = True)
-# # test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
-# #                                             batch_size = len(yTest),
-# #                                             shuffle = False)
-
-
 # Model
 input_size = XTrain.shape[1]
 model = NeuralNet(device = device,
@@ -175,26 +139,34 @@ optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
 
 # Train the model
 transformation = nn.Sigmoid()
-model, loss_vec = model.fit(x_data = XTrain,
-                            y_data = yTrain,
-                            num_epochs = NUM_EPOCHS,
-                            batch_size = BATCH_SIZE,
-                            optimizer = optimizer,
-                            criterion = criterion)
+loss_train_vec = np.zeros(NUM_EPOCHS)
+loss_valid_vec = np.zeros(NUM_EPOCHS)
+for ind in range(NUM_EPOCHS):
+    # Train loss
+    model, loss_train = model.fit(x_data = XTrain,
+                                y_data = yTrain,
+                                num_epochs = 1,
+                                batch_size = BATCH_SIZE,
+                                optimizer = optimizer,
+                                criterion = criterion)
+    # Validation loss
+    transformation = nn.Sigmoid().to(device)
+    criterion_valid = nn.CrossEntropyLoss(weight = torch.FloatTensor([CLASS_WEIGHT0, CLASS_WEIGHT1])).to(device)
+    pred, loss_valid = model.predict_proba_single(x_data = XValid,
+                                                    y_data = yValid,
+                                                    batch_size = BATCH_SIZE,
+                                                    transformation = transformation,
+                                                    criterion = criterion_valid)
+    print(loss_valid)
+    loss_train_vec[ind] = loss_train / ( CLASS_WEIGHT0 * (len(yTrain) - yTrain.sum()) + CLASS_WEIGHT1 * yTrain.sum() )
+    loss_valid_vec[ind] = loss_valid / ( CLASS_WEIGHT0 * (len(yValid) - yValid.sum()) + CLASS_WEIGHT1 * yValid.sum() )
 
 
-
-
-# Prediction
-transformation = nn.Sigmoid().to(device)
-pred = model.predict_proba_single(x_data = XValid,
-                                    batch_size = BATCH_SIZE,
-                                    transformation = transformation)
 
 
 # Plot and save losses
-_ = sns.scatterplot(range(len(loss_vec)), loss_vec, label = "train")
-_ = sns.scatterplot(range(len(loss_vec)), loss_vec_valid, label = "valid")
+_ = sns.scatterplot(range(len(loss_train_vec)), loss_train_vec, label = "train")
+_ = sns.scatterplot(range(len(loss_valid_vec)), 10*loss_valid_vec, label = "valid")
 plt.savefig(DYNAMIC_PATH + f"losses_{time_pred}.png")
 plt.close()
 
@@ -206,10 +178,22 @@ plt.close()
     #                                             shuffle = False)
 
 
-evaluator = Evaluation.Evaluation(yTrain, pred)
+evaluator = Evaluation.Evaluation(yValid, pred)
 
 # Save ROC plot
 _ = evaluator.roc_plot(plot = False, title = MODEL_NAME, save_path = DYNAMIC_PATH + f"roc_{time_pred}")
+
+
+
+pred = model.predict_proba_single(x_data = XTest,
+                                y_data = yTest,
+                                batch_size = BATCH_SIZE,
+                                transformation = transformation)
+
+
+evaluator = Evaluation.Evaluation(yTest, pred)
+# Save ROC plot
+_ = evaluator.roc_plot(plot = False, title = MODEL_NAME, save_path = DYNAMIC_PATH + f"roc_test_{time_pred}")
 
 
 

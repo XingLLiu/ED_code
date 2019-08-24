@@ -15,7 +15,6 @@ CLASS_WEIGHT1 = 300000
 CLASS_WEIGHT0 = 100
 MODE = "e"
 FPR_THRESHOLD = 0.1
-
 NUM_CLASS = 2
 NUM_EPOCHS = 1200
 BATCH_SIZE = 125
@@ -130,6 +129,7 @@ for j, time in enumerate(time_span[2:-1]):
     # Prediction
     transformation = nn.Sigmoid().to(device)
     pred = model.predict_proba_single(x_data = XTest,
+                                        y_data = yTest,
                                         batch_size = BATCH_SIZE,
                                         transformation = transformation)
     

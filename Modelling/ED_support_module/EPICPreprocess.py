@@ -5,9 +5,17 @@ from ED_support_module import *
 class Preprocess:
     '''
     Preparing datasets for modelling using the preprocessed EPIC dataset.
+
+    Input :
+            path = [str] path to preprocessed data.
+            disease = [list of str's] disease names to be identified as class 1. Names are case-sensitive.
+                        Set to be Sepsis by default.
+            drop_cols = [list of str's] column names of the dataset to be droped (e.g. for feature selection).
+            after_triage = [list of str's] column names of the features collected after triage.
     '''
-    def __init__(self, path, drop_cols='default', after_triage='default'):
+    def __init__(self, path, disease=['Sepsis', 'sepsis'], drop_cols='default', after_triage='default'):
         self.path = path
+        self.disease = disease
         self.drop_cols = drop_cols
         self.after_triage = after_triage
 
@@ -81,15 +89,19 @@ class Preprocess:
         diagnosis = EPIC['Diagnosis']
         diagnoses = EPIC['Diagnoses']
         EPIC = EPIC.drop(['Diagnosis', 'Diagnoses'], axis = 1)
-        # Check if Primary.Dx contains Sepsis or related classes
-        ifSepsis1 = EPIC['Primary.Dx'].str.contains('epsis')
-        # Check if Diagnosis contains Sepsis or related classes
-        ifSepsis2 = diagnosis.str.contains('epsis')
-        # Check if Diagnoses contains Sepsis or related classes
-        ifSepsis3 = diagnoses.str.contains('epsis')
-        # Lable as sepsis if any of the above contains Sepsis
-        ifSepsis = ifSepsis1 | ifSepsis2 | ifSepsis3
+        # Initialize indicators
+        ifSepsis1 = np.zeros(EPIC.shape[0], dtype = bool)
+        ifSepsis2 = np.zeros(EPIC.shape[0], dtype = bool)
+        ifSepsis3 = np.zeros(EPIC.shape[0], dtype = bool)
+        for name in self.disease:
+            # Check if Primary.Dx contains disease
+            ifSepsis1 = EPIC['Primary.Dx'].str.contains(name) | ifSepsis1
+            # Check if Diagnosis contains disease
+            ifSepsis2 = diagnosis.str.contains(name) | ifSepsis2
+            # Check if Diagnoses contains disease
+            ifSepsis3 = diagnoses.str.contains(name) | ifSepsis3
         # Convert into binary class
+        ifSepsis = ifSepsis1 | ifSepsis2 | ifSepsis3
         EPIC.loc[-ifSepsis, 'Primary.Dx'] = 0
         EPIC.loc[ifSepsis, 'Primary.Dx'] = 1
         EPIC['Primary.Dx'] = EPIC['Primary.Dx'].astype('int')
