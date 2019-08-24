@@ -260,6 +260,21 @@ class BertForSepsis(nn.Module):
     def train_model(self, train_loader, criterion, optimizer,
                     gradient_accumulation_steps=1,
                     NUM_GPU=1):
+        '''
+        Train and back-propagate the neural network model. Note that
+        this is different from the built-in method self.train, which
+        sets the model to train mode.
+
+        Model will be set to evaluation mode internally.
+
+        Input : train_loader = [DataLoader] training set. The
+                               last column must be the response.
+                criterion = [Function] tensor function for evaluatin
+                            the loss.
+                optimizer = [Function] tensor optimizer function.
+                device = [object] cuda or cpu
+        Output: loss
+        '''
         self.train()
         self.bert.train()
         # Initialize loss vector
@@ -289,6 +304,23 @@ class BertForSepsis(nn.Module):
                 loss_vec[i // 10] = loss.item()
         return loss_vec
     def eval_model(self, test_loader, batch_size, transformation=None):
+        '''
+        Evaluate the neural network model. Only makes sense if
+        test_loader contains all test data. Note that this is
+        different from the built-in method self.eval, which
+        sets the model to train mode.
+        
+        Model will be set to evaluation mode internally.
+
+        Input :
+                train_loader = [DataLoader] training set. Must not
+                                contain the response.
+                transformation = [Function] function for evaluatin
+                                 transforming the output. If not given,
+                                 raw output is return.
+        Output:
+                outputs = output from the model (after transformation).
+        '''
         self.eval()
         self.bert.eval()
         with torch.no_grad():
@@ -313,6 +345,7 @@ class BertForSepsis(nn.Module):
     def fit(self, train_features, num_epochs, batch_size, optimizer, criterion):
         '''
         Fit BERT + classification head layer.
+
         Input :
                 train_features = BERT features from the function convert_examples_to_features.
                 num_epochs = [int] number of epochs
@@ -336,6 +369,7 @@ class BertForSepsis(nn.Module):
         '''
         Transform x_data into dataloader and return predicted scores
         for being of class 1.
+
         Input :
                 x_data = [DataFrame or array] train set. Must not contain
                          the response.
@@ -356,6 +390,7 @@ class BertForSepsis(nn.Module):
         '''
         Transform x_data into dataloader and return a 2d predicted scores
         for being class 0 and class 1.
+
         Input :
                 x_data = [DataFrame or array] train set. Must not contain
                          the response.
@@ -478,6 +513,7 @@ def fill_missing_text(EPIC, EPIC_cc, notes_cols):
 def create_bert_data(x_data, y_data, save_path=None):
     '''
     Generate data in the format required by BERT.
+
     Input :
             x_data = [DataFrame or array] text data
             y_data = [DataFrame or array] lables
@@ -517,18 +553,24 @@ def feature_to_loader(train_features, batch_size):
     return train_dataloader
 
 
-def save_bert(bert_model, tokenizer, OUTPUT_DIR):
+def save_bert(bert_model, tokenizer, save_path):
     '''
     Save the parameters and configuration of BERT and the tokenizer.
+
+    Input :
+            bert_model = [object] bert model
+            tokenizer = [object] bert tokenizer
+            save_path = [str] path to save model
     '''
     model_to_save = bert_model.module if hasattr(bert_model, "module") else bert_model
+    # Set up names
+    output_model_file = os.path.join(save_path, "pytorch_model.bin")
+    output_config_file = os.path.join(save_path, "bert_config.json")
+
     # Save using the predefined names so that one can load using `from_pretrained`
-    output_model_file = os.path.join(OUTPUT_DIR, "pytorch_model.bin")
-    output_config_file = os.path.join(OUTPUT_DIR, "bert_config.json")
-    # Save
     torch.save(model_to_save.state_dict(), output_model_file)
     model_to_save.config.to_json_file(output_config_file)
-    tokenizer.save_vocabulary(OUTPUT_DIR)
+    tokenizer.save_vocabulary(save_path)
 
 
 
@@ -548,27 +590,37 @@ def clean_epic_notes(EPIC, EPIC_cc, notes_cols, data_path,
     '''
     # Loop over each file and write to a csv
     print("\nStart cleaning notes ...")
+
     # Clean text
     for col in notes_cols:
         print("Cleaning {}".format(col))
         EPIC.loc[:, col] = list(map(clean_text, EPIC[col]))
+
     # Save data
     EPIC.to_csv(save_path + 'EPIC_triage.csv', index=False)
+
     # Load data nonetheless to convert empty notes "" to nan
     EPIC = pd.read_csv(save_path + 'EPIC_triage.csv')
+
     # Fill in missing vals
     EPIC = fill_missing_text(EPIC, EPIC_cc, notes_cols)
+
     # Save imputed text
     EPIC.to_csv(save_path + 'EPIC_triage.csv', index=False)
+
     # Further preprocessing
     preprocessor = EPICPreprocess.Preprocess(data_path)
     _, _, _, EPIC_arrival = preprocessor.streamline()
+
     # Remove the obvious outliers
     EPIC = EPIC.loc[EPIC_arrival.index, :]
+
     # Add time variable
     EPIC = pd.concat([EPIC, EPIC_arrival["Arrived"].astype(int)], axis = 1)
+
     # Get time span
     time_span = EPIC['Arrived'].unique().tolist()
+
     # Save data
     if save_path is not None:
         pickle.dump(time_span, open( save_path + "time_span", "wb") )

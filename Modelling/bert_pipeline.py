@@ -161,38 +161,13 @@ EPIC = EPIC_original[['Primary.Dx'] + notes_cols]
 # ----------------------------------------------------
 # ========= 1. Further preprocessing =========
 
-if CLEAN_NOTES:
-    EPIC = clean_epic_notes(EPIC = EPIC,
-                            EPIC_cc = EPIC_original,
-                            notes_cols = notes_cols,
-                            data_path = DATA_PATH,
-                            save_path = RAW_SAVE_DIR)
-    # # Loop over each file and write to a csv
-    # print("\nStart cleaning notes ...")
-    # # Clean text
-    # for col in notes_cols:
-    #     print("Cleaning {}".format(col))
-    #     EPIC.loc[:, col] = list(map(clean_text, EPIC[col]))
-    # # Save data
-    # EPIC.to_csv(RAW_SAVE_DIR + 'EPIC_triage.csv', index=False)
-    # # Load data nonetheless to convert empty notes "" to nan
-    # EPIC = pd.read_csv(RAW_SAVE_DIR + 'EPIC_triage.csv')
-    # # Fill in missing vals
-    # EPIC = fill_missing_text(EPIC, EPIC_original, notes_cols)
-    # # Save imputed text
-    # EPIC.to_csv(RAW_SAVE_DIR + 'EPIC_triage.csv', index=False)
-    # # Further preprocessing
-    # preprocessor = EPICPreprocess.Preprocess(DATA_PATH)
-    # _, _, _, EPIC_arrival = preprocessor.streamline()
-    # # Remove the obvious outliers
-    # EPIC = EPIC.loc[EPIC_arrival.index, :]
-    # # Add time variable
-    # EPIC = pd.concat([EPIC, EPIC_arrival["Arrived"].astype(int)], axis = 1)
-    # # Get time span
-    # time_span = EPIC['Arrived'].unique().tolist()
-    # # Save data
-    # EPIC.to_csv(RAW_SAVE_DIR + 'EPIC.csv', index=False)
-    # pickle.dump(time_span, open( RAW_SAVE_DIR + "time_span", "wb") )
+# if CLEAN_NOTES:
+#     EPIC = clean_epic_notes(EPIC = EPIC,
+#                             EPIC_cc = EPIC_original,
+#                             notes_cols = notes_cols,
+#                             data_path = DATA_PATH,
+#                             save_path = RAW_SAVE_DIR)
+
 
 # Clean the file if not already done
 if not os.path.exists(RAW_SAVE_DIR + "EPIC.csv"):
@@ -363,6 +338,13 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
     # Save predicted probabilities
     pred = pd.DataFrame(pred, columns = ["pred_prob"])
     pred.to_csv(REPORTS_DIR + f"predicted_result_{time_pred}.csv", index = False)
+
+    # Save probs for train set (for stacked model)
+    pred_train = prediction_model.predict_proba_single(eval_features = train_features,
+                                                        batch_size = EVAL_BATCH_SIZE,
+                                                        transformation = transformation)
+    pred_train = pd.DataFrame(pred_train, columns = ["pred_prob"])
+    pred_train.to_csv(DYNAMIC_PATH + f"predicted_result_train_{time_pred}.csv", index = True)   
 
 
     # ========= 2.b. Evaluation =========

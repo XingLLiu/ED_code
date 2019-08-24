@@ -13,10 +13,11 @@ class NeuralNet(nn.Module):
         self.dp_layer2 = nn.Dropout(drop_prob)
         self.device = device
         nn.init.xavier_normal_(self.fc1.weight)
+        nn.init.xavier_normal_(self.fc2.weight)
     def forward(self, x):
-        h = self.dp_layer1(x)
-        h = self.fc1(h)
+        h = self.fc1(x)
         h = self.ac1(h)
+        h = self.dp_layer1(h)
         h = self.fc2(h)
         h = self.ac2(h)
         h = self.dp_layer2(h)
