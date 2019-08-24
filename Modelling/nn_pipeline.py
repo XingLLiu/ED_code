@@ -129,7 +129,6 @@ for j, time in enumerate(time_span[2:-1]):
     # Prediction
     transformation = nn.Sigmoid().to(device)
     pred = model.predict_proba_single(x_data = XTest,
-                                        y_data = yTest,
                                         batch_size = BATCH_SIZE,
                                         transformation = transformation)
     

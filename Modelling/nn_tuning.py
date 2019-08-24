@@ -152,12 +152,11 @@ for ind in range(NUM_EPOCHS):
     # Validation loss
     transformation = nn.Sigmoid().to(device)
     criterion_valid = nn.CrossEntropyLoss(weight = torch.FloatTensor([CLASS_WEIGHT0, CLASS_WEIGHT1])).to(device)
-    pred, loss_valid = model.predict_proba_single(x_data = XValid,
+    pred, loss_valid = model.validate(x_data = XValid,
                                                     y_data = yValid,
                                                     batch_size = BATCH_SIZE,
                                                     transformation = transformation,
                                                     criterion = criterion_valid)
-    print(loss_valid)
     loss_train_vec[ind] = loss_train / ( CLASS_WEIGHT0 * (len(yTrain) - yTrain.sum()) + CLASS_WEIGHT1 * yTrain.sum() )
     loss_valid_vec[ind] = loss_valid / ( CLASS_WEIGHT0 * (len(yValid) - yValid.sum()) + CLASS_WEIGHT1 * yValid.sum() )
 
@@ -183,6 +182,22 @@ evaluator = Evaluation.Evaluation(yValid, pred)
 # Save ROC plot
 _ = evaluator.roc_plot(plot = False, title = MODEL_NAME, save_path = DYNAMIC_PATH + f"roc_{time_pred}")
 
+# Store predictions
+pred_valid1 = pred
+
+
+# Permutation test
+imp_means, imp_vars = feature_importance_permutation(
+                        predict_method = model.predict_proba_single,
+                        X = np.array(XValid),
+                        y = np.array(yValid),
+                        metric = true_positive_rate,
+                        fpr_threshold = FPR_THRESHOLD,
+                        num_rounds = 5,
+                        seed = RANDOM_SEED)
+# Save feature importance plot
+fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XValid.columns, MODEL_NAME, show_num = "all")
+fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
 
 pred = model.predict_proba_single(x_data = XTest,
