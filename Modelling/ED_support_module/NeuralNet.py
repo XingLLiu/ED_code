@@ -3,19 +3,21 @@ from ED_support_module import *
 class NeuralNet(nn.Module):
     def __init__(self, device, input_size=61, hidden_size=500, num_classes=2, drop_prob=0):
         super(NeuralNet, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.input_size = input_size
+        self.fc1 = nn.Linear(self.input_size, hidden_size * 2)
         self.ac1 = nn.LeakyReLU()
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size * 2, hidden_size)
         self.ac2 = nn.LeakyReLU()
         self.classification = nn.Linear(hidden_size, num_classes)
         self.dp_layer1 = nn.Dropout(drop_prob)
         self.dp_layer2 = nn.Dropout(drop_prob)
         self.device = device
         nn.init.xavier_normal_(self.fc1.weight)
+        nn.init.xavier_normal_(self.fc2.weight)
     def forward(self, x):
-        h = self.dp_layer1(x)
-        h = self.fc1(h)
+        h = self.fc1(x)
         h = self.ac1(h)
+        h = self.dp_layer1(h)
         h = self.fc2(h)
         h = self.ac2(h)
         h = self.dp_layer2(h)
@@ -65,7 +67,7 @@ class NeuralNet(nn.Module):
                 transformation = [Function] function for evaluatin
                                  transforming the output. If not given,
                                  raw output is return.
-        Output: 
+        Output:
                 outputs = output from the model (after transformation).
         '''
         self.eval()
@@ -81,25 +83,67 @@ class NeuralNet(nn.Module):
                     outputs = transformation(outputs).detach()
                 # Append probabilities
                 if i == 0:
-                    outputs_vec = np.array(outputs)
+                    outputs_vec = np.array(outputs.cpu())
                 else:
                     outputs_vec = np.append(outputs_vec,
-                                            np.array(outputs),
+                                            np.array(outputs.cpu()),
                                             axis = 0)
         return outputs_vec
-    def predict_proba_single(self, x_data):
+    def predict_proba_single(self, x_data, batch_size=None, transformation=None):
         '''
         Transform x_data into dataloader and return predicted scores
         for being of class 1.
         Input :
                 x_data = [DataFrame or array] train set. Must not contain
                          the response.
+                batch_size = [int] batch size used to construct data loader.
+                transformation = [Function] function for evaluatin
+                                 transforming the output. If not given,
+                                 raw output is returned.
         Output:
                 pred_prob = [array] predicted probability for being
                             of class 1.
         '''
+        if batch_size is None:
+            batch_size = x_data.shape[0]
         test_loader = torch.utils.data.DataLoader(dataset = np.array(x_data),
-                                                batch_size = len(x_data),
+                                                batch_size = batch_size,
                                                 shuffle = False)
-        return self.eval_model(test_loader, transformation=None)[:, 1]
-        
+        return self.eval_model(test_loader, transformation)[:, 1]
+    def fit(self, x_data, y_data, num_epochs, batch_size, optimizer, criterion):
+        '''
+        Fit the model on x_data and y_data.
+        ##
+        Input :
+                x_data = [DataFrame] x data
+                y_data = [Series] labels
+                num_epochs = [int] number of epochs
+                batch_size = [int] batch size
+                optimizer = [pytorch function] optimizer for training
+                criterion = [pytorch function] loss function
+        Output: trained model, train loss
+        '''
+        train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([x_data, y_data], axis = 1)),
+                                                    batch_size = batch_size,
+                                                    shuffle = True)
+        # Train the model
+        loss_vec = np.zeros(num_epochs)
+        for epoch in trange(num_epochs):
+            loss = self.train_model(train_loader,
+                                    criterion = criterion,
+                                    optimizer = optimizer)
+            loss_vec[epoch] = loss.item()
+        return self, loss_vec
+    def save_model(self, save_path):
+        '''
+        Save the model to save_path.
+        Input :
+                save_path = [str] path to save the model parameters.
+        Output:
+                None
+        '''
+        # Save model
+        model_to_save = self.module if hasattr(self, "module") else self
+        torch.save(model_to_save, save_path)
+
+

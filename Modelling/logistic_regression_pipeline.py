@@ -8,7 +8,7 @@ from ED_support_module import LogisticRegression
 # ========= 0. Preliminary seetings =========
 MODEL_NAME = "LR"
 RANDOM_SEED = 50
-MODE = "e"
+MODE = "a"
 FPR_THRESHOLD = 0.1
 
 PENALTY = "l1"   # Penalty of the first fit
@@ -54,9 +54,10 @@ def setup_parser():
 
 
 # ----------------------------------------------------
-# Path to save figures
-FIG_PATH = "../../results/logistic_regression_e/"
+# Path set-up
+FIG_PATH = "../../results/logistic_regression/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}_{PENALTY}penalty/"
 
 
 # Create folder if not already exist
@@ -87,7 +88,7 @@ for j, time in enumerate(time_span[2:-1]):
     # Month to be predicted
     time_pred = time_span[j + 3]
     # Create folder if not already exist
-    DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
+    DYNAMIC_PATH = FIG_ROOT_PATH + f"{time_pred}/"
     if not os.path.exists(DYNAMIC_PATH):
         os.makedirs(DYNAMIC_PATH)
 
@@ -95,7 +96,7 @@ for j, time in enumerate(time_span[2:-1]):
     # Prepare train/test sets
     XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival,
                                             num_cols = num_cols,
-                                            mode = "a",
+                                            mode = MODE,
                                             time_threshold = time,
                                             test_size  =None,
                                             EPIC_CUI = EPIC_CUI,
@@ -103,7 +104,7 @@ for j, time in enumerate(time_span[2:-1]):
 
     print("Training for data up to {} ...".format(time))
     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
-                .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+                .format( yTrain.shape, yTest.shape, yTrain.sum(), yTest.sum() ) )
             
 
     # ========= 2.a.i. Model =========
@@ -179,7 +180,7 @@ for j, time in enumerate(time_span[2:-1]):
 # ========= 2.c. Summary plots =========
 print("Saving summary plots ...")
 
-summary_plot_path = FIG_PATH + "dynamic/"
+summary_plot_path = FIG_ROOT_PATH
 # Subplots of ROCs
 evaluator.roc_subplot(summary_plot_path, time_span, [3, 3], eps = True)
 # Aggregate ROC

@@ -316,6 +316,9 @@ class Preprocess:
         Output: num_cols = [list] col names of numerical features
         '''
         num_cols = data.select_dtypes(include = [np.number]).columns.tolist()
+        # Disch.Date.Time should have been categorical
+        if "Disch.Date.Time" in num_cols:
+            num_cols.remove("Disch.Date.Time")
         return num_cols
 
 
@@ -334,63 +337,5 @@ class Preprocess:
         data_col = data[col_name]
         # Get index of missing dates
         return data_col.isnull().loc[data_col.isnull()].index
-
-
-
-
-# ----------------------------------------------------
-
-# XTrain2, XTest2, XValid2, yTrain2, yTest2, yValid2 = stratified_split(EPIC_enc, numCols, "b", test_size=0.25, EPIC_CUI=EPIC_CUI,
-#                                                                       valid_size=0.15, seed=27, pca_components=0.95)
-
-# XTrain2, XTest2, XValid2, yTrain2, yTest2, yValid2 = stratified_split(EPIC_enc, numCols, "e", test_size=0.25, EPIC_CUI=EPIC_CUI,
-#                                                                       valid_size=0.15, seed=27, pca_components=0.95)
-
-
-# XTrain2, XTest2, XValid2, yTrain2, yTest2, yValid2 = stratified_split(EPIC_arrival, numCols, "e", time_threshold=201902,
-#                                                                       test_size=0.25, EPIC_CUI=EPIC_CUI,
-#                                                                       valid_size=0.15, seed=27, pca_components=0.95)
-
-
-
-# ----------------------------------------------------
-
-
-
-# ----------------------------------------------------
-# class EPICTrainTest2:
-#     def __init__(self, EPIC_enc, num_cols, mode,
-#                 EPIC_CUI=None, valid_size=None, pca_components=None, seed=None,
-#                 time_threshold=None):
-#         self.EPIC_enc = EPIC_enc
-#         self.num_cols = num_cols
-
-#         def add_TFIDF(self, ):
-#             if mode not in ['a', 'b']:
-#                 try:
-#                     return TFIDF(EPIC_CUI, EPIC_enc)
-#                 except:
-#                     raise ValueError("EPIC_CUI must be given when including TF-IDF")
-
-
-#             # Prepare taining set
-#             if mode not in ['a', 'b']:
-#                 try:
-#                     EPIC_enc, cui_cols = TFIDF(EPIC_CUI, EPIC_enc)
-#                 except:
-#                     raise ValueError("EPIC_CUI must be given when including TF-IDF")
-#             # Separate input features and target
-#             y = EPIC_enc['Primary.Dx']
-#             X = EPIC_enc.drop('Primary.Dx', axis = 1)
-#             # Prepare train and test sets
-#             if "Arrived" in X.columns:
-#                 XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True)
-#             else:
-#                 raise ValueError("\'Arrived\' must be included as a feature in input EPIC_enc.")
-#             return PCA_splitter(XTrain, XTest, yTrain, yTest, num_cols,
-#                                 valid_size=valid_size, pca_compoents=pca_components, seed=seed)
-
-
-
 
 

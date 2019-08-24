@@ -113,7 +113,7 @@ def predict_proba_single(self, x):
     
 
 
-
+# Add methods
 sk.linear_model.LogisticRegression.which_zero = which_zero
 sk.linear_model.LogisticRegression.remove_zero_coef_ = remove_zero_coef_
 sk.linear_model.LogisticRegression.double_fits = double_fits

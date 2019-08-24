@@ -151,7 +151,8 @@ def shapley(model_class, train_dict, test_data, fpr_threshold,
 
 
 def shapley_exact(model_class, train_dict, test_data, fpr_threshold,
-                convergence_tol, performance_tol, max_iter, benchmark_score):
+                convergence_tol, performance_tol, max_iter, benchmark_score,
+                model_name, num_epochs, batch_size, optimizer, criterion, device):
     groups = list( train_dict.keys() )
     power_set = list_powerset(groups)
     power_set.remove([])
@@ -161,17 +162,35 @@ def shapley_exact(model_class, train_dict, test_data, fpr_threshold,
     x_test = test_data.iloc[:, :-1]
     y_test = test_data.iloc[:, -1]
     for current_gp in groups:
+        print("Computing Shapley for {}".format(current_gp))
         shapley = 0
         for subgp in power_set:
             if current_gp not in subgp:
-                summand = shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, fpr_threshold)
+                input_size = x_test.shape[0]
+                DROP_PROB = 0.4
+                HIDDEN_SIZE = 500
+                BATCH_SIZE = 128
+                NUM_EPOCHS = 100
+                LEARNING_RATE = 1e-3
+                CLASS_WEIGHT = 3000
+                model_class = NeuralNet(device = device,
+                                        input_size = input_size,
+                                        drop_prob = DROP_PROB,
+                                        hidden_size = HIDDEN_SIZE).to(device)
+                criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
+                optimizer = torch.optim.SGD(model_class.parameters(), lr = LEARNING_RATE)
+                summand = shapley_summand(model_class, subgp, current_gp, train_dict,
+                                            x_test, y_test, fpr_threshold,
+                                            model_name, num_epochs, batch_size, optimizer,
+                                            criterion, device)
                 shapley += summand
         shapley_vec[current_gp] = shapley
     return shapley_vec
 
 
 
-def shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, fpr_threshold):
+def shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, fpr_threshold,
+                    model_name, num_epochs, batch_size, optimizer, criterion, device):
     '''
     Compute the summand.
     '''
@@ -190,13 +209,21 @@ def shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, 
         # Get labels
         y_train = data.iloc[:, -1]
         # Fit model and evaluate metric
-        model = model_class.fit(x_train, y_train)
-        pred_prob = model.predict_proba(x_test)[:, 1]
-        y_pred = pred_prob > 0.5
-        scores[k] = sk.metrics.accuracy_score(y_test, y_pred)
-        # y_pred = threshold_predict(pred_prob, y_test, fpr_threshold)
-        # scores[k] = true_positive_rate(y_test, y_pred)
-    print(scores)
+        if model_name == "logistic":
+            model = model_class.fit(x_train, y_train)
+            pred_prob = model.predict_proba(x_test)[:, 1]
+        elif model_name == "nn":
+            model = model_class.fit(self = model_class, x_data = x_train,
+                                    y_data = y_train,
+                                    num_epochs = num_epochs,
+                                    batch_size = batch_size,
+                                    optimizer = optimizer,
+                                    criterion = criterion)
+            pred_prob = model.predict_proba(x_test)[:, 1]
+        # y_pred = pred_prob > 0.5
+        # scores[k] = sk.metrics.accuracy_score(y_test, y_pred)
+        y_pred = threshold_predict(pred_prob, y_test, fpr_threshold)
+        scores[k] = true_positive_rate(y_test, y_pred)
     
     return (scores[1] - scores[0]) / comb( len( train_dict ) - 1, len( subgp ) )
 

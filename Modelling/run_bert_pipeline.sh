@@ -3,7 +3,7 @@
 
 CODE_DIR=$(pwd)
 
-echo "$(tput setaf 1)Contents of output directory:$(tput sgr 0)"
+echo "$(tput setaf 1)Running BERT pipeline...$(tput sgr 0)"
 
 # Fine-tune and save model
 for j in 2 3 4 5 6 7 8 9 10
@@ -14,5 +14,7 @@ for j in 2 3 4 5 6 7 8 9 10
         --task_name=epic_task \
         --start_time=$j
         echo "$(tput setaf 1) $j completed.\n$(tput sgr 0)"
+
     done
+
 
