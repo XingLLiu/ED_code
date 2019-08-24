@@ -112,15 +112,15 @@ CACHE_DIR = '../../ClinicalBert/pretrained_bert_tf/biobert_pretrain_output_all_n
 MAX_SEQ_LENGTH = 512
 
 # Other model hyper-parameters
-WEIGHT = 300000
-WEIGHT2 = 100
+WEIGHT1 = 300000
+WEIGHT0 = 100
 TRAIN_BATCH_SIZE = 6
 EVAL_BATCH_SIZE = 8
 LEARNING_RATE = 1e-3
-NUM_TRAIN_EPOCHS = 1
+NUM_TRAIN_EPOCHS = 6
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
-WARMUP_PROPORTION = 0.1
+WARMUP_PROPORTION = 0.15
 OUTPUT_MODE = 'classification'
 
 CONFIG_NAME = "bert_config.json"
@@ -254,7 +254,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
                             warmup=WARMUP_PROPORTION,
                             t_total=num_train_optimization_steps)
         # Loss
-        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT])).to(device)
+        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([WEIGHT0, WEIGHT1])).to(device)
     else:
         # Get train set (= test set from the last month)
         _, XTrainOld, _, yTrainOld= time_split(data = EPIC, threshold = time_span[j - 1])
