@@ -90,20 +90,20 @@ class Preprocess:
         diagnoses = EPIC['Diagnoses']
         EPIC = EPIC.drop(['Diagnosis', 'Diagnoses'], axis = 1)
         # Initialize indicators
-        ifSepsis1 = np.zeros(EPIC.shape[0], dtype = bool)
-        ifSepsis2 = np.zeros(EPIC.shape[0], dtype = bool)
-        ifSepsis3 = np.zeros(EPIC.shape[0], dtype = bool)
+        if_disease1 = np.zeros(EPIC.shape[0], dtype = bool)
+        if_disease2 = np.zeros(EPIC.shape[0], dtype = bool)
+        if_disease3 = np.zeros(EPIC.shape[0], dtype = bool)
         for name in self.disease:
             # Check if Primary.Dx contains disease
-            ifSepsis1 = EPIC['Primary.Dx'].str.contains(name) | ifSepsis1
+            if_disease1 = EPIC['Primary.Dx'].str.contains(name) | if_disease1
             # Check if Diagnosis contains disease
-            ifSepsis2 = diagnosis.str.contains(name) | ifSepsis2
+            if_disease2 = diagnosis.str.contains(name) | if_disease2
             # Check if Diagnoses contains disease
-            ifSepsis3 = diagnoses.str.contains(name) | ifSepsis3
+            if_disease3 = diagnoses.str.contains(name) | if_disease3
         # Convert into binary class
-        ifSepsis = ifSepsis1 | ifSepsis2 | ifSepsis3
-        EPIC.loc[-ifSepsis, 'Primary.Dx'] = 0
-        EPIC.loc[ifSepsis, 'Primary.Dx'] = 1
+        if_disease = if_disease1 | if_disease2 | if_disease3
+        EPIC.loc[-if_disease, 'Primary.Dx'] = 0
+        EPIC.loc[if_disease, 'Primary.Dx'] = 1
         EPIC['Primary.Dx'] = EPIC['Primary.Dx'].astype('int')
         return EPIC
 
@@ -247,8 +247,8 @@ class Preprocess:
                 cuiCols: Column names of the CUIs
         '''
         # Find all Sepsis
-        ifSepsis = EPIC['Primary.Dx'] == 1
-        CUISepsis = EPIC.iloc[ifSepsis.values]
+        if_disease = EPIC['Primary.Dx'] == 1
+        CUISepsis = EPIC.iloc[if_disease.values]
         # Get all unique CUIs
         triageNotes = {}
         for i in CUISepsis.index:
