@@ -39,6 +39,7 @@ class NeuralNet(nn.Module):
         Output: loss
         '''
         self.train()
+        loss_sum = 0
         for i, x in enumerate(train_loader):
             x = x.to(self.device)
             # Retrieve design matrix and labels
@@ -51,8 +52,10 @@ class NeuralNet(nn.Module):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        return loss
-    def eval_model(self, test_loader, transformation=None):
+            # Add loss
+            loss_sum += loss.item()
+        return loss_sum
+    def eval_model(self, test_loader, transformation=None, criterion=None):
         '''
         Evaluate the neural network model. Only makes sense if
         test_loader contains all test data. Note that this is
@@ -62,20 +65,25 @@ class NeuralNet(nn.Module):
         Model will be set to evaluation mode internally.
 
         Input :
-                train_loader = [DataLoader] training set. Must not
-                                contain the response.
+                train_loader = [DataLoader] training set. Must contain
+                                the response in the last column.
                 transformation = [Function] function for evaluatin
                                  transforming the output. If not given,
                                  raw output is return.
+                criterion = [Function] if given, the accumulative loss
+                            is computed.
         Output:
                 outputs = output from the model (after transformation).
+                loss = accumulative loss.
         '''
         self.eval()
+        loss_sum = 0
         with torch.no_grad():
             for i, x in enumerate(test_loader):
                 x = x.to(self.device)
-                # Retrieve design matrix
-                x = x.float()
+                # Retrieve design matrix and labels
+                labels = x[:, -1].long()
+                x = x[:, :(-1)].float()
                 # Prediction
                 outputs = self(x)
                 if transformation is not None:
@@ -88,28 +96,43 @@ class NeuralNet(nn.Module):
                     outputs_vec = np.append(outputs_vec,
                                             np.array(outputs.cpu()),
                                             axis = 0)
-        return outputs_vec
-    def predict_proba_single(self, x_data, batch_size=None, transformation=None):
+                # Compute loss
+                if criterion is not None:
+                    loss = criterion(outputs, labels)
+                    loss_sum += loss.item()
+        if criterion is not None:
+            return outputs_vec, loss_sum
+        else:
+            return outputs_vec
+    def predict_proba_single(self, x_data, y_data, batch_size=None,
+                            transformation=None, criterion=None):
         '''
         Transform x_data into dataloader and return predicted scores
         for being of class 1.
         Input :
-                x_data = [DataFrame or array] train set. Must not contain
-                         the response.
+                x_data = [DataFrame] train set.
+                y_data = [DataFrame] labels,
                 batch_size = [int] batch size used to construct data loader.
                 transformation = [Function] function for evaluatin
                                  transforming the output. If not given,
                                  raw output is returned.
+                criterion = [Function] if given, the accumulative loss
+                            is computed.
         Output:
                 pred_prob = [array] predicted probability for being
                             of class 1.
         '''
+        data = pd.concat([x_data, y_data], axis = 1)
         if batch_size is None:
             batch_size = x_data.shape[0]
-        test_loader = torch.utils.data.DataLoader(dataset = np.array(x_data),
+        test_loader = torch.utils.data.DataLoader(dataset = np.array(data),
                                                 batch_size = batch_size,
                                                 shuffle = False)
-        return self.eval_model(test_loader, transformation)[:, 1]
+        if criterion is not None:
+            pred_prob, loss = self.eval_model(test_loader, transformation, criterion)
+            return pred_prob[:, 1], loss
+        else:
+            return self.eval_model(test_loader, transformation, criterion)[:, 1]
     def fit(self, x_data, y_data, num_epochs, batch_size, optimizer, criterion):
         '''
         Fit the model on x_data and y_data.
@@ -129,10 +152,10 @@ class NeuralNet(nn.Module):
         # Train the model
         loss_vec = np.zeros(num_epochs)
         for epoch in trange(num_epochs):
-            loss = self.train_model(train_loader,
-                                    criterion = criterion,
-                                    optimizer = optimizer)
-            loss_vec[epoch] = loss.item()
+            loss_sum = self.train_model(train_loader,
+                                        criterion = criterion,
+                                        optimizer = optimizer)
+            loss_vec[epoch] = loss_sum
         return self, loss_vec
     def save_model(self, save_path):
         '''

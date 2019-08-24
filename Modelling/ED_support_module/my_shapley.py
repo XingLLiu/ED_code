@@ -166,23 +166,28 @@ def shapley_exact(model_class, train_dict, test_data, fpr_threshold,
         shapley = 0
         for subgp in power_set:
             if current_gp not in subgp:
-                input_size = x_test.shape[0]
-                DROP_PROB = 0.4
-                HIDDEN_SIZE = 500
-                BATCH_SIZE = 128
-                NUM_EPOCHS = 100
-                LEARNING_RATE = 1e-3
-                CLASS_WEIGHT = 3000
-                model_class = NeuralNet(device = device,
-                                        input_size = input_size,
-                                        drop_prob = DROP_PROB,
-                                        hidden_size = HIDDEN_SIZE).to(device)
-                criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
-                optimizer = torch.optim.SGD(model_class.parameters(), lr = LEARNING_RATE)
-                summand = shapley_summand(model_class, subgp, current_gp, train_dict,
-                                            x_test, y_test, fpr_threshold,
-                                            model_name, num_epochs, batch_size, optimizer,
-                                            criterion, device)
+                if model_name == "nn":
+                    input_size = x_test.shape[0]
+                    DROP_PROB = 0.4
+                    HIDDEN_SIZE = 500
+                    BATCH_SIZE = 128
+                    NUM_EPOCHS = 100
+                    LEARNING_RATE = 1e-3
+                    CLASS_WEIGHT = 3000
+                    model_class = NeuralNet(device = device,
+                                            input_size = input_size,
+                                            drop_prob = DROP_PROB,
+                                            hidden_size = HIDDEN_SIZE).to(device)
+                    criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
+                    optimizer = torch.optim.SGD(model_class.parameters(), lr = LEARNING_RATE)
+                    summand = shapley_summand(model_class, subgp, current_gp, train_dict,
+                                                x_test, y_test, fpr_threshold,
+                                                model_name, num_epochs, batch_size, optimizer,
+                                                criterion, device)
+                else:
+                    model_class = model_class
+                    summand = shapley_summand(model_class, subgp, current_gp, train_dict,
+                                                x_test, y_test, fpr_threshold, model_name)
                 shapley += summand
         shapley_vec[current_gp] = shapley
     return shapley_vec
@@ -190,7 +195,7 @@ def shapley_exact(model_class, train_dict, test_data, fpr_threshold,
 
 
 def shapley_summand(model_class, subgp, current_gp, train_dict, x_test, y_test, fpr_threshold,
-                    model_name, num_epochs, batch_size, optimizer, criterion, device):
+                    model_name, num_epochs=None, batch_size=None, optimizer=None, criterion=None, device=None):
     '''
     Compute the summand.
     '''

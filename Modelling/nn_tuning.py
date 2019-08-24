@@ -15,7 +15,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 MODEL_NAME = "NN"
 RANDOM_SEED = 27
-CLASS_WEIGHT = 3000
+CLASS_WEIGHT1 = 300000
+CLASS_WEIGHT0 = 100
 MODE = "a"
 FPR_THRESHOLD = 0.1
 
@@ -57,7 +58,7 @@ def setup_parser():
 
 
 # Path set-up
-FIG_PATH = "../../results/neural_net_tuning/"
+FIG_PATH = "../../results/neural_net_tunning/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 
 
@@ -126,62 +127,46 @@ print( "Train size: {}. Test size: {}. Validation size: {}. Sepsis cases in [tra
 # ========= 2.a.i. Model =========
 # Initialize the model at the first iteration
 
-# Neural net model
+# Model
 input_size = XTrain.shape[1]
 model = NeuralNet(device = device,
                     input_size = input_size,
                     drop_prob = DROP_PROB,
                     hidden_size = HIDDEN_SIZE).to(device)
-
 # Loss and optimizer
-# nn.CrossEntropyLoss() computes softmax internally
-criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
+criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([CLASS_WEIGHT0, CLASS_WEIGHT1])).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
-
-# Initialize loss vector
-loss_vec = np.zeros(NUM_EPOCHS)
-loss_vec_valid = np.zeros(NUM_EPOCHS)
-
-# Construct data loaders
-train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
-                                            batch_size = BATCH_SIZE,
-                                            shuffle = True)
-test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
-                                            batch_size = len(yTest),
-                                            shuffle = False)
-valid_loader = torch.utils.data.DataLoader(dataset = np.array(XValid),
-                                            batch_size = len(yValid),
-                                            shuffle = False)
-# Otherwise only update the model on data from the previous month
-# else:
-# train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrainOld, yTrainOld], axis = 1)),
-#                                             batch_size = BATCH_SIZE,
-#                                             shuffle = True)
-# test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
-#                                             batch_size = len(yTest),
-#                                             shuffle = False)
 
 # Train the model
 transformation = nn.Sigmoid()
-for epoch in trange(NUM_EPOCHS):
-    loss = model.train_model(train_loader,
-                            criterion = criterion,
-                            optimizer = optimizer)
-    # Validation
-    output_valid = model.eval_model(test_loader = valid_loader,
-                        transformation = transformation)
-    y_pred = threshold_predict(pred_prob = output_valid[:, 1], y_data = yValid, fpr = FPR_THRESHOLD)
-    with torch.no_grad():
-        y_pred = np.array(y_pred)
-        yValid = np.array(yValid)
-        loss_valid = criterion(torch.Tensor(output_valid), torch.Tensor(yValid).long())
-    # Save loss
-    loss_vec[epoch] = loss.item()
-    loss_vec_valid[epoch] = loss_valid.item()
+loss_train_vec = np.zeros(NUM_EPOCHS)
+loss_valid_vec = np.zeros(NUM_EPOCHS)
+for ind in range(NUM_EPOCHS):
+    # Train loss
+    model, loss_train = model.fit(x_data = XTrain,
+                                y_data = yTrain,
+                                num_epochs = 1,
+                                batch_size = BATCH_SIZE,
+                                optimizer = optimizer,
+                                criterion = criterion)
+    # Validation loss
+    transformation = nn.Sigmoid().to(device)
+    criterion_valid = nn.CrossEntropyLoss(weight = torch.FloatTensor([CLASS_WEIGHT0, CLASS_WEIGHT1])).to(device)
+    pred, loss_valid = model.predict_proba_single(x_data = XValid,
+                                                    y_data = yValid,
+                                                    batch_size = BATCH_SIZE,
+                                                    transformation = transformation,
+                                                    criterion = criterion_valid)
+    print(loss_valid)
+    loss_train_vec[ind] = loss_train / ( CLASS_WEIGHT0 * (len(yTrain) - yTrain.sum()) + CLASS_WEIGHT1 * yTrain.sum() )
+    loss_valid_vec[ind] = loss_valid / ( CLASS_WEIGHT0 * (len(yValid) - yValid.sum()) + CLASS_WEIGHT1 * yValid.sum() )
+
+
+
 
 # Plot and save losses
-_ = sns.scatterplot(range(len(loss_vec)), loss_vec, label = "train")
-_ = sns.scatterplot(range(len(loss_vec)), loss_vec_valid, label = "valid")
+_ = sns.scatterplot(range(len(loss_train_vec)), loss_train_vec, label = "train")
+_ = sns.scatterplot(range(len(loss_valid_vec)), 10*loss_valid_vec, label = "valid")
 plt.savefig(DYNAMIC_PATH + f"losses_{time_pred}.png")
 plt.close()
 
@@ -192,15 +177,24 @@ plt.close()
     #                                             batch_size = len(yTrain),
     #                                             shuffle = False)
 
-    transformation = nn.Sigmoid()
-    pred = model.eval_model(test_loader = test_loader,
-                            transformation = transformation)[:, 1]
 
-    evaluator = Evaluation.Evaluation(yTrain, pred)
+evaluator = Evaluation.Evaluation(yValid, pred)
 
-    # Save ROC plot
-    _ = evaluator.roc_plot(plot = False, title = MODEL_NAME, save_path = DYNAMIC_PATH + f"roc_{time_pred}")
-    
+# Save ROC plot
+_ = evaluator.roc_plot(plot = False, title = MODEL_NAME, save_path = DYNAMIC_PATH + f"roc_{time_pred}")
+
+
+
+pred = model.predict_proba_single(x_data = XTest,
+                                y_data = yTest,
+                                batch_size = BATCH_SIZE,
+                                transformation = transformation)
+
+
+evaluator = Evaluation.Evaluation(yTest, pred)
+# Save ROC plot
+_ = evaluator.roc_plot(plot = False, title = MODEL_NAME, save_path = DYNAMIC_PATH + f"roc_test_{time_pred}")
+
 
 
     # Save data of this month as train set for the next iteration
