@@ -165,7 +165,7 @@ XTrain, XTest, yTrain, yTest= time_split(data = EPIC, threshold = time)
 
 print("Training for data up to {} ...".format(time))
 print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
-            .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+            .format( yTrain.shape, yTest.shape, yTrain.sum(), yTest.sum() ) )
 
 
 
@@ -287,8 +287,6 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
     features = []
     max_len = 0
     for (ex_index, example) in enumerate(examples):
-        if (ex_index % 10000) == 0:
-            print('Iteration:', ex_index)
         tokens_a = tokenizer.tokenize(example.text_a)
         tokens_b = None
         if example.text_b:
@@ -610,6 +608,8 @@ for i, batch in enumerate(tqdm(eval_dataloader, desc="Evaluating")):
 
 # Save predicted probabilities
 pickle.dump(prob, open(REPORTS_DIR + "predicted_probs.pkl", 'wb'))
+prob = pd.DataFrame(prob, columns = ["pred_prob"])
+prob.to_csv(REPORTS_DIR + "predicted_probs.csv", index = False)
 
 roc = lr_roc_plot(yTest, prob, save_path = REPORTS_DIR + f'roc.eps', plot = True)
 

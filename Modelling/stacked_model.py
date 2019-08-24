@@ -1,130 +1,33 @@
 from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
+from ED_support_module.StackedModel import StackedModel
 
 
 # ----------------------------------------------------
-# ========= 0.i. Supporting functions and classes =========
-# NN model
-class NeuralNet(nn.Module):
-    def __init__(self, device, input_size=61, hidden_size=500, num_classes=2, drop_prob=0):
-        super(NeuralNet, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.ac1 = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_size, num_classes)
-        self.dp_layer1 = nn.Dropout(drop_prob)
-        self.dp_layer2 = nn.Dropout(drop_prob)
-        self.device = device
-    def forward(self, x):
-        h = self.dp_layer1(x)
-        h = self.fc1(h)
-        h = self.ac1(h)
-        h = self.dp_layer2(h)
-        return self.fc2(h)
-    def train_model(self, train_loader, criterion, optimizer):
-        '''
-        Train and back-propagate the neural network model. Note that
-        this is different from the built-in method self.train, which
-        sets the model to train mode.
-
-        Model will be set to evaluation mode internally.
-
-        Input : train_loader = [DataLoader] training set. The
-                               last column must be the response.
-                criterion = [Function] tensor function for evaluatin
-                            the loss.
-                optimizer = [Function] tensor optimizer function.
-                device = [object] cuda or cpu
-        Output: loss
-        '''
-        self.train()
-        for i, x in enumerate(train_loader):
-            x = x.to(self.device)
-            # Retrieve design matrix and labels
-            labels = x[:, -1].long()
-            x = x[:, :(-1)].float()
-            # Forward pass
-            outputs = self(x)
-            loss = criterion(outputs, labels)
-            # Backward and optimize
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-        return loss
-    def eval_model(self, test_loader, transformation=None):
-        '''
-        Evaluate the neural network model. Only makes sense if
-        test_loader contains all test data. Note that this is
-        different from the built-in method self.eval, which
-        sets the model to train mode.
-        
-        Model will be set to evaluation mode internally.
-
-        Input : 
-                train_loader = [DataLoader] training set. Must not
-                                contain the response.
-                transformation = [Function] function for evaluatin
-                                 transforming the output. If not given,
-                                 raw output is return.
-        Output: 
-                outputs = output from the model (after transformation).
-        '''
-        model.eval()
-        with torch.no_grad():
-            for i, x in enumerate(test_loader):
-                x = x.to(self.device)
-                # Retrieve design matrix
-                x = x.float()
-                # Prediction
-                outputs = model(x)
-                if transformation is not None:
-                    # Probability of belonging to class 1
-                    outputs = transformation(outputs).detach()
-                # Append probabilities
-                if i == 0:
-                    outputs_vec = np.array(outputs[:, 1])
-                else:
-                    outputs_vec = np.append(outputs_vec,
-                                            np.array(outputs[:, 1]),
-                                            axis = 0)
-        return outputs_vec
-    def predict_proba_single(self, x_data):
-        '''
-        Transform x_data into dataloader and return predicted scores
-        for being of class 1.
-        Input :
-                x_data = [DataFrame or array] train set. Must not contain
-                         the response.
-        Output:
-                pred_prob = [array] predicted probability for being
-                            of class 1.
-        '''
-        test_loader = torch.utils.data.DataLoader(dataset = np.array(x_data),
-                                                batch_size = len(x_data),
-                                                shuffle = False)
-        return self.eval_model(test_loader, transformation=None)
-        
-
-# ----------------------------------------------------
-# ========= 0.ii. Preliminary seetings =========
+# ========= 0. Preliminary seetings =========
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-MODEL_NAME = "NN"
+MODEL_NAME = "stacked"
 RANDOM_SEED = 27
-CLASS_WEIGHT = 3000
+CLASS_WEIGHT1 = 300000
+CLASS_WEIGHT0 = 100
 MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 10000
+NUM_EPOCHS = 25
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
-# SAMPLE_WEIGHT = 15
-DROP_PROB = 0.1
-HIDDEN_SIZE = 250
+DROP_PROB = 0.4
+HIDDEN_SIZE = 100
 
-
+# Parameters of NN (for loading results).
+NUM_EPOCHS_NN = 25
+HIDDEN_SIZE_NN = 500 
+# Parameters of BERT
+TASK_NAME = "epic_task"
 
 
 
@@ -153,9 +56,14 @@ def setup_parser():
 # args = parser.parse_args()
 
 
-# Path to save figures
-FIG_PATH = "../../results/neural_net/"
+# Path set-up
+FIG_PATH = "../../results/stacked/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+FIG_ROOT_PATH = FIG_PATH + f"dynamic_{NUM_EPOCHS}epochs_{2 * HIDDEN_SIZE}hiddenSize/"
+NN_ROOT_PATH =  f"../../results/neural_net/dynamic_{NUM_EPOCHS_NN}epochs_{2 * HIDDEN_SIZE_NN}hiddenSize/"
+BERT_ROOT_PATH = f"../../results/bert/dynamic/{TASK_NAME}/"
+
+TIME_SPAN_PATH = "../../results/bert/Raw_Notes/time_span"
 
 
 # Create folder if not already exist
@@ -164,7 +72,7 @@ if not os.path.exists(FIG_PATH):
 
 
 # ----------------------------------------------------
-# ========= 1. Further preprocessing =========
+# ========= 1. Read in data =========
 preprocessor = EPICPreprocess.Preprocess(DATA_PATH)
 EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival = preprocessor.streamline()
 
@@ -188,96 +96,89 @@ for j, time in enumerate(time_span[2:-1]):
     time_pred = time_span[j + 3]
 
     # Create folder if not already exist
-    DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
-    if not os.path.exists(DYNAMIC_PATH):
-        os.makedirs(DYNAMIC_PATH)
+    DYNAMIC_PATH = FIG_ROOT_PATH + f"{time_pred}/"
+    MONTH_DATA_PATH = DYNAMIC_PATH + "data/"
+    # NN results path
+    NN_RESULTS_PATH = NN_ROOT_PATH + f"{time_pred}/"
+    BERT_RESULTS_PATH = BERT_ROOT_PATH + f"{time_pred}/"
+
+    for path in [DYNAMIC_PATH, MONTH_DATA_PATH]:
+        if not os.path.exists(path):
+            os.makedirs(path)
 
 
-    # Prepare train/test sets
-    XTrain, XTest, yTrain, yTest= splitter(EPIC_arrival,
-                                            num_cols,
-                                            MODE,
-                                            time_threshold = time,
-                                            test_size = None,
-                                            EPIC_CUI = EPIC_CUI,
-                                            seed = RANDOM_SEED)
-    print("Training for data up to {} ...".format(time))
-    print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
-                .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
-
-
-    # ========= 2.a.i. Model 1 =========
-    # Initialize the model at the first iteration
-    if j == 0:
-        # Neural net model
-        input_size = XTrain.shape[1]
-        model = NeuralNet(device = device,
-                          input_size = input_size,
-                          drop_prob = DROP_PROB,
-                          hidden_size = HIDDEN_SIZE).to(device)
-
-        # Loss and optimizer
-        # nn.CrossEntropyLoss() computes softmax internally
-        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
-        optimizer = torch.optim.SGD(model.parameters(), lr = LEARNING_RATE)
-
-        # Initialize loss vector
-        loss_vec = np.zeros(NUM_EPOCHS)
-
-        # Construct data loaders
-        train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
-                                                    batch_size = BATCH_SIZE,
-                                                    shuffle = True)
-        test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
-                                                    batch_size = len(yTest),
-                                                    shuffle = False)
-    # Otherwise only update the model on data from the previous month
+    # Prepare train set
+    nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_{time_pred}.csv")
+    bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_{time_pred}.csv")
+    # Account for more response being added to bert_results
+    if bert_results.shape[0] > nn_results.shape[0]:
+        XTrain = pd.concat( [ nn_results, bert_results[ : nn_results.shape[0] ] ], axis = 1 )
     else:
-        train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrainOld, yTrainOld], axis = 1)),
-                                                    batch_size = BATCH_SIZE,
-                                                    shuffle = True)
-        test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest, yTest),
-                                                    batch_size = len(yTest),
-                                                    shuffle = False)
+        XTrain = pd.concat([nn_results, bert_results], axis = 1)
+
+    # Get train labels
+    _, _, _, yTrain= splitter(EPIC_arrival,
+                                num_cols,
+                                MODE,
+                                time_threshold = time,
+                                test_size = None,
+                                EPIC_CUI = EPIC_CUI,
+                                seed = RANDOM_SEED)
+
+    # Prepare test set
+    NN_RESULTS_PATH = NN_ROOT_PATH + f"{time_span[j + 4]}/"
+    BERT_RESULTS_PATH = BERT_ROOT_PATH + f"{time_span[j + 4]}/"
+    nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_{time_span[j + 4]}.csv")
+    bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_{time_span[j + 4]}.csv")
+    if bert_results.shape[0] > nn_results.shape[0]:
+        XTest = pd.concat( [ nn_results, bert_results[ : nn_results.shape[0] ] ], axis = 1 )
+    else:
+        XTest = pd.concat([nn_results, bert_results], axis = 1)
+
+    # Get test labels
+    _, _, _, yTest = splitter(EPIC_arrival,
+                                num_cols,
+                                MODE,
+                                time_threshold = time_pred,
+                                test_size = None,
+                                EPIC_CUI = EPIC_CUI,
+                                seed = RANDOM_SEED)
+
+
+    print("Training for data up to {} ...".format(time_pred))
+    print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
+                .format( yTrain.shape, yTest.shape, yTrain.sum(), yTest.sum() ) )
+
+
+    # ========= 2.a.i. Model =========
+    input_size = XTrain.shape[1]
+    model = StackedModel(device = device,
+                        input_size = input_size,
+                        drop_prob = DROP_PROB,
+                        hidden_size = HIDDEN_SIZE).to(device)
+    # Loss and optimizer
+    criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([CLASS_WEIGHT0, CLASS_WEIGHT1])).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
+
 
     # Train the model
-    for epoch in trange(NUM_EPOCHS):
-        loss = model.train_model(train_loader,
-                                criterion = criterion,
-                                optimizer = optimizer)
-        loss_vec[epoch] = loss.item()
+    model, loss_vec = model.fit(x_data = XTrain,
+                                y_data = yTrain,
+                                num_epochs = NUM_EPOCHS,
+                                batch_size = BATCH_SIZE,
+                                optimizer = optimizer,
+                                criterion = criterion)
 
     # Prediction
-    transformation = nn.Sigmoid()
-    pred = model.eval_model(test_loader = test_loader,
-                            transformation = transformation)
+    transformation = nn.Sigmoid().to(device)
+    pred = model.predict_proba_single(x_data = XTest,
+                                        batch_size = BATCH_SIZE,
+                                        transformation = transformation)
 
-    # Save data of this month as train set for the next iteration
-    XTrainOld = XTest
-    yTrainOld = yTest
-
-    # Save model
-    model_to_save = model.module if hasattr(model, "module") else model
-    torch.save(model_to_save.state_dict(), DYNAMIC_PATH + f"model_{time_pred}.pkl")
-
-
-    # ========= 2.a.i. Model 2 =========
-
-
-    # ========= 2.a.ii. Feature importance by permutation test =========
-    # Permutation test
-    imp_means, imp_vars = feature_importance_permutation(
-                            predict_method = model.predict_proba_single,
-                            X = np.array(XTest),
-                            y = np.array(yTest),
-                            metric = true_positive_rate,
-                            fpr_threshold = FPR_THRESHOLD,
-                            num_rounds = 5,
-                            seed = RANDOM_SEED)
-    # Save feature importance plot
-    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
-
+    # Comput and store the predicted probs for the train set
+    pred_train = model.predict_proba_single(x_data = XTrain,
+                                            batch_size = BATCH_SIZE,
+                                            transformation = transformation)
 
     # ========= 2.b. Evaluation =========
     evaluator = Evaluation.Evaluation(yTest, pred)
@@ -287,12 +188,17 @@ for j, time in enumerate(time_span[2:-1]):
 
     # Save summary
     summary_data = evaluator.summary()
-    summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
+    summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = True)
 
 
     # ========= 2.c. Save predicted results =========
+    # Store probs for test set
     pred = pd.DataFrame(pred, columns = ["pred_prob"])
-    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = False)
+    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = True)
+
+    # Store probs for train set (for stacked model)
+    pred_train = pd.DataFrame(pred, columns = ["pred_prob"])
+    pred_train.to_csv(DYNAMIC_PATH + f"predicted_result_train_{time_pred}.csv", index = True)   
 
 
     # ========= End of iteration =========
@@ -303,7 +209,8 @@ for j, time in enumerate(time_span[2:-1]):
 # ========= 2.c. Summary plots =========
 print("Saving summary plots ...")
 
-SUMMARY_PLOT_PATH = FIG_PATH + "dynamic/"
+SUMMARY_PLOT_PATH = FIG_ROOT_PATH
+
 # Subplots of ROCs
 evaluator.roc_subplot(SUMMARY_PLOT_PATH, time_span, dim = [3, 3], eps = True)
 # Aggregate ROC

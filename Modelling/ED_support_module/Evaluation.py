@@ -7,8 +7,10 @@ class Evaluation:
             pred_prob = [list or Series] predicted probability of class 1.
     '''
     def __init__(self, y_true, pred_prob):
-        self.pred_prob = pred_prob
         self.y_true = y_true
+        self.pred_prob = pred_prob
+        if isinstance(pred_prob, pd.DataFrame):
+            self.pred_prob = self.pred_prob.iloc[:, 0]
     def roc_plot(self, plot=True, title="", n_pts = 51, save_path = None):
         '''
         Plot the roc curve of a trained logistic regression model.

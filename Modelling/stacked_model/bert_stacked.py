@@ -3,9 +3,11 @@
 # 1. if clean note
 # 2. mode: train, test, train_test
 # ----------------------------------------------------
+import sys
+sys.path.append("../")
+sys.path.append("../ClinicalNotePreProcessing")
 from __future__ import absolute_import, division, print_function
 from ED_support_module import *
-sys.path.append("../ClinicalNotePreProcessing")
 from extract_dates_script import findDates
 import csv
 import logging
@@ -21,9 +23,9 @@ from ED_support_module.BertForSepsis import *
 # ----------------------------------------------------
 # Directories for saving files
 # Path set-up
-FIG_PATH = "../../results/bert/"
-DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
-RAW_TEXT_PATH = "../../data/EPIC_DATA/EPIC.csv"
+FIG_PATH = "../../../results/stacked_model/"
+DATA_PATH = "../../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
+RAW_TEXT_PATH = "../../../data/EPIC_DATA/EPIC.csv"
 RAW_SAVE_DIR = FIG_PATH + "Raw_Notes/"
 
 
@@ -92,9 +94,6 @@ logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(messa
                     level = logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Parser arguements
-parser = setup_parser()
-args = parser.parse_args()
 
 # Bert pre-trained model selected in the list: bert-base-uncased, 
 # bert-large-uncased, bert-base-cased, bert-large-cased, bert-base-multilingual-uncased,
@@ -105,22 +104,23 @@ BERT_MODEL = 'clinical_bert'
 TASK_NAME = 'epic_task'
 
 # This is where BERT will look for pre-trained models to load parameters from.
-CACHE_DIR = '../../ClinicalBert/pretrained_bert_tf/biobert_pretrain_output_all_notes_150000/'
+CACHE_DIR = '../../../ClinicalBert/pretrained_bert_tf/biobert_pretrain_output_all_notes_150000/'
 
 # The maximum total input sequence length after WordPiece tokenization.
 # Sequences longer than this will be truncated, and sequences shorter than this will be padded.
 MAX_SEQ_LENGTH = 512
 
 # Other model hyper-parameters
-WEIGHT1 = 300000
-WEIGHT0 = 100
+MODE = "a"
+WEIGHT = 500
+WEIGHT2 = 16
 TRAIN_BATCH_SIZE = 6
 EVAL_BATCH_SIZE = 8
 LEARNING_RATE = 1e-3
-NUM_TRAIN_EPOCHS = 6
+NUM_TRAIN_EPOCHS = 1
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
-WARMUP_PROPORTION = 0.15
+WARMUP_PROPORTION = 0.1
 OUTPUT_MODE = 'classification'
 
 CONFIG_NAME = "bert_config.json"
@@ -134,87 +134,42 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NUM_GPU = torch.cuda.device_count()
 
 
-
-CLEAN_NOTES = False
-
-
-
 # ----------------------------------------------------
-# Create folder to save raw text data if not exist
-if not os.path.exists(RAW_SAVE_DIR):
-    os.makedirs(RAW_SAVE_DIR)
-
-
-# ----------------------------------------------------
-# Prepare train and test sets
-# Load file
-EPIC_original = pd.read_csv(RAW_TEXT_PATH, encoding = 'ISO-8859-1')
-preprocessor = EPICPreprocess.Preprocess(path = RAW_TEXT_PATH)
-EPIC_original = preprocessor.BinarizeSepsis(EPIC_original)
-
-
-# Only keep text columns and label
-notes_cols = ['Note.Data_ED.Triage.Notes']
-EPIC = EPIC_original[['Primary.Dx'] + notes_cols]
+# ========= 1.Read data =========
+time_span = pickle.load(open(RAW_SAVE_DIR + "time_span", "rb"))
 
 
 # ----------------------------------------------------
 # ========= 1. Further preprocessing =========
 
-# if CLEAN_NOTES:
-#     EPIC = clean_epic_notes(EPIC = EPIC,
-#                             EPIC_cc = EPIC_original,
-#                             notes_cols = notes_cols,
-#                             data_path = DATA_PATH,
-#                             save_path = RAW_SAVE_DIR)
-
-
-# Clean the file if not already done
-if not os.path.exists(RAW_SAVE_DIR + "EPIC.csv"):
-    _ = clean_epic_notes(EPIC = EPIC,
-                        EPIC_cc = EPIC_original,
-                        notes_cols = notes_cols,
-                        data_path = DATA_PATH,
-                        save_path = RAW_SAVE_DIR)
-
-# Load data
-EPIC = pd.read_csv(RAW_SAVE_DIR + "EPIC.csv")
-time_span = pickle.load( open( RAW_SAVE_DIR + "time_span", "rb" ) )
-
-
-
-# ----------------------------------------------------
-# ========= 2.a. One-month ahead prediction =========
-print("====================================")
-print("Dynamically evaluate the model ...\n")
-
 
 
 for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
-    # ========= 2.a. Setup =========
-    # Month to be predicted
-    j = args.start_time
-    time = time_span[j]
-    time_pred = time_span[j + 1]
+# ========= 2.a. Setup =========
+# Month to be predicted
+j = args.start_time
+time = time_span[j]
+time_pred = time_span[j + 1]
 
 
-    # Create folder if not already exist
-    FIG_ROOT_PATH = FIG_PATH + f"dynamic/{TASK_NAME}/"
-    DYNAMIC_PATH = FIG_ROOT_PATH + f"{time_pred}/"
-    OUTPUT_DIR = DYNAMIC_PATH + f'Saved_Checkpoints/'
-    REPORTS_DIR = DYNAMIC_PATH
-    PROCESSED_NOTES_DIR = DYNAMIC_PATH + f"Processed_Texts/"
-    for path in [DYNAMIC_PATH, OUTPUT_DIR, REPORTS_DIR, PROCESSED_NOTES_DIR]:
-        if not os.path.exists(path):
-            os.makedirs(path)
+# Create folder if not already exist
+FIG_ROOT_PATH = FIG_PATH + f"dynamic/{TASK_NAME}/"
+DYNAMIC_PATH = FIG_ROOT_PATH + f"{time_pred}/"
+OUTPUT_DIR = DYNAMIC_PATH + f'Saved_Checkpoints/'
+REPORTS_DIR = DYNAMIC_PATH + "Reports/"
+RESULTS_DIR = DYNAMIC_PATH + "bert_results/"
+PROCESSED_NOTES_DIR = DYNAMIC_PATH + f"Processed_Texts/"
+for path in [DYNAMIC_PATH, OUTPUT_DIR, REPORTS_DIR, PROCESSED_NOTES_DIR]:
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 
-    # Prepare train/test sets
-    XTrain, XTest, yTrain, yTest= time_split(data = EPIC, threshold = time)
+# Prepare train/test sets
+XTrain, XTest, yTrain, yTest= time_split(data = EPIC, threshold = time)
 
-    print("Training for data up to {} ...".format(time))
-    print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
-                .format( yTrain.shape, yTest.shape, yTrain.sum(), yTest.sum() ) )
+print("Training for data up to {} ...".format(time))
+print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
+            .format( yTrain.shape, yTest.shape, yTrain.sum(), yTest.sum() ) )
 
 
 
@@ -254,7 +209,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
                             warmup=WARMUP_PROPORTION,
                             t_total=num_train_optimization_steps)
         # Loss
-        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([WEIGHT0, WEIGHT1])).to(device)
+        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, WEIGHT])).to(device)
     else:
         # Get train set (= test set from the last month)
         _, XTrainOld, _, yTrainOld= time_split(data = EPIC, threshold = time_span[j - 1])
@@ -310,12 +265,9 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
     save_bert(model, tokenizer, OUTPUT_DIR)
     # Save entire model
     torch.save(prediction_model, OUTPUT_DIR + "entire_model.ckpt")
-    # Save optimizer and loss function
+    # Save optimizer and loss
     pickle.dump(optimizer, open( OUTPUT_DIR + "optimizer.ckpt", "wb" ) )
     pickle.dump(criterion, open( OUTPUT_DIR + "loss.ckpt", "wb" ) )
-    # Save loss vector
-    loss_vec = pd.Series(loss_vec, name = "loss", index = False)
-    loss_vec.to_csv(OUTPUT_DIR + "loss_vec.csv")
 
     # Tar files
     P = subprocess.check_call(["./tar_bert_models.sh", OUTPUT_DIR, TASK_NAME, CONFIG_NAME, WEIGHTS_NAME])
@@ -338,13 +290,6 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
     # Save predicted probabilities
     pred = pd.DataFrame(pred, columns = ["pred_prob"])
     pred.to_csv(REPORTS_DIR + f"predicted_result_{time_pred}.csv", index = False)
-
-    # Save probs for train set (for stacked model)
-    pred_train = prediction_model.predict_proba_single(eval_features = train_features,
-                                                        batch_size = EVAL_BATCH_SIZE,
-                                                        transformation = transformation)
-    pred_train = pd.DataFrame(pred_train, columns = ["pred_prob"])
-    pred_train.to_csv(DYNAMIC_PATH + f"predicted_result_train_{time_pred}.csv", index = True)   
 
 
     # ========= 2.b. Evaluation =========

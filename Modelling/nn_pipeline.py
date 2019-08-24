@@ -3,13 +3,9 @@ from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
 from ED_support_module.NeuralNet import NeuralNet
 
-# ----------------------------------------------------
-# ========= 0.i. Supporting functions and classes =========
-# NN model
-   
 
 # ----------------------------------------------------
-# ========= 0.ii. Preliminary seetings =========
+# ========= 0. Preliminary seetings =========
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -21,13 +17,11 @@ MODE = "e"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 1000
+NUM_EPOCHS = 25
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 DROP_PROB = 0.4
 HIDDEN_SIZE = 500
-
-
 
 
 
@@ -56,7 +50,7 @@ def setup_parser():
 # args = parser.parse_args()
 
 
-# Path to save figures
+# Path set-up
 FIG_PATH = "../../results/neural_net/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 FIG_ROOT_PATH = FIG_PATH + f"dynamic_{NUM_EPOCHS}epochs_{2 * HIDDEN_SIZE}hiddenSize/"
@@ -109,64 +103,24 @@ for j, time in enumerate(time_span[2:-1]):
                                             seed = RANDOM_SEED)
     print("Training for data up to {} ...".format(time))
     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
-                .format( len(yTrain), len(yTest), yTrain.sum(), yTest.sum() ) )
+                .format( yTrain.shape, yTest.shape, yTrain.sum(), yTest.sum() ) )
 
 
     # ========= 2.a.i. Model =========
-    # Initialize the model at the first iteration
-    if j == 0:
+    # Initialize the model at all iterations
+    if j >= 0:
         # Neural net model
         input_size = XTrain.shape[1]
         model = NeuralNet(device = device,
                           input_size = input_size,
                           drop_prob = DROP_PROB,
                           hidden_size = HIDDEN_SIZE).to(device)
-
         # Loss and optimizer
-        # nn.CrossEntropyLoss() computes softmax internally
         criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
 
-        # # Initialize loss vector
-        # loss_vec = np.zeros(NUM_EPOCHS)
-
-        # # Construct data loaders
-        # train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
-        #                                             batch_size = BATCH_SIZE,
-        #                                             shuffle = True)
-        # test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
-        #                                             batch_size = len(yTest),
-        #                                             shuffle = False)
-    # Otherwise only update the model on data from the previous month
-    else:
-        # XTrain = XTrainOld
-        # yTrain = yTrainOld
-        # Read data. Train sets for this month is the test sets for last month
-        XTrain = pd.read_csv(MONTH_DATA_PATH + f"x_test_{time}.csv")
-        yTrain = pd.read_csv(MONTH_DATA_PATH + f"y_test_{time}.csv")
-        # train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrainOld, yTrainOld], axis = 1)),
-        #                                             batch_size = BATCH_SIZE,
-        #                                             shuffle = True)
-        # test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest, yTest),
-        #                                             batch_size = len(yTest),
-        #                                             shuffle = False)
-        # Load model
-        input_size = XTrain.shape[1]
-        # model = NeuralNet(device = device,
-        #                   input_size = input_size,
-        #                   drop_prob = DROP_PROB,
-        #                   hidden_size = HIDDEN_SIZE).to(device)
-        model = torch.load(FIG_ROOT_PATH + f"{time}/" + f"model_{time}.ckpt")
-
-
 
     # Train the model
-    # for epoch in trange(NUM_EPOCHS):
-    #     loss = model.train_model(train_loader,
-    #                             criterion = criterion,
-    #                             optimizer = optimizer)
-    #     loss_vec[epoch] = loss.item()
-
     model, loss_vec = model.fit(x_data = XTrain,
                                 y_data = yTrain,
                                 num_epochs = NUM_EPOCHS,
@@ -175,42 +129,43 @@ for j, time in enumerate(time_span[2:-1]):
                                 criterion = criterion)
 
     # Prediction
-    transformation = nn.Sigmoid()
-    # pred = model.eval_model(test_loader = test_loader,
-    #                         transformation = transformation)[:, 1]
-    pred = model.predict_proba_singel(x_data = XTest, batch_size = BATCH_SIZE,
+    transformation = nn.Sigmoid().to(device)
+    pred = model.predict_proba_single(x_data = XTest,
+                                        batch_size = BATCH_SIZE,
                                         transformation = transformation)
     
 
-    # # Save data of this month as train set for the next iteration
-    # XTrainOld = XTest
-    # yTrainOld = yTest
-
     # Save data
     XTrain.to_csv(MONTH_DATA_PATH + f"x_train_{time}.csv", index = False)
-    yTrain.to_csv(MONTH_DATA_PATH + f"y_train_{time}.csv", index = False)
+    yTrain.to_csv(MONTH_DATA_PATH + f"y_train_{time}.csv", index = False, header = True)
     XTest.to_csv(MONTH_DATA_PATH + f"x_test_{time_pred}.csv", index = False)
-    yTest.to_csv(MONTH_DATA_PATH + f"y_test_{time_pred}.csv", index = False)
+    yTest.to_csv(MONTH_DATA_PATH + f"y_test_{time_pred}.csv", index = False, header = True)
 
-    # Save model
-    # model_to_save = model.module if hasattr(model, "module") else model
-    # torch.save(model_to_save, DYNAMIC_PATH + f"model_{time_pred}.ckpt")
+    # Save model, optimizer and loss function
     model.save_model(save_path = DYNAMIC_PATH + f"model_{time_pred}.ckpt")
+    pickle.dump( optimizer, open( DYNAMIC_PATH + f"optimizer_{time_pred}.ckpt", "wb" ) )
+    pickle.dump( criterion, open( DYNAMIC_PATH + f"loss_func_{time_pred}.ckpt", "wb" ) )
+
+
+    # Comput and store the predicted probs for the train set (for stacked model)
+    pred_train = model.predict_proba_single(x_data = XTrain,
+                                            batch_size = BATCH_SIZE,
+                                            transformation = transformation)
 
 
     # ========= 2.a.ii. Feature importance by permutation test =========
-    # # Permutation test
-    # imp_means, imp_vars = feature_importance_permutation(
-    #                         predict_method = model.predict_proba_single,
-    #                         X = np.array(XTest),
-    #                         y = np.array(yTest),
-    #                         metric = true_positive_rate,
-    #                         fpr_threshold = FPR_THRESHOLD,
-    #                         num_rounds = 5,
-    #                         seed = RANDOM_SEED)
-    # # Save feature importance plot
-    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+    # Permutation test
+    imp_means, imp_vars = feature_importance_permutation(
+                            predict_method = model.predict_proba_single,
+                            X = np.array(XTest),
+                            y = np.array(yTest),
+                            metric = true_positive_rate,
+                            fpr_threshold = FPR_THRESHOLD,
+                            num_rounds = 5,
+                            seed = RANDOM_SEED)
+    # Save feature importance plot
+    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
 
     # ========= 2.b. Evaluation =========
@@ -221,12 +176,16 @@ for j, time in enumerate(time_span[2:-1]):
 
     # Save summary
     summary_data = evaluator.summary()
-    summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
+    summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = True)
 
 
     # ========= 2.c. Save predicted results =========
     pred = pd.DataFrame(pred, columns = ["pred_prob"])
-    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = False)
+    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = True)
+
+    # Save probs for train set (for stacked model)
+    pred_train = pd.DataFrame(pred_train, columns = ["pred_prob"])
+    pred_train.to_csv(DYNAMIC_PATH + f"predicted_result_train_{time_pred}.csv", index = True)   
 
 
     # ========= End of iteration =========

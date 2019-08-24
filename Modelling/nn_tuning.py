@@ -56,7 +56,7 @@ def setup_parser():
 # args = parser.parse_args()
 
 
-# Path to save figures
+# Path set-up
 FIG_PATH = "../../results/neural_net/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 
@@ -107,7 +107,7 @@ for j, time in enumerate(time_span[2:-1]):
                                                         seed = RANDOM_SEED)
     print("Training for data up to {} ...".format(time))
     print( "Train size: {}. Test size: {}. Validation size: {}. Sepsis cases in [train, test, valid]: [{}, {}, {}]."
-                .format( len(yTrain), len(yTest), len(yValid), yTrain.sum(), yTest.sum(), yValid.sum() ) )
+                .format( yTrain.shape, yTest.shape, len(yValid), yTrain.sum(), yTest.sum(), yValid.sum() ) )
 
 
 
