@@ -11,15 +11,15 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 MODEL_NAME = "NN"
 RANDOM_SEED = 27
-CLASS_WEIGHT = 300000
-NORMAL_CLASS_WEIGHT = 100
+CLASS_WEIGHT1 = 300000
+CLASS_WEIGHT0 = 100
 MODE = "e"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
 NUM_EPOCHS = 25
-BATCH_SIZE = 128
-LEARNING_RATE = 1e-3
+BATCH_SIZE = 1000
+LEARNING_RATE = 1e-4
 DROP_PROB = 0.4
 HIDDEN_SIZE = 500
 
@@ -116,7 +116,7 @@ for j, time in enumerate(time_span[2:-1]):
                           drop_prob = DROP_PROB,
                           hidden_size = HIDDEN_SIZE).to(device)
         # Loss and optimizer
-        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
+        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([CLASS_WEIGHT0, CLASS_WEIGHT1])).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
 
 
