@@ -89,7 +89,7 @@ class NeuralNet(nn.Module):
                                             np.array(outputs.cpu()),
                                             axis = 0)
         return outputs_vec
-    def predict_proba_single(self, x_data, batch_size, transformation=None):
+    def predict_proba_single(self, x_data, batch_size=None, transformation=None):
         '''
         Transform x_data into dataloader and return predicted scores
         for being of class 1.
@@ -104,6 +104,8 @@ class NeuralNet(nn.Module):
                 pred_prob = [array] predicted probability for being
                             of class 1.
         '''
+        if batch_size is None:
+            batch_size = x_data.shape[0]
         test_loader = torch.utils.data.DataLoader(dataset = np.array(x_data),
                                                 batch_size = batch_size,
                                                 shuffle = False)

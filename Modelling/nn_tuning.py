@@ -20,7 +20,7 @@ MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 1000
+NUM_EPOCHS = 100
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
 # SAMPLE_WEIGHT = 15
@@ -57,7 +57,7 @@ def setup_parser():
 
 
 # Path set-up
-FIG_PATH = "../../results/neural_net/"
+FIG_PATH = "../../results/neural_net_tuning/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 
 
@@ -68,7 +68,15 @@ if not os.path.exists(FIG_PATH):
 
 # ----------------------------------------------------
 # ========= 1. Further preprocessing =========
-preprocessor = EPICPreprocess.Preprocess(DATA_PATH)
+drop_cols = ['First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',
+                'Day.of.Arrival', 'Arrival.Month', 'FSA', 'Name.Of.Walkin', 'Name.Of.Hospital',
+                'Admitting.Provider', 'Disch.Date.Time', 'Discharge.Admit.Time',
+                'Distance.To.Sick.Kids', 'Distance.To.Walkin', 'Distance.To.Hospital', 'Systolic',
+                'Pulse']
+
+drop_cols = []
+
+preprocessor = EPICPreprocess.Preprocess(DATA_PATH, drop_cols = drop_cols)
 EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival = preprocessor.streamline()
 
 # Get numerical columns (for later transformation)
@@ -85,93 +93,97 @@ print("====================================")
 print("Dynamically evaluate the model ...\n")
 
 
-for j, time in enumerate(time_span[2:-1]):
-    # ========= 2.a. Setup =========
-    # Month to be predicted
-    time_pred = time_span[j + 3]
+# for j, time in enumerate(time_span[2:-1]):
 
-    # Create folder if not already exist
-    DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
-    if not os.path.exists(DYNAMIC_PATH):
-        os.makedirs(DYNAMIC_PATH)
+j = 0
+time = time_span[j + 2]
 
+# ========= 2.a. Setup =========
+# Month to be predicted
+time_pred = time_span[j + 3]
 
-    # Prepare train/test sets
-    XTrain, XTest, XValid, yTrain, yTest, yValid= splitter(EPIC_arrival,
-                                                        num_cols,
-                                                        MODE,
-                                                        time_threshold = time,
-                                                        test_size = None,
-                                                        valid_size = 0.15,
-                                                        EPIC_CUI = EPIC_CUI,
-                                                        seed = RANDOM_SEED)
-    print("Training for data up to {} ...".format(time))
-    print( "Train size: {}. Test size: {}. Validation size: {}. Sepsis cases in [train, test, valid]: [{}, {}, {}]."
-                .format( yTrain.shape, yTest.shape, len(yValid), yTrain.sum(), yTest.sum(), yValid.sum() ) )
+# Create folder if not already exist
+DYNAMIC_PATH = FIG_PATH + "dynamic/" + f"{time_pred}/"
+if not os.path.exists(DYNAMIC_PATH):
+    os.makedirs(DYNAMIC_PATH)
 
 
+# Prepare train/test sets
+XTrain, XTest, XValid, yTrain, yTest, yValid= splitter(EPIC_arrival,
+                                                    num_cols,
+                                                    MODE,
+                                                    time_threshold = time,
+                                                    test_size = None,
+                                                    valid_size = 0.15,
+                                                    EPIC_CUI = EPIC_CUI,
+                                                    seed = RANDOM_SEED)
+print("Training for data up to {} ...".format(time))
+print( "Train size: {}. Test size: {}. Validation size: {}. Sepsis cases in [train, test, valid]: [{}, {}, {}]."
+            .format( yTrain.shape, yTest.shape, len(yValid), yTrain.sum(), yTest.sum(), yValid.sum() ) )
 
-    # ========= 2.a.i. Model =========
-    # Initialize the model at the first iteration
-    if j == 0:
-        # Neural net model
-        input_size = XTrain.shape[1]
-        model = NeuralNet(device = device,
-                          input_size = input_size,
-                          drop_prob = DROP_PROB,
-                          hidden_size = HIDDEN_SIZE).to(device)
 
-        # Loss and optimizer
-        # nn.CrossEntropyLoss() computes softmax internally
-        criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
 
-        # Initialize loss vector
-        loss_vec = np.zeros(NUM_EPOCHS)
-        loss_vec_valid = np.zeros(NUM_EPOCHS)
+# ========= 2.a.i. Model =========
+# Initialize the model at the first iteration
 
-        # Construct data loaders
-        train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
-                                                    batch_size = BATCH_SIZE,
-                                                    shuffle = True)
-        test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
-                                                    batch_size = len(yTest),
-                                                    shuffle = False)
-        valid_loader = torch.utils.data.DataLoader(dataset = np.array(XValid),
-                                                    batch_size = len(yValid),
-                                                    shuffle = False)
-    # Otherwise only update the model on data from the previous month
-    else:
-        train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrainOld, yTrainOld], axis = 1)),
-                                                    batch_size = BATCH_SIZE,
-                                                    shuffle = True)
-        test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
-                                                    batch_size = len(yTest),
-                                                    shuffle = False)
+# Neural net model
+input_size = XTrain.shape[1]
+model = NeuralNet(device = device,
+                    input_size = input_size,
+                    drop_prob = DROP_PROB,
+                    hidden_size = HIDDEN_SIZE).to(device)
 
-    # Train the model
-    transformation = nn.Sigmoid()
-    for epoch in trange(NUM_EPOCHS):
-        loss = model.train_model(train_loader,
-                                criterion = criterion,
-                                optimizer = optimizer)
-        # Validation
-        output_valid = model.eval_model(test_loader = valid_loader,
-                            transformation = transformation)
-        y_pred = threshold_predict(pred_prob = output_valid[:, 1], y_data = yValid, fpr = FPR_THRESHOLD)
-        with torch.no_grad():
-            y_pred = np.array(y_pred)
-            yValid = np.array(yValid)
-            loss_valid = criterion(torch.Tensor(output_valid), torch.Tensor(yValid).long())
-        # Save loss
-        loss_vec[epoch] = loss.item()
-        loss_vec_valid[epoch] = loss_valid.item()
+# Loss and optimizer
+# nn.CrossEntropyLoss() computes softmax internally
+criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([1, CLASS_WEIGHT])).to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)
 
-    # Plot and save losses
-    _ = sns.scatterplot(range(len(loss_vec)), loss_vec, label = "train")
-    _ = sns.scatterplot(range(len(loss_vec)), loss_vec_valid, label = "valid")
-    plt.savefig(DYNAMIC_PATH + f"losses_{time_pred}.png")
-    plt.close()
+# Initialize loss vector
+loss_vec = np.zeros(NUM_EPOCHS)
+loss_vec_valid = np.zeros(NUM_EPOCHS)
+
+# Construct data loaders
+train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrain, yTrain], axis = 1)),
+                                            batch_size = BATCH_SIZE,
+                                            shuffle = True)
+test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
+                                            batch_size = len(yTest),
+                                            shuffle = False)
+valid_loader = torch.utils.data.DataLoader(dataset = np.array(XValid),
+                                            batch_size = len(yValid),
+                                            shuffle = False)
+# Otherwise only update the model on data from the previous month
+# else:
+# train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([XTrainOld, yTrainOld], axis = 1)),
+#                                             batch_size = BATCH_SIZE,
+#                                             shuffle = True)
+# test_loader = torch.utils.data.DataLoader(dataset = np.array(XTest),
+#                                             batch_size = len(yTest),
+#                                             shuffle = False)
+
+# Train the model
+transformation = nn.Sigmoid()
+for epoch in trange(NUM_EPOCHS):
+    loss = model.train_model(train_loader,
+                            criterion = criterion,
+                            optimizer = optimizer)
+    # Validation
+    output_valid = model.eval_model(test_loader = valid_loader,
+                        transformation = transformation)
+    y_pred = threshold_predict(pred_prob = output_valid[:, 1], y_data = yValid, fpr = FPR_THRESHOLD)
+    with torch.no_grad():
+        y_pred = np.array(y_pred)
+        yValid = np.array(yValid)
+        loss_valid = criterion(torch.Tensor(output_valid), torch.Tensor(yValid).long())
+    # Save loss
+    loss_vec[epoch] = loss.item()
+    loss_vec_valid[epoch] = loss_valid.item()
+
+# Plot and save losses
+_ = sns.scatterplot(range(len(loss_vec)), loss_vec, label = "train")
+_ = sns.scatterplot(range(len(loss_vec)), loss_vec_valid, label = "valid")
+plt.savefig(DYNAMIC_PATH + f"losses_{time_pred}.png")
+plt.close()
 
 
 

@@ -316,6 +316,9 @@ class Preprocess:
         Output: num_cols = [list] col names of numerical features
         '''
         num_cols = data.select_dtypes(include = [np.number]).columns.tolist()
+        # Disch.Date.Time should have been categorical
+        if "Disch.Date.Time" in num_cols:
+            num_cols.remove("Disch.Date.Time")
         return num_cols
 
 

@@ -154,18 +154,18 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.ii. Feature importance by permutation test =========
-    # Permutation test
-    imp_means, imp_vars = feature_importance_permutation(
-                            predict_method = model.predict_proba_single,
-                            X = np.array(XTest),
-                            y = np.array(yTest),
-                            metric = true_positive_rate,
-                            fpr_threshold = FPR_THRESHOLD,
-                            num_rounds = 5,
-                            seed = RANDOM_SEED)
-    # Save feature importance plot
-    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+    # # Permutation test
+    # imp_means, imp_vars = feature_importance_permutation(
+    #                         predict_method = model.predict_proba_single,
+    #                         X = np.array(XTest),
+    #                         y = np.array(yTest),
+    #                         metric = true_positive_rate,
+    #                         fpr_threshold = FPR_THRESHOLD,
+    #                         num_rounds = 5,
+    #                         seed = RANDOM_SEED)
+    # # Save feature importance plot
+    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
 
     # ========= 2.b. Evaluation =========
@@ -176,16 +176,16 @@ for j, time in enumerate(time_span[2:-1]):
 
     # Save summary
     summary_data = evaluator.summary()
-    summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = True)
+    summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
 
 
     # ========= 2.c. Save predicted results =========
     pred = pd.DataFrame(pred, columns = ["pred_prob"])
-    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = True)
+    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = False)
 
     # Save probs for train set (for stacked model)
     pred_train = pd.DataFrame(pred_train, columns = ["pred_prob"])
-    pred_train.to_csv(DYNAMIC_PATH + f"predicted_result_train_{time_pred}.csv", index = True)   
+    pred_train.to_csv(DYNAMIC_PATH + f"predicted_result_train_{time_pred}.csv", index = False)
 
 
     # ========= End of iteration =========
