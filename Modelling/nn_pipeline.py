@@ -17,7 +17,7 @@ MODE = "e"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 1200
+NUM_EPOCHS = 1500
 BATCH_SIZE = 125
 LEARNING_RATE = 1e-4
 DROP_PROB = 0.4
@@ -53,7 +53,7 @@ def setup_parser():
 # Path set-up
 FIG_PATH = "../../results/neural_net/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
-FIG_ROOT_PATH = FIG_PATH + f"dynamic_{NUM_EPOCHS}epochs_{2 * HIDDEN_SIZE}hiddenSize/"
+FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}_{NUM_EPOCHS}epochs_{2 * HIDDEN_SIZE}hiddenSize/"
 
 
 # Create folder if not already exist
