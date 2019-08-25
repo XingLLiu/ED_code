@@ -116,8 +116,8 @@ WEIGHT1 = 300000
 WEIGHT0 = 100
 TRAIN_BATCH_SIZE = 6
 EVAL_BATCH_SIZE = 8
-LEARNING_RATE = 1e-7
-NUM_TRAIN_EPOCHS = 2
+LEARNING_RATE = 1e-6
+NUM_TRAIN_EPOCHS = 1
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
 WARMUP_PROPORTION = 0.15
@@ -219,7 +219,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
         label_list = processor.get_labels()
         # Optimization step
         num_train_optimization_steps = int(
-            len(XTrain) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
+            len(XTrain) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS // 10
         # Load pretrained model tokenizer (vocabulary)
         tokenizer = BertTokenizer.from_pretrained(CACHE_DIR, do_lower_case=False)
         # Load model
@@ -260,7 +260,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
         label_list = processor.get_labels()
         # Optimization step
         num_train_optimization_steps = int(
-            len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
+            len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS // 20
         # Load pretrained tokenizer and model
         tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR_OLD + 'vocab.txt', do_lower_case=False)
         model = BertModel.from_pretrained(OUTPUT_DIR_OLD + f"{TASK_NAME}.tar.gz",cache_dir=OUTPUT_DIR)
@@ -285,11 +285,13 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
 
 
     # ========= 2.a.ii. Fine-tuning =========
-    prediction_model, loss_vec = prediction_model.fit(train_features = train_features,
-                                                        num_epochs = NUM_TRAIN_EPOCHS,
-                                                        batch_size = TRAIN_BATCH_SIZE,
-                                                        optimizer = optimizer,
-                                                        criterion = criterion)
+    if j <= 5:
+        # Train on the first 5 months to prevent overfitting
+        prediction_model, loss_vec = prediction_model.fit(train_features = train_features,
+                                                            num_epochs = NUM_TRAIN_EPOCHS,
+                                                            batch_size = TRAIN_BATCH_SIZE,
+                                                            optimizer = optimizer,
+                                                            criterion = criterion)
 
 
     # Save bert model

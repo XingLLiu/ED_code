@@ -286,7 +286,6 @@ class BertForSepsis(nn.Module):
             batch = tuple( t.to( self.device ) for t in batch )
             input_ids, input_mask, segment_ids, label_ids = batch
             logits = self(input_ids, segment_ids, input_mask).to(self.device)
-            print(logits)
             # Compute loss
             loss = criterion(logits, label_ids)
             if (i + 1) % gradient_accumulation_steps == 0:
@@ -332,7 +331,6 @@ class BertForSepsis(nn.Module):
                 input_ids, input_mask, segment_ids, label_ids = batch
                 # Output
                 logits = self(input_ids, segment_ids, input_mask).to(self.device)
-                print(logits)
                 # Evaluation metric
                 logits = logits.detach().cpu()
                 if transformation is not None:
@@ -364,10 +362,6 @@ class BertForSepsis(nn.Module):
                                     criterion = criterion,
                                     optimizer = optimizer)
             loss_vec[epoch] = loss
-            # if epoch == 0:
-            #     loss_vec = loss
-            # else:
-            #     loss_vec = np.append(loss_vec, loss)
         return self, loss_vec
     def predict_proba_single(self, eval_features, batch_size, transformation=None):
         '''

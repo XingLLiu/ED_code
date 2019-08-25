@@ -110,6 +110,10 @@ for j, time in enumerate(time_span[2:-1]):
     # Prepare train set
     nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_train_{time_pred}.csv")
     bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_train_{time_pred}.csv")
+    if bert_results.var() < 1e-4:
+        # Add permutation to bert_results
+        bert_results = bert_results + np.random.normal(bert_results.mean(), bert_results.mean()/5, bert_results.shape)
+    # Combine data
     XTrain = pd.concat( [ nn_results, bert_results[ : nn_results.shape[0] ] ], axis = 1 )
     # Print warning if dimensions do not agree
     if bert_results.shape[0] != nn_results.shape[0]:
@@ -126,15 +130,20 @@ for j, time in enumerate(time_span[2:-1]):
                                 EPIC_CUI = EPIC_CUI,
                                 seed = RANDOM_SEED)
 
+
     # Prepare test set
     NN_RESULTS_PATH = NN_ROOT_PATH + f"{time_span[j + 4]}/"
     BERT_RESULTS_PATH = BERT_ROOT_PATH + f"{time_span[j + 4]}/"
     nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_{time_span[j + 4]}.csv")
     bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_{time_span[j + 4]}.csv")
-    if bert_results.shape[0] > nn_results.shape[0]:
-        XTest = pd.concat( [ nn_results, bert_results[ : nn_results.shape[0] ] ], axis = 1 )
-    else:
-        XTest = pd.concat([nn_results, bert_results], axis = 1)
+    if bert_results.var() < 1e-4:
+        # Add permutation to bert_results
+        bert_results = bert_results + np.random.normal(bert_results.mean(), bert_results.mean()/5, bert_results.shape)
+    if bert_results.shape[0] != nn_results.shape[0]:
+        raise Warning( "Numbers of bert and NN results do not agree: [{}, {}]"
+                        .format( bert_results.shape[0], nn_results.shape[0] ) )
+    # Combine data
+    XTest = pd.concat([nn_results, bert_results], axis = 1)
 
 
     # Get test labels
