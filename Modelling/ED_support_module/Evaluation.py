@@ -180,6 +180,7 @@ class FeatureImportance:
         _ = sns.barplot(y = sorted_features[:self.show_num], x = self.mean[self.indices][:self.show_num],
                         xerr = std[self.indices][:self.show_num])
         _ = plt.yticks(fontsize = y_fontsize)
+        _ = plt.tight_layout()
         if save_path is not None:
             if eps:
                 plt.savefig(save_path + "feature_importance.eps", format="eps", dpi=800)

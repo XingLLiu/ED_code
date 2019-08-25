@@ -45,7 +45,7 @@ def setup_parser():
 
 
 # Path set-up
-FIG_PATH = "../../results/random_forest_c/"
+FIG_PATH = "../../results/random_forest/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}/"
 
@@ -127,32 +127,20 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.iii. Feature importance by permutation test =========
-    # # Add method for feature importance evaluation
-    # add_method(y_true = yTest, fpr = FPR_THRESHOLD)
 
-    # Permutation test
-    imp_means, imp_vars = mlxtend.evaluate.feature_importance_permutation(
-                            predict_method = model.threshold_predict,
-                            X = np.array(XTest),
-                            y = np.array(yTest),
-                            metric = true_positive_rate,
-                            num_rounds = 15,
-                            seed = RANDOM_SEED)
+    # # Permutation test
+    # imp_means, imp_vars = feature_importance_permutation(
+    #                         predict_method = model.predict_proba_single,
+    #                         X = np.array(XTest),
+    #                         y = np.array(yTest),
+    #                         metric = true_positive_rate,
+    #                         fpr_threshold = FPR_THRESHOLD,
+    #                         num_rounds = 10,
+    #                         seed = RANDOM_SEED)
 
-
-    # Permutation test
-    imp_means, imp_vars = feature_importance_permutation(
-                            predict_method = model.predict_proba_single,
-                            X = np.array(XTest),
-                            y = np.array(yTest),
-                            metric = true_positive_rate,
-                            fpr_threshold = FPR_THRESHOLD,
-                            num_rounds = 10,
-                            seed = RANDOM_SEED)
-
-    # Save feature importance plot
-    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+    # # Save feature importance plot
+    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
     # ========= 2.b. Evaluation =========
     evaluator = Evaluation.Evaluation(yTest, pred)
@@ -167,7 +155,7 @@ for j, time in enumerate(time_span[2:-1]):
     
     # ========= 2.c. Save predicted results =========
     pred = pd.Series(pred, name = "pred_prob")
-    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = False)
+    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = False, header = True)
 
 
     # ========= End of iteration =========

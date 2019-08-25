@@ -251,9 +251,11 @@ class BertForSepsis(nn.Module):
         self.num_labels = num_labels
         self.dropout = nn.Dropout(dropout_prob)
         self.classifier = nn.Linear(hidden_size, num_labels)
+        self.ac = nn.Sigmoid()
         nn.init.xavier_normal_(self.classifier.weight)
     def forward(self, input_ids, segment_ids, input_mask):
         _, pooled_output = self.bert(input_ids, segment_ids, input_mask)
+        pooled_output = self.ac(pooled_output)
         pooled_output = self.dropout(pooled_output.to(self.device))
         logits = self.classifier(pooled_output)
         return logits
@@ -278,12 +280,13 @@ class BertForSepsis(nn.Module):
         self.train()
         self.bert.train()
         # Initialize loss vector
-        loss_vec = np.zeros( len( train_loader ) // 10 )
+        loss_sum = 0
         for i, batch in enumerate(tqdm(train_loader, desc="Training")):
             # Get batch
             batch = tuple( t.to( self.device ) for t in batch )
             input_ids, input_mask, segment_ids, label_ids = batch
             logits = self(input_ids, segment_ids, input_mask).to(self.device)
+            print(logits)
             # Compute loss
             loss = criterion(logits, label_ids)
             if (i + 1) % gradient_accumulation_steps == 0:
@@ -300,9 +303,8 @@ class BertForSepsis(nn.Module):
             if (i + 1) % gradient_accumulation_steps == 0:
                 optimizer.step()
             # Store loss
-            if (i + 1) % 10 == 0:
-                loss_vec[i // 10] = loss.item()
-        return loss_vec
+            loss_sum += loss.item()
+        return loss_sum
     def eval_model(self, test_loader, batch_size, transformation=None):
         '''
         Evaluate the neural network model. Only makes sense if
@@ -328,11 +330,11 @@ class BertForSepsis(nn.Module):
                 # Get batch
                 batch = tuple( t.to( self.device ) for t in batch )
                 input_ids, input_mask, segment_ids, label_ids = batch
-                # Evaluate loss
+                # Output
                 logits = self(input_ids, segment_ids, input_mask).to(self.device)
+                print(logits)
                 # Evaluation metric
                 logits = logits.detach().cpu()
-                logits = logits
                 if transformation is not None:
                     logits = transformation(logits)
                 label_ids = label_ids.to('cpu').numpy()
@@ -356,14 +358,16 @@ class BertForSepsis(nn.Module):
                 trained model, train loss
         '''
         train_loader = feature_to_loader(train_features, batch_size)
+        loss_vec = np.zeros(num_epochs)
         for epoch in range(num_epochs):
             loss = self.train_model(train_loader,
                                     criterion = criterion,
                                     optimizer = optimizer)
-            if epoch == 0:
-                loss_vec = loss
-            else:
-                loss_vec = np.append(loss_vec, loss)
+            loss_vec[epoch] = loss
+            # if epoch == 0:
+            #     loss_vec = loss
+            # else:
+            #     loss_vec = np.append(loss_vec, loss)
         return self, loss_vec
     def predict_proba_single(self, eval_features, batch_size, transformation=None):
         '''
