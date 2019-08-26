@@ -25,19 +25,9 @@ tar zxvf ../ClinicalBert/pretrained_bert_tf.tar.gz -C ../ClinicalBert/
 ## Fine-Tune Clinical BERT
 BERT models require the input texts to be in a specific format. [Here](https://medium.com/swlh/a-simple-guide-on-using-bert-for-text-classification-bbf041ac8d04) is a clear and gental example of using BERT for classification. Seting `--clean_notes=True` and `--mode train` changes the texts into the required format and fine-tune the model.
 ```
-python ModelsBert.py \
---clean_notes=True \
---mode train \
---path ../data/EPIC_DATA/EPIC.csv \
---task_name customized_task_name
+sh run_bert_pipeline.sh
 ```
-
-## Model Evaluation
-To test the fine-tuned model:
-```
-python ModelsBERT.py \
---clean_notes False \
---mode test \
---path /home/xingliu/Documents/ED/data/EPIC_DATA/EPIC.csv \
---task_name customized_task_name
-```
+This will call `bert_pipeline.py`, which
+1. fine-tunes the BERT model under the one-month ahead framework,
+2. tar the fine-tuned model into `ED/results/bert/dynamic/epic_task/month/Saved_Checkpoints/` for later reference,
+3. evaluate the performance and save the plots in `ED/results/bert/dynamic/epic_task/month/`
