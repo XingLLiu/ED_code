@@ -7,7 +7,7 @@ from ED_support_module import LogisticRegression
 # ----------------------------------------------------
 # ========= 0. Preliminary seetings =========
 MODEL_NAME = "LR"
-RANDOM_SEED = 50
+RANDOM_SEED = 20
 MODE = "c"
 FPR_THRESHOLD = 0.1
 
@@ -57,7 +57,7 @@ def setup_parser():
 # Path set-up
 FIG_PATH = "../../results/logistic_regression/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
-FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}_{PENALTY}penalty/"
+FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}_seeds{RANDOM_SEED}_{PENALTY}penalty/"
 
 
 # Create folder if not already exist
@@ -116,12 +116,12 @@ for j, time in enumerate(time_span[2:-1]):
 
     # Fit logistic regression
     model = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = PENALTY,
-                                                max_iter = 1000).fit(XTrain, yTrain)
+                                                max_iter = 1000, random_state = RANDOM_SEED).fit(XTrain, yTrain)
 
     # Re-fit after removing features of zero coefficients
     XTrain = model.remove_zero_coef_(XTrain)
     model_new = sk.linear_model.LogisticRegression(solver = 'liblinear', penalty = 'l2',
-                                                    max_iter = 1000).fit(XTrain, yTrain)
+                                                    max_iter = 1000, random_state = RANDOM_SEED).fit(XTrain, yTrain)
 
     # Predict
     # Note that remove_zero_coef_ does not use XTest in training. It only removes some
@@ -143,19 +143,19 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.c. Feature importance =========
-    # Permutation test
-    imp_means, imp_vars = feature_importance_permutation(
-                            predict_method = model_new.predict_proba_single,
-                            X = np.array(XTest),
-                            y = np.array(yTest),
-                            metric = true_positive_rate,
-                            fpr_threshold = FPR_THRESHOLD,
-                            num_rounds = 5,
-                            seed = RANDOM_SEED)
+    # # Permutation test
+    # imp_means, imp_vars = feature_importance_permutation(
+    #                         predict_method = model_new.predict_proba_single,
+    #                         X = np.array(XTest),
+    #                         y = np.array(yTest),
+    #                         metric = true_positive_rate,
+    #                         fpr_threshold = FPR_THRESHOLD,
+    #                         num_rounds = 5,
+    #                         seed = RANDOM_SEED)
 
-    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    # Save feature importance plot
-    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 8, eps = True)
+    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    # # Save feature importance plot
+    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 8, eps = True)
 
 
     # ========= 2.b. Evaluation =========

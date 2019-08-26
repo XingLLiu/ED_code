@@ -20,16 +20,16 @@ MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 10
+NUM_EPOCHS = 400
 BATCH_SIZE = 128
-LEARNING_RATE = 1e-8
+LEARNING_RATE = 5e-4
 DROP_PROB = 0.4
-HIDDEN_SIZE = 100
+HIDDEN_SIZE = 50
 
-# Parameters of NN (for loading results).
+# Parameters of NN (for loading results)
 NUM_EPOCHS_NN = 1000
 HIDDEN_SIZE_NN = 500 
-# Parameters of BERT
+# Parameters of BERT (for loading results)
 TASK_NAME = "epic_task"
 
 
@@ -62,8 +62,8 @@ def setup_parser():
 # Path set-up
 FIG_PATH = "../../results/stacked/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
-FIG_ROOT_PATH = FIG_PATH + f"dynamic_{NUM_EPOCHS}epochs_{2 * HIDDEN_SIZE}hiddenSize/"
-NN_ROOT_PATH =  f"../../results/neural_net/dynamic_{MODE}_{NUM_EPOCHS_NN}epochs_{2 * HIDDEN_SIZE_NN}hiddenSize/"
+FIG_ROOT_PATH = FIG_PATH + f"dynamic_{NUM_EPOCHS}epochs/"
+NN_ROOT_PATH =  f"../../results/neural_net/dynamic_{MODE}_{NUM_EPOCHS_NN}epochs_{HIDDEN_SIZE_NN}hiddenSize/"
 BERT_ROOT_PATH = f"../../results/bert/dynamic/{TASK_NAME}/"
 
 TIME_SPAN_PATH = "../../results/bert/Raw_Notes/time_span"
@@ -100,50 +100,42 @@ for j, time in enumerate(time_span[2:-1]):
 
     # Create folder if not already exist
     DYNAMIC_PATH = FIG_ROOT_PATH + f"{time_pred}/"
-    MONTH_DATA_PATH = DYNAMIC_PATH + "data/"
+
     # NN results path
     NN_RESULTS_PATH = NN_ROOT_PATH + f"{time_pred}/"
+    # BERT results path
     BERT_RESULTS_PATH = BERT_ROOT_PATH + f"{time_pred}/"
 
-    for path in [DYNAMIC_PATH, MONTH_DATA_PATH]:
-        if not os.path.exists(path):
-            os.makedirs(path)
+    if not os.path.exists(DYNAMIC_PATH):
+        os.makedirs(DYNAMIC_PATH)
 
 
     # Prepare train set
     nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_train_{time_pred}.csv")
     bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_train_{time_pred}.csv")
-    if any( bert_results.var().values < 1e-3 ):
-        # Add permutation to bert_results
-        bert_results = bert_results + np.random.normal(bert_results.mean(), bert_results.mean(), bert_results.shape)
 
+    # Combine data, assuming data is sorted by time
+    nn_results = nn_results.iloc[-bert_results.shape[0] : ]
+    nn_results.reset_index(drop = True, inplace = True)
+    XTrain = pd.concat( [ nn_results.iloc[-bert_results.shape[0] : ], bert_results ], axis = 1 )
 
-    # Combine data
-    XTrain = pd.concat( [ nn_results, bert_results[ : nn_results.shape[0] ] ], axis = 1 )
-    # Print warning if dimensions do not agree
     if bert_results.shape[0] != nn_results.shape[0]:
-        print( "Warning: Numbers of bert and NN results do not agree: [{}, {}]"
-                        .format( bert_results.shape[0], nn_results.shape[0] ) )
+        print( "Warning: Numbers of bert and NN results do not agree in train sets: [{}, {}]. Year: {}"
+                        .format( bert_results.shape[0], nn_results.shape[0] , time_pred ) )
 
 
 
     # Prepare test set
-    # NN_RESULTS_PATH = NN_ROOT_PATH + f"{time_pred}/"
-    # BERT_RESULTS_PATH = BERT_ROOT_PATH + f"{time_pred}/"
     nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_{time_pred}.csv")
     bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_{time_pred}.csv")
-    if any( bert_results.var().values < 1e-3 ):
-        # Add permutation to bert_results
-        bert_results = bert_results + np.random.normal(bert_results.mean(), bert_results.mean(), bert_results.shape)
-
 
     if bert_results.shape[0] != nn_results.shape[0]:
-        print( "Warning: Numbers of bert and NN results do not agree: [{}, {}]"
-                        .format( bert_results.shape[0], nn_results.shape[0] ) )
+        print( "Warning: Numbers of bert and NN results do not agree in test sets: [{}, {}]. Year: {}"
+                        .format( bert_results.shape[0], nn_results.shape[0], time_pred ) )
 
 
     # Combine data
-    XTest = pd.concat( [ nn_results, bert_results[ : nn_results.shape[0] ] ], axis = 1 )
+    XTest = pd.concat( [ nn_results, bert_results ], axis = 1 )
 
 
     # Get labels
@@ -166,7 +158,7 @@ for j, time in enumerate(time_span[2:-1]):
         _, _, _, yTrain = splitter(EPIC_arrival,
                                     num_cols,
                                     MODE,
-                                    time_threshold = time_span[j - 1],
+                                    time_threshold = time_span[j + 1],
                                     test_size = None,
                                     EPIC_CUI = EPIC_CUI,
                                     seed = RANDOM_SEED)
@@ -179,14 +171,16 @@ for j, time in enumerate(time_span[2:-1]):
                                     seed = RANDOM_SEED)
 
 
+    # Assign the indices back to train data (useful when concatenating dataframes)
+    XTrain.index = yTrain.index
+    XTest.index = yTest.index
+
     print("Training for data up to {} ...".format(time_pred))
     print( "Train size: {}. Test size: {}. Sepsis cases in [train, test]: [{}, {}]."
                 .format( yTrain.shape, yTest.shape, yTrain.sum(), yTest.sum() ) )
 
 
     # ========= 2.a.i. Model =========
-    XTrain.columns = ["0", "1"]
-    XTest.columns = ["0", "1"]
     input_size = XTrain.shape[1]
     model = StackedModel(device = device,
                         input_size = input_size,

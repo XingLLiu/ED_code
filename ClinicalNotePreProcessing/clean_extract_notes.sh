@@ -1,6 +1,6 @@
 #!/bin/bash
 
-dir_apache=~/Documents/Ctakes/apache-ctakes-4.0.0/bin
+dir_apache=../Ctakes/apache-ctakes-4.0.0/bin
 
 # Maria's user/pass
 uname="MariaY"

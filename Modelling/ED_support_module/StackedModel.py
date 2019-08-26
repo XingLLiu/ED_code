@@ -2,24 +2,27 @@ from ED_support_module import *
 from ED_support_module.NeuralNet import NeuralNet
 
 class StackedModel(nn.Module):
-    def __init__(self, device, input_size=2, hidden_size=10, num_classes=2, drop_prob=0):
+    def __init__(self, device, input_size=2, hidden_size=20, num_classes=2, drop_prob=0):
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        # self.fc1 = nn.Linear(self.input_size, self.hidden_size)
-        # self.classification = nn.Linear(self.hidden_size, num_classes)
-        self.classification = nn.Linear(self.input_size, num_classes)
+        self.fc1 = nn.Linear(self.input_size, self.hidden_size)
+        self.fc2 = nn.Linear(self.hidden_size, self.hidden_size)
         self.ac1 = nn.LeakyReLU()
-        self.dp_layer = nn.Dropout(drop_prob)
+        self.ac2 = nn.LeakyReLU()
+        self.classification = nn.Linear(self.hidden_size, num_classes)
+        self.dp_layer1 = nn.Dropout(drop_prob)
+        self.dp_layer2 = nn.Dropout(drop_prob)
+        nn.init.xavier_normal_(self.classification.weight)
         self.device = device
     def forward(self, x):
-        # h = self.fc1(x)
-        # print(h)
-        # h = self.ac1(h)
-        # h = self.dp_layer1(h)
-        h = self.classification(x)
-        print(h)
-        return self.classification(x)
+        h = self.fc1(x)
+        h = self.ac1(h)
+        h = self.dp_layer1(h)
+        h = self.fc2(h)
+        h = self.ac2(h)
+        h = self.dp_layer2(h)
+        return self.classification(h)
     def train_model(self, train_loader, criterion, optimizer):
         '''
         Train and back-propagate the neural network model. Note that
@@ -183,6 +186,8 @@ class StackedModel(nn.Module):
                 criterion = [pytorch function] loss function
         Output: trained model, train loss
         '''
+        if any(x_data.index != y_data.index):
+            raise ValueError("Indices of x_data and y_data do not match! Make sure the indices are the same.")
         train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([x_data, y_data], axis = 1)),
                                                     batch_size = batch_size,
                                                     shuffle = True)

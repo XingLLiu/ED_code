@@ -197,6 +197,9 @@ class NeuralNet(nn.Module):
                 criterion = [pytorch function] loss function
         Output: trained model, train loss
         '''
+        # Check if the indices match. This may affect the concatenation step in preparing dataloader
+        if any(x_data.index != y_data.index):
+            raise ValueError("Indices of x_data and y_data do not match! Make sure the indices are the same.")
         train_loader = torch.utils.data.DataLoader(dataset = np.array(pd.concat([x_data, y_data], axis = 1)),
                                                     batch_size = batch_size,
                                                     shuffle = True)

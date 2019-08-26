@@ -8,12 +8,12 @@ from ED_support_module import RandomForest
 # ----------------------------------------------------
 # ========= 0. Preliminary seetings =========
 MODEL_NAME = "RF"
-RANDOM_SEED = 27
+RANDOM_SEED = 20
 CLASS_WEIGHT = 500
-MODE = "c"
+MODE = "a"
 FPR_THRESHOLD = 0.1
 
-N_ESTIMATORS = 4000
+N_ESTIMATORS = 2000
 MAX_DEPTH = 30
 MAX_FEATURES = "auto"
 
@@ -107,23 +107,24 @@ for j, time in enumerate(time_span[2:-1]):
     model = sk.ensemble.RandomForestClassifier(n_estimators = N_ESTIMATORS,
                                                max_depth = MAX_DEPTH,
                                                max_features = MAX_FEATURES,
-                                               class_weight = {0:1, 1:CLASS_WEIGHT}).fit(XTrain, yTrain)
+                                               class_weight = {0:1, 1:CLASS_WEIGHT},
+                                               random_state = RANDOM_SEED).fit(XTrain, yTrain)
 
     # Prediction
     pred = model.predict_proba(XTest)[:, 1]
 
 
     # ========= 2.a.ii. Feature importances by Gini impurity =========
-    # Get importance scores
-    importance_vals = model.feature_importances_
-    std = np.std( [tree.feature_importances_ for tree in model.estimators_] , axis=0 )
-    indices = np.argsort(importance_vals)[::-1]
-    _ = plt.figure()
-    _ = plt.title("Random Forest Feature Importance (Gini)")
-    _ = sns.barplot(y = XTrain.columns[indices][:20], x = importance_vals[indices][:20], xerr = std[indices][:20])
-    _ = plt.yticks(fontsize = 11)
-    plt.savefig(DYNAMIC_PATH + f"feature_imp_by_gini_{time_pred}.eps", format = 'eps', dpi = 800)
-    plt.close()
+    # # Get importance scores
+    # importance_vals = model.feature_importances_
+    # std = np.std( [tree.feature_importances_ for tree in model.estimators_] , axis=0 )
+    # indices = np.argsort(importance_vals)[::-1]
+    # _ = plt.figure()
+    # _ = plt.title("Random Forest Feature Importance (Gini)")
+    # _ = sns.barplot(y = XTrain.columns[indices][:20], x = importance_vals[indices][:20], xerr = std[indices][:20])
+    # _ = plt.yticks(fontsize = 11)
+    # plt.savefig(DYNAMIC_PATH + f"feature_imp_by_gini_{time_pred}.eps", format = 'eps', dpi = 800)
+    # plt.close()
 
 
     # ========= 2.a.iii. Feature importance by permutation test =========
