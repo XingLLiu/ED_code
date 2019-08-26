@@ -116,8 +116,8 @@ WEIGHT1 = 300000
 WEIGHT0 = 100
 TRAIN_BATCH_SIZE = 6
 EVAL_BATCH_SIZE = 8
-LEARNING_RATE = 1e-3
-NUM_TRAIN_EPOCHS = 6
+LEARNING_RATE = 1e-6
+NUM_TRAIN_EPOCHS = 1
 RANDOM_SEED = 27
 GRADIENT_ACCUMULATION_STEPS = 1
 WARMUP_PROPORTION = 0.15
@@ -132,11 +132,6 @@ MODEL_NAME = "bert"   # For saving the results
 # Use GPU if exists otherwise CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NUM_GPU = torch.cuda.device_count()
-
-
-
-CLEAN_NOTES = False
-
 
 
 # ----------------------------------------------------
@@ -160,15 +155,6 @@ EPIC = EPIC_original[['Primary.Dx'] + notes_cols]
 
 # ----------------------------------------------------
 # ========= 1. Further preprocessing =========
-
-# if CLEAN_NOTES:
-#     EPIC = clean_epic_notes(EPIC = EPIC,
-#                             EPIC_cc = EPIC_original,
-#                             notes_cols = notes_cols,
-#                             data_path = DATA_PATH,
-#                             save_path = RAW_SAVE_DIR)
-
-
 # Clean the file if not already done
 if not os.path.exists(RAW_SAVE_DIR + "EPIC.csv"):
     _ = clean_epic_notes(EPIC = EPIC,
@@ -232,8 +218,9 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
         train_data = processor.get_train_examples(PROCESSED_NOTES_DIR)
         label_list = processor.get_labels()
         # Optimization step
-        num_train_optimization_steps = int(
-            len(XTrain) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS * 10
+        # num_train_optimization_steps = int(
+        #     len(XTrain) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS // 10
+        num_train_optimization_steps = 500
         # Load pretrained model tokenizer (vocabulary)
         tokenizer = BertTokenizer.from_pretrained(CACHE_DIR, do_lower_case=False)
         # Load model
@@ -246,13 +233,14 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
         param_optimizer = list(prediction_model.named_parameters())
         no_decay = []
         optimizer_grouped_parameters = [
-            {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.001},
+            {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 1e-6},
             {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
         ]
         optimizer = BertAdam(optimizer_grouped_parameters,
                             lr=LEARNING_RATE,
                             warmup=WARMUP_PROPORTION,
                             t_total=num_train_optimization_steps)
+        # optimizer = torch.optim.Adam(prediction_model.parameters(), lr = LEARNING_RATE)
         # Loss
         criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([WEIGHT0, WEIGHT1])).to(device)
     else:
@@ -272,8 +260,9 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
         train_data = processor.get_train_examples(PROCESSED_NOTES_DIR)
         label_list = processor.get_labels()
         # Optimization step
-        num_train_optimization_steps = int(
-            len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS * 10
+        # num_train_optimization_steps = int(
+        #     len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS // 20
+        num_train_optimization_steps = 500
         # Load pretrained tokenizer and model
         tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR_OLD + 'vocab.txt', do_lower_case=False)
         model = BertModel.from_pretrained(OUTPUT_DIR_OLD + f"{TASK_NAME}.tar.gz",cache_dir=OUTPUT_DIR)
@@ -290,7 +279,6 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
     print("\nConverting examples to features ...")
     train_features = convert_examples_to_features(train_data, label_list, MAX_SEQ_LENGTH, tokenizer,
                                                     save_path = OUTPUT_DIR + "train_features.pkl")
-    # pickle.dump(train_features, open(OUTPUT_DIR + "train_features.pkl", 'wb'))
     print("Complete and saved to {}".format(OUTPUT_DIR))
 
     # Set weights of all embedding layers trainable
@@ -299,6 +287,8 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
 
 
     # ========= 2.a.ii. Fine-tuning =========
+    # if j <= 5:
+    # Train on the first 5 months to prevent overfitting
     prediction_model, loss_vec = prediction_model.fit(train_features = train_features,
                                                         num_epochs = NUM_TRAIN_EPOCHS,
                                                         batch_size = TRAIN_BATCH_SIZE,
@@ -315,7 +305,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
     pickle.dump(criterion, open( OUTPUT_DIR + "loss.ckpt", "wb" ) )
     # Save loss vector
     loss_vec = pd.Series(loss_vec, name = "loss")
-    loss_vec.to_csv(OUTPUT_DIR + "loss_vec.csv")
+    loss_vec.to_csv(OUTPUT_DIR + "loss_vec.csv", index = False, header = True)
 
     # Tar files
     P = subprocess.check_call(["./tar_bert_models.sh", OUTPUT_DIR, TASK_NAME, CONFIG_NAME, WEIGHTS_NAME])
@@ -337,7 +327,7 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
 
     # Save predicted probabilities
     pred = pd.DataFrame(pred, columns = ["pred_prob"])
-    pred.to_csv(REPORTS_DIR + f"predicted_result_{time_pred}.csv", index = False)
+    pred.to_csv(REPORTS_DIR + f"predicted_result_{time_pred}.csv", index = False, header = True)
 
     # Save probs for train set (for stacked model)
     pred_train = prediction_model.predict_proba_single(eval_features = train_features,

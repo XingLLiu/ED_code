@@ -1,3 +1,6 @@
+# May have bug if nn_pipeline.py and run_bert_pipeline.py
+# didn't run properly!
+
 from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
@@ -17,14 +20,14 @@ MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 25
+NUM_EPOCHS = 10
 BATCH_SIZE = 128
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-8
 DROP_PROB = 0.4
 HIDDEN_SIZE = 100
 
 # Parameters of NN (for loading results).
-NUM_EPOCHS_NN = 25
+NUM_EPOCHS_NN = 1000
 HIDDEN_SIZE_NN = 500 
 # Parameters of BERT
 TASK_NAME = "epic_task"
@@ -60,7 +63,7 @@ def setup_parser():
 FIG_PATH = "../../results/stacked/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 FIG_ROOT_PATH = FIG_PATH + f"dynamic_{NUM_EPOCHS}epochs_{2 * HIDDEN_SIZE}hiddenSize/"
-NN_ROOT_PATH =  f"../../results/neural_net/dynamic_{NUM_EPOCHS_NN}epochs_{2 * HIDDEN_SIZE_NN}hiddenSize/"
+NN_ROOT_PATH =  f"../../results/neural_net/dynamic_{MODE}_{NUM_EPOCHS_NN}epochs_{2 * HIDDEN_SIZE_NN}hiddenSize/"
 BERT_ROOT_PATH = f"../../results/bert/dynamic/{TASK_NAME}/"
 
 TIME_SPAN_PATH = "../../results/bert/Raw_Notes/time_span"
@@ -108,41 +111,72 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # Prepare train set
-    nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_{time_pred}.csv")
-    bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_{time_pred}.csv")
-    # Account for more response being added to bert_results
-    if bert_results.shape[0] > nn_results.shape[0]:
-        XTrain = pd.concat( [ nn_results, bert_results[ : nn_results.shape[0] ] ], axis = 1 )
-    else:
-        XTrain = pd.concat([nn_results, bert_results], axis = 1)
+    nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_train_{time_pred}.csv")
+    bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_train_{time_pred}.csv")
+    if any( bert_results.var().values < 1e-3 ):
+        # Add permutation to bert_results
+        bert_results = bert_results + np.random.normal(bert_results.mean(), bert_results.mean(), bert_results.shape)
 
-    # Get train labels
-    _, _, _, yTrain= splitter(EPIC_arrival,
-                                num_cols,
-                                MODE,
-                                time_threshold = time,
-                                test_size = None,
-                                EPIC_CUI = EPIC_CUI,
-                                seed = RANDOM_SEED)
+
+    # Combine data
+    XTrain = pd.concat( [ nn_results, bert_results[ : nn_results.shape[0] ] ], axis = 1 )
+    # Print warning if dimensions do not agree
+    if bert_results.shape[0] != nn_results.shape[0]:
+        print( "Warning: Numbers of bert and NN results do not agree: [{}, {}]"
+                        .format( bert_results.shape[0], nn_results.shape[0] ) )
+
+
 
     # Prepare test set
-    NN_RESULTS_PATH = NN_ROOT_PATH + f"{time_span[j + 4]}/"
-    BERT_RESULTS_PATH = BERT_ROOT_PATH + f"{time_span[j + 4]}/"
-    nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_{time_span[j + 4]}.csv")
-    bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_{time_span[j + 4]}.csv")
-    if bert_results.shape[0] > nn_results.shape[0]:
-        XTest = pd.concat( [ nn_results, bert_results[ : nn_results.shape[0] ] ], axis = 1 )
-    else:
-        XTest = pd.concat([nn_results, bert_results], axis = 1)
+    # NN_RESULTS_PATH = NN_ROOT_PATH + f"{time_pred}/"
+    # BERT_RESULTS_PATH = BERT_ROOT_PATH + f"{time_pred}/"
+    nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_{time_pred}.csv")
+    bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_{time_pred}.csv")
+    if any( bert_results.var().values < 1e-3 ):
+        # Add permutation to bert_results
+        bert_results = bert_results + np.random.normal(bert_results.mean(), bert_results.mean(), bert_results.shape)
 
-    # Get test labels
-    _, _, _, yTest = splitter(EPIC_arrival,
-                                num_cols,
-                                MODE,
-                                time_threshold = time_pred,
-                                test_size = None,
-                                EPIC_CUI = EPIC_CUI,
-                                seed = RANDOM_SEED)
+
+    if bert_results.shape[0] != nn_results.shape[0]:
+        print( "Warning: Numbers of bert and NN results do not agree: [{}, {}]"
+                        .format( bert_results.shape[0], nn_results.shape[0] ) )
+
+
+    # Combine data
+    XTest = pd.concat( [ nn_results, bert_results[ : nn_results.shape[0] ] ], axis = 1 )
+
+
+    # Get labels
+    if j == 0:
+        _, _, yTrain, _ = splitter(EPIC_arrival,
+                                    num_cols,
+                                    MODE,
+                                    time_threshold = time,
+                                    test_size = None,
+                                    EPIC_CUI = EPIC_CUI,
+                                    seed = RANDOM_SEED)
+        _, _, _, yTest = splitter(EPIC_arrival,
+                                    num_cols,
+                                    MODE,
+                                    time_threshold = time,
+                                    test_size = None,
+                                    EPIC_CUI = EPIC_CUI,
+                                    seed = RANDOM_SEED)
+    else:
+        _, _, _, yTrain = splitter(EPIC_arrival,
+                                    num_cols,
+                                    MODE,
+                                    time_threshold = time_span[j - 1],
+                                    test_size = None,
+                                    EPIC_CUI = EPIC_CUI,
+                                    seed = RANDOM_SEED)
+        _, _, _, yTest = splitter(EPIC_arrival,
+                                    num_cols,
+                                    MODE,
+                                    time_threshold = time,
+                                    test_size = None,
+                                    EPIC_CUI = EPIC_CUI,
+                                    seed = RANDOM_SEED)
 
 
     print("Training for data up to {} ...".format(time_pred))
@@ -151,6 +185,8 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.i. Model =========
+    XTrain.columns = ["0", "1"]
+    XTest.columns = ["0", "1"]
     input_size = XTrain.shape[1]
     model = StackedModel(device = device,
                         input_size = input_size,
@@ -169,16 +205,13 @@ for j, time in enumerate(time_span[2:-1]):
                                 optimizer = optimizer,
                                 criterion = criterion)
 
+
     # Prediction
     transformation = nn.Sigmoid().to(device)
     pred = model.predict_proba_single(x_data = XTest,
                                         batch_size = BATCH_SIZE,
                                         transformation = transformation)
 
-    # Comput and store the predicted probs for the train set
-    pred_train = model.predict_proba_single(x_data = XTrain,
-                                            batch_size = BATCH_SIZE,
-                                            transformation = transformation)
 
     # ========= 2.b. Evaluation =========
     evaluator = Evaluation.Evaluation(yTest, pred)
@@ -188,17 +221,14 @@ for j, time in enumerate(time_span[2:-1]):
 
     # Save summary
     summary_data = evaluator.summary()
-    summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = True)
+    summary_data.to_csv(DYNAMIC_PATH + f"summary_{time_pred}.csv", index = False)
 
 
     # ========= 2.c. Save predicted results =========
     # Store probs for test set
     pred = pd.DataFrame(pred, columns = ["pred_prob"])
-    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = True)
+    pred.to_csv(DYNAMIC_PATH + f"predicted_result_{time_pred}.csv", index = False)
 
-    # Store probs for train set (for stacked model)
-    pred_train = pd.DataFrame(pred, columns = ["pred_prob"])
-    pred_train.to_csv(DYNAMIC_PATH + f"predicted_result_train_{time_pred}.csv", index = True)   
 
 
     # ========= End of iteration =========

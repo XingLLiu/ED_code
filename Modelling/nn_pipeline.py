@@ -13,14 +13,14 @@ MODEL_NAME = "NN"
 RANDOM_SEED = 27
 CLASS_WEIGHT1 = 300000
 CLASS_WEIGHT0 = 100
-MODE = "e"
+MODE = "c"
 FPR_THRESHOLD = 0.1
 NUM_CLASS = 2
-NUM_EPOCHS = 1200
+NUM_EPOCHS = 100
 BATCH_SIZE = 125
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-3
 DROP_PROB = 0.4
-HIDDEN_SIZE = 500
+HIDDEN_SIZE = 1000
 
 
 
@@ -52,7 +52,7 @@ def setup_parser():
 # Path set-up
 FIG_PATH = "../../results/neural_net/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
-FIG_ROOT_PATH = FIG_PATH + f"dynamic_{NUM_EPOCHS}epochs_{2 * HIDDEN_SIZE}hiddenSize/"
+FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}_{NUM_EPOCHS}epochs_{2 * HIDDEN_SIZE}hiddenSize/"
 
 
 # Create folder if not already exist
@@ -129,7 +129,6 @@ for j, time in enumerate(time_span[2:-1]):
     # Prediction
     transformation = nn.Sigmoid().to(device)
     pred = model.predict_proba_single(x_data = XTest,
-                                        y_data = yTest,
                                         batch_size = BATCH_SIZE,
                                         transformation = transformation)
     
@@ -153,7 +152,7 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.ii. Feature importance by permutation test =========
-    # # Permutation test
+    # Permutation test
     # imp_means, imp_vars = feature_importance_permutation(
     #                         predict_method = model.predict_proba_single,
     #                         X = np.array(XTest),

@@ -8,7 +8,7 @@ from ED_support_module import LogisticRegression
 # ========= 0. Preliminary seetings =========
 MODEL_NAME = "LR"
 RANDOM_SEED = 50
-MODE = "a"
+MODE = "c"
 FPR_THRESHOLD = 0.1
 
 PENALTY = "l1"   # Penalty of the first fit
@@ -155,7 +155,7 @@ for j, time in enumerate(time_span[2:-1]):
 
     fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
     # Save feature importance plot
-    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 8, eps = True)
 
 
     # ========= 2.b. Evaluation =========
