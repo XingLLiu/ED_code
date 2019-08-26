@@ -1,3 +1,6 @@
+# May have bug if nn_pipeline.py and run_bert_pipeline.py
+# didn't run properly!
+
 from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
@@ -17,9 +20,9 @@ MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 25
+NUM_EPOCHS = 10
 BATCH_SIZE = 128
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-8
 DROP_PROB = 0.4
 HIDDEN_SIZE = 100
 
@@ -110,50 +113,70 @@ for j, time in enumerate(time_span[2:-1]):
     # Prepare train set
     nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_train_{time_pred}.csv")
     bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_train_{time_pred}.csv")
-    if bert_results.var() < 1e-4:
+    if any( bert_results.var().values < 1e-3 ):
         # Add permutation to bert_results
-        bert_results = bert_results + np.random.normal(bert_results.mean(), bert_results.mean()/5, bert_results.shape)
+        bert_results = bert_results + np.random.normal(bert_results.mean(), bert_results.mean(), bert_results.shape)
+
+
     # Combine data
     XTrain = pd.concat( [ nn_results, bert_results[ : nn_results.shape[0] ] ], axis = 1 )
     # Print warning if dimensions do not agree
     if bert_results.shape[0] != nn_results.shape[0]:
-        raise Warning( "Numbers of bert and NN results do not agree: [{}, {}]"
+        print( "Warning: Numbers of bert and NN results do not agree: [{}, {}]"
                         .format( bert_results.shape[0], nn_results.shape[0] ) )
 
-
-    # Get train labels
-    _, _, _, yTrain= splitter(EPIC_arrival,
-                                num_cols,
-                                MODE,
-                                time_threshold = time,
-                                test_size = None,
-                                EPIC_CUI = EPIC_CUI,
-                                seed = RANDOM_SEED)
 
 
     # Prepare test set
-    NN_RESULTS_PATH = NN_ROOT_PATH + f"{time_span[j + 4]}/"
-    BERT_RESULTS_PATH = BERT_ROOT_PATH + f"{time_span[j + 4]}/"
-    nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_{time_span[j + 4]}.csv")
-    bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_{time_span[j + 4]}.csv")
-    if bert_results.var() < 1e-4:
+    # NN_RESULTS_PATH = NN_ROOT_PATH + f"{time_pred}/"
+    # BERT_RESULTS_PATH = BERT_ROOT_PATH + f"{time_pred}/"
+    nn_results = pd.read_csv(NN_RESULTS_PATH + f"predicted_result_{time_pred}.csv")
+    bert_results = pd.read_csv(BERT_RESULTS_PATH + f"predicted_result_{time_pred}.csv")
+    if any( bert_results.var().values < 1e-3 ):
         # Add permutation to bert_results
-        bert_results = bert_results + np.random.normal(bert_results.mean(), bert_results.mean()/5, bert_results.shape)
+        bert_results = bert_results + np.random.normal(bert_results.mean(), bert_results.mean(), bert_results.shape)
+
+
     if bert_results.shape[0] != nn_results.shape[0]:
-        raise Warning( "Numbers of bert and NN results do not agree: [{}, {}]"
+        print( "Warning: Numbers of bert and NN results do not agree: [{}, {}]"
                         .format( bert_results.shape[0], nn_results.shape[0] ) )
+
+
     # Combine data
-    XTest = pd.concat([nn_results, bert_results], axis = 1)
+    XTest = pd.concat( [ nn_results, bert_results[ : nn_results.shape[0] ] ], axis = 1 )
 
 
-    # Get test labels
-    _, _, _, yTest = splitter(EPIC_arrival,
-                                num_cols,
-                                MODE,
-                                time_threshold = time_pred,
-                                test_size = None,
-                                EPIC_CUI = EPIC_CUI,
-                                seed = RANDOM_SEED)
+    # Get labels
+    if j == 0:
+        _, _, yTrain, _ = splitter(EPIC_arrival,
+                                    num_cols,
+                                    MODE,
+                                    time_threshold = time,
+                                    test_size = None,
+                                    EPIC_CUI = EPIC_CUI,
+                                    seed = RANDOM_SEED)
+        _, _, _, yTest = splitter(EPIC_arrival,
+                                    num_cols,
+                                    MODE,
+                                    time_threshold = time,
+                                    test_size = None,
+                                    EPIC_CUI = EPIC_CUI,
+                                    seed = RANDOM_SEED)
+    else:
+        _, _, _, yTrain = splitter(EPIC_arrival,
+                                    num_cols,
+                                    MODE,
+                                    time_threshold = time_span[j - 1],
+                                    test_size = None,
+                                    EPIC_CUI = EPIC_CUI,
+                                    seed = RANDOM_SEED)
+        _, _, _, yTest = splitter(EPIC_arrival,
+                                    num_cols,
+                                    MODE,
+                                    time_threshold = time,
+                                    test_size = None,
+                                    EPIC_CUI = EPIC_CUI,
+                                    seed = RANDOM_SEED)
 
 
     print("Training for data up to {} ...".format(time_pred))
@@ -162,6 +185,8 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.i. Model =========
+    XTrain.columns = ["0", "1"]
+    XTest.columns = ["0", "1"]
     input_size = XTrain.shape[1]
     model = StackedModel(device = device,
                         input_size = input_size,
@@ -179,6 +204,7 @@ for j, time in enumerate(time_span[2:-1]):
                                 batch_size = BATCH_SIZE,
                                 optimizer = optimizer,
                                 criterion = criterion)
+
 
     # Prediction
     transformation = nn.Sigmoid().to(device)

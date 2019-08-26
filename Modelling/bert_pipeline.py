@@ -21,7 +21,7 @@ from ED_support_module.BertForSepsis import *
 # ----------------------------------------------------
 # Directories for saving files
 # Path set-up
-FIG_PATH = "../../results/bert_trial/"
+FIG_PATH = "../../results/bert/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 RAW_TEXT_PATH = "../../data/EPIC_DATA/EPIC.csv"
 RAW_SAVE_DIR = FIG_PATH + "Raw_Notes/"
@@ -218,8 +218,9 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
         train_data = processor.get_train_examples(PROCESSED_NOTES_DIR)
         label_list = processor.get_labels()
         # Optimization step
-        num_train_optimization_steps = int(
-            len(XTrain) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS // 10
+        # num_train_optimization_steps = int(
+        #     len(XTrain) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS // 10
+        num_train_optimization_steps = 500
         # Load pretrained model tokenizer (vocabulary)
         tokenizer = BertTokenizer.from_pretrained(CACHE_DIR, do_lower_case=False)
         # Load model
@@ -259,8 +260,9 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
         train_data = processor.get_train_examples(PROCESSED_NOTES_DIR)
         label_list = processor.get_labels()
         # Optimization step
-        num_train_optimization_steps = int(
-            len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS // 20
+        # num_train_optimization_steps = int(
+        #     len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS // 20
+        num_train_optimization_steps = 500
         # Load pretrained tokenizer and model
         tokenizer = BertTokenizer.from_pretrained(OUTPUT_DIR_OLD + 'vocab.txt', do_lower_case=False)
         model = BertModel.from_pretrained(OUTPUT_DIR_OLD + f"{TASK_NAME}.tar.gz",cache_dir=OUTPUT_DIR)
@@ -285,13 +287,13 @@ for j, time in enumerate(time_span[args.start_time : args.start_time + 1]):
 
 
     # ========= 2.a.ii. Fine-tuning =========
-    if j <= 5:
-        # Train on the first 5 months to prevent overfitting
-        prediction_model, loss_vec = prediction_model.fit(train_features = train_features,
-                                                            num_epochs = NUM_TRAIN_EPOCHS,
-                                                            batch_size = TRAIN_BATCH_SIZE,
-                                                            optimizer = optimizer,
-                                                            criterion = criterion)
+    # if j <= 5:
+    # Train on the first 5 months to prevent overfitting
+    prediction_model, loss_vec = prediction_model.fit(train_features = train_features,
+                                                        num_epochs = NUM_TRAIN_EPOCHS,
+                                                        batch_size = TRAIN_BATCH_SIZE,
+                                                        optimizer = optimizer,
+                                                        criterion = criterion)
 
 
     # Save bert model
