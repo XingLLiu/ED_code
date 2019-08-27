@@ -11,15 +11,7 @@ from ED_support_module import EPICPreprocess
 
 
 # ----------------------------------------------------
-logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
-                    datefmt = '%m/%d/%Y %H:%M:%S',
-                    level = logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-
-# ----------------------------------------------------
-#a list of common abbreviations that do not have other potential meanings
+# A list of common abbreviations that do not have other potential meanings
 abbrevs = {'hrs':'hours', 'mins':'minutes',
            'S&S':'signs and symptoms', 
            'bc':'because', 'b/c':'because', 
@@ -410,6 +402,14 @@ class BertForSepsis(nn.Module):
 
 # Function that cleans the text
 def clean_text(text):
+    '''
+    Clean the raw clinical notes for BERT.
+
+    Input :
+            text = [str] notes.
+    Output:
+            cleaned notes.
+    '''
     if ((text == 'nan') | (text != text)):
         return ''
     #date extraction and replacement
@@ -541,10 +541,12 @@ def feature_to_loader(train_features, batch_size):
     Output: 
             [object] data loader.
     '''
+    # Retrieve token ids
     all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype = torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype = torch.long)
     all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype = torch.long)
     all_label_ids = torch.tensor([f.label_id for f in train_features], dtype = torch.long)
+
     # Create data loader
     train_dataloader = torch.utils.data.TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
     train_dataloader = torch.utils.data.DataLoader(train_dataloader, batch_size = batch_size)

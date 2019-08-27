@@ -33,11 +33,14 @@ plt.style.use('seaborn')
 def double_scatter(x_feature = None, y_feature = None, classes = 'Primary.Dx', data = None):
     '''
     Scatter plot for y_feature against x_feature, coloured accourding to classes.
-    Input:  x_feature: name of feature on the x axis (str)
+
+    Input:  
+            x_feature: name of feature on the x axis (str)
             y_feature: name of feature on the y axis (str)
             class: multi-class categorical variable used for colouring
             EPIC: the EPIC dataset
-    Output: plt.scatter
+    Output: 
+            plot object
     '''
     plt.scatter(data[x_feature], data[y_feature], alpha = 0.7, c = data[classes])
     plt.scatter(data.loc[data[classes] == 1, x_feature], data.loc[data[classes] == 1, y_feature], c = 'goldenrod')
@@ -50,10 +53,13 @@ def double_scatter(x_feature = None, y_feature = None, classes = 'Primary.Dx', d
 def roc_plot(yTest = None, pred = None, plot = True, show_results = True,
              save_path = None, eps = False):
     '''
-    Plot the roc curve of a given test set and predictions
-    Input : yTest = test set (pd.dataframe or series)
+    Plot the roc curve of a given test set and predictions.
+
+    Input : 
+            yTest = test set (pd.dataframe or series)
             pred = predictions (pd.dataframe or seires)
-    Output: ROC plot
+    Output: 
+            Plot object
     '''
     precision = sk.metrics.precision_score(yTest, pred)
     f1_score = sk.metrics.f1_score(yTest, pred)
@@ -88,9 +94,12 @@ def roc_plot(yTest = None, pred = None, plot = True, show_results = True,
 def lr_roc_plot(yTest = None, proba = None, plot = True, title = ' ', n_pts = 51, save_path = None):
     '''
     Plot the roc curve of a trained logistic regression model.
-    Input:  yTest = test set (pd.dataframe or series)
+
+    Input:  
+            yTest = test set (pd.dataframe or series)
             proba = predicted probability (np.array)
-    Output: ROC plot
+    Output: 
+            Plot object
     '''
     fprLst, tprLst = [], []
     threshold = np.linspace(0, 1, n_pts)
@@ -125,9 +134,12 @@ def if_roc_plot(yTest = None, score = None, plot = True,
                 title = ' ', n_pts = 51, extended = False):
     '''
     Plot the roc curve of a trained isolation forest model.
-    Input:  yTest = test set (pd.dataframe or series)
+
+    Input:  
+            yTest = test set (pd.dataframe or series)
             proba = predicted probability (np.array)
-    Output: ROC plot
+    Output: 
+            Plot object
     '''
     fprLst, tprLst = [], []
     threshold = np.linspace(0, 1, n_pts)
@@ -165,9 +177,12 @@ def if_roc_plot(yTest = None, score = None, plot = True,
 def metricsPlot(results, model_name):
     '''
     Show plots for various evaluation metrics.
-    Input:  results: a dictionary with precision, recall, f1 score and AUC (in that order).
+
+    Input:  
+            results: a dictionary with precision, recall, f1 score and AUC (in that order).
             model_name: name of the model used (str; to be shown in the title).
-    Output: plot of these metrics
+    Output: 
+            plot of these metrics
     '''
     xVec = range(len(results))
     f1Vec = [scores[2] for scores in results.values()]
@@ -188,7 +203,9 @@ def metricsPlot(results, model_name):
 def saveModel(model, filename):
     '''
     Save sklearn model as 'filename' in current directory.
-    Input:  model: sklearn model
+
+    Input:  
+            model: sklearn model
             filename: name of the model file (str)
     '''
     pickle.dump(model, open(filename, 'wb'))
@@ -198,7 +215,9 @@ def saveModel(model, filename):
 def loadModel(filename):
     '''
     Load sklearn model 'filename' in current directory.
-    Input:  model: sklearn model
+
+    Input:  
+            model: sklearn model
             filename: name of the model file (str)
     '''
     return(pickle.load(open(filename, 'rb')))
@@ -206,6 +225,16 @@ def loadModel(filename):
 
 # Append TF-IDF
 def TFIDF(EPIC_CUI, EPIC_enc):
+    '''
+    Compute and append the TF-IDF, using the CUIs.
+
+    Input :
+            EPIC_CUI = [DataFrame] notes in the form of CUIs.
+            EPIC_enc = [DataFrame] one-hot encoded design matrix.
+    Output:
+            EPIC_enc = [DataFrame] EPIC_enc with TF-IDF appended.
+            cui_cols = [list] column names of the CUI TF-IDFs.
+    '''
     # Find all Sepsis
     ifSepsis = EPIC_enc['Primary.Dx'] == 1
     CUISepsis = EPIC_CUI.iloc[ifSepsis.values]
@@ -250,14 +279,16 @@ def TFIDF(EPIC_CUI, EPIC_enc):
     return EPIC_enc, cuiCols
 
 
-# Prediction with VAE
+# Prediction with Variational Auto Encoders
 def vaePredict(loss_train = None, loss_test = None, batch_size = None, 
                sample_size = 1000, k = 1, percent = 0.1):
     '''
-    Make prediction based on the train loss and the test loss.
-    Threshold is set to be mu + k * std, where mu and std are computed
-    from the last sample_size batches.
-    Input : loss_train = loss of the train set (np.array or pd.Series)
+    Make prediction for Variational Auto Encoders based on the train
+    loss and the test loss. Threshold is set to be mu + k * std, where
+    mu and std are computed from the last sample_size batches.
+
+    Input : 
+            loss_train = loss of the train set (np.array or pd.Series)
             loss_test = loss of the test set (np.array or pd.Series)
             batch_size = batch size used in the training
             sample_size = size of the sample used to set the threshold
@@ -277,11 +308,13 @@ def time_split(data, threshold = 201903, dynamic = True, pred_span = 1,
     Sort data by the feature 'Arrived' and output train and test sets
     as specified by threshold. This can be used as a special version
     of sk.model_selection.train_test_split.
+
     Input : 
             data = EPIC dataset with feature 'Arrived'
             threshold = time of the train/test split
             keep_time = whether to keep 'Arrived' in the returned data
-    Output: XTrain, XTest, yTrain, yTest
+    Output: 
+            XTrain, XTest, yTrain, yTest
     '''
     # Sort by arrival date
     data = data.sort_values(by = ['Arrived'])
@@ -316,8 +349,10 @@ def time_split(data, threshold = 201903, dynamic = True, pred_span = 1,
 # Save summary results for dynamic training/testing
 def dynamic_summary(summary, p_num, n_num):
     '''
-    Return a dataframe with the TPR, FPR, TP, FN, FP, TN .
-    Input : summary = a dataframe with TPR and FPR (colnames: tpr, fpr, respectively.)
+    Return a dataframe with the TPR, FPR, TP, FN, FP, TN.
+
+    Input : 
+            summary = a dataframe with TPR and FPR (colnames: tpr, fpr, respectively.)
             p_num = number of positives in the test set
             n_num = number of negatives in the test set
     '''
@@ -340,15 +375,18 @@ def splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, mode,
         # Prepare validation set
         XTrain, XValid, yTrain, yValid = sk.model_selection.train_test_split(XTrain, yTrain, test_size=valid_size,
                                         random_state=seed, stratify=yTrain)
+
     # Separate the numerical features
     if mode in ['c', 'e', 'f']:
         num_cols = num_cols + list(cui_cols)
+
     # Extract the numerical columns to be transformed
     XTrainNum = XTrain[num_cols]
     XTestNum = XTest[num_cols]
     if valid_size != None:
         XValidNum = XValid[num_cols]
-    # PCA on the numerical entries   # 27, 11  # Without PCA: 20, 18
+
+    # PCA on the numerical entries
     if mode in ['b', 'd', 'e', 'f']:
         if mode in ['f']:
             if type(pca_components) != float:
@@ -358,19 +396,23 @@ def splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, mode,
         else:
             # Usual PCA
             pca = sk.decomposition.PCA(pca_components).fit(XTrainNum)
+
         # Assign the transformed values back
         XTrainNum = pd.DataFrame( pca.transform( XTrainNum ) )
         XTestNum = pd.DataFrame( pca.transform( XTestNum ) )
         XTrainNum.index = XTrain.index
         XTestNum.index = XTest.index
+
         if valid_size != None:
             # Transform validation set
             XValidNum = pd.DataFrame( pca.transform( XValidNum ) )
             XValidNum.index = XValidNum.index
+
     # Assign the transformed values back
     cat_cols = [col for col in XTrain.columns if col not in num_cols]
     XTrain = pd.concat( [ XTrain[cat_cols], XTrainNum ], axis=1 )
     XTest = pd.concat( [ XTest[cat_cols], XTestNum ], axis=1 )
+
     if valid_size != None:
         XValid = pd.concat( [ XValid[cat_cols], XValidNum ], axis=1 )
         return XTrain, XTest, XValid, yTrain, yTest, yValid
@@ -385,7 +427,9 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
     '''
     Split EPIC_enc into train/test/(valid) with/without PCA/Sparse PCA (see 'mode'). This can be
     used as a substitute of sklearn.model_selection.TrainTestSplit.
-    Input : num_cols = [list or pd.Index] names of numerical cols to be transformed.
+
+    Input : 
+            num_cols = [list or pd.Index] names of numerical cols to be transformed.
             cui_cols = [list or pd.Index] names of CUI cols to be transformed if
                        EPIC_CUI is not None.
             test_size = [float] must be None if time_threshold is give.
@@ -398,7 +442,8 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
                             d -- PCA, but not on TF-IDF
                             e -- PCA, TF-IDF
                             f -- Sparse PCA, TF-IDF
-    Output: XTrain, XTest, (XValid), yTrain, yTest, (yValid)
+    Output: 
+            XTrain, XTest, (XValid), yTrain, yTest, (yValid)
     '''
     # Split by time
     if time_threshold is not None:
@@ -407,6 +452,7 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
                                                         keep_time=keep_time)
         else:
             raise ValueError("Feature \'Arrived\' must be in EPIC_enc to split by time.")
+
     # Add TFIDF
     if mode not in ['a', 'b']:
         try:
@@ -416,11 +462,11 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
             raise ValueError("EPIC_CUI must be given when including TF-IDF")
     else:
         cui_cols = None
+
     # Separate input features and target
     y = EPIC_enc['Primary.Dx']
     X = EPIC_enc.drop('Primary.Dx', axis = 1)
-    # # Columns that are not transformed
-    # keep_cols = [col for col in X.columns if col not in num_cols]
+
     # Prepare train and test sets
     if time_threshold == None:
         if test_size == None:
@@ -431,10 +477,9 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
         if "Arrived" in EPIC_enc.columns:
             XTrain, XTest, yTrain, yTest = time_split(EPIC_enc, threshold=time_threshold, dynamic=True,
                                                         keep_time=keep_time)
-            # # Remove the time column
-            # keep_cols.remove("Arrived")
         else:
             raise ValueError("Feature \'Arrived\' must be in EPIC_enc to split by time.")
+
     return splitter_downstream(XTrain, XTest, yTrain, yTest, num_cols, mode,
                                cui_cols=cui_cols, valid_size=valid_size, pca_components=pca_components, seed=seed)
 
@@ -443,28 +488,38 @@ def splitter(EPIC_enc, num_cols, mode, test_size,
 def threshold_predict(pred_prob, y_data, fpr=0.05):
     '''
     Predict y values by controling the false positive rate.
-    Input : pred_prob = [Series] predicted scores. Higher for class 1.
+
+    Input : 
+            pred_prob = [Series] predicted scores. Higher for class 1.
             y_data = [Series] true response vector.
+            fpr = [float] false positive rate threshold.
+    Output:
+            predicted response vector that has the specified false positive rate.
     '''
     # Initialization
     if pred_prob.shape != y_data.shape:
         raise Warning("Shapes of predicted probs ({}) do not agree with the true data {}."
                         .format(pred_prob.shape, y_data.shape))
+
     num_fp = int( np.round( len( y_data ) * fpr ) )
     y_data = pd.Series(y_data)
     fprLst, tprLst = [], []
     threshold = np.linspace(0, 1, 501)
     score_sorted = np.argsort(pred_prob)
+
     # Find threshold
     for i in range(len(threshold)):
         indices_with_preds = score_sorted[ -int( np.ceil( threshold[i] * y_data.shape[0] ) ): ]
         y_pred = y_data * 0
         y_pred.iloc[indices_with_preds] = 1
+
         # Compute FPR for the current predicted response vector
         current_fpr = false_positive_rate(y_data, y_pred)
+
         # Stop if the current FPR is just over the desired FPR
         if current_fpr >= fpr and i > 0:
             break
+
     # Return the predicted response vector
     if i == len(threshold):
         Warning("All thresholds give a FPR lower than the given value. Make sure it is from 0 to 1.")
@@ -475,6 +530,11 @@ def threshold_predict(pred_prob, y_data, fpr=0.05):
 def predict_transform(self, x_data):
     '''
     Predict and transform the predicted response to 0 or 1 instead of -1 and 1.
+
+    Input :
+            x_data = [DataFrame or array] design matrix.
+    Output:
+            predicted response vector, 0 for class 0 and 1 for class 1.
     '''
     # Predicted response
     y_pred = self.predict(x_data)
@@ -485,6 +545,15 @@ def predict_transform(self, x_data):
 
 # Compute FPR. Helper function for threshold_predict.
 def false_positive_rate(y_true, y_pred):
+    '''
+    Compute FPR.
+
+    Input :
+            y_true = [DataFrame or array] real response vector.
+            y_pred = [DataFrame or array] predicted response vector.
+    Output:
+            fpr = [float] false positive rate.
+    '''
     true_negative = ( (y_pred == 0) & (y_true == 0) ).sum()
     negative = len(y_true) -  y_true.sum()
     if negative != 0:
@@ -499,9 +568,12 @@ def false_positive_rate(y_true, y_pred):
 def true_positive_rate(y_true, y_pred):
     '''
     Compute TPR.
-    Input : y_true = [Series or array] true response vector.
+
+    Input : 
+            y_true = [Series or array] true response vector.
             y_pred = [Series or array] predicted response vector.
-    Output: tpr = [float] true positive rate.
+    Output: 
+            tpr = [float] true positive rate.
     '''
     true_positive = ( (y_pred == 1) & (y_true == 1) ).sum()
     positive = y_true.sum()

@@ -3,7 +3,9 @@ from ED_support_module import *
 class Evaluation:
     '''
     Class for plotting and summarizing ROC for each month and on aggregate.
-    Input : y_true = [list or Series] real response values.
+
+    Input : 
+            y_true = [list or Series] real response values.
             pred_prob = [list or Series] predicted probability of class 1.
     '''
     def __init__(self, y_true, pred_prob):
@@ -14,8 +16,14 @@ class Evaluation:
     def roc_plot(self, plot=True, title="", n_pts = 51, save_path = None):
         '''
         Plot the roc curve of a trained logistic regression model.
-        Input:  self.y_true = test set (pd.dataframe or series)
-        Output: ROC plot
+
+        Input:  
+                plot = [bool] whether to show the plot in window.
+                title = [str] title of the plot.
+                n_pts = [int] number of points on the x-axis.
+                save_path = [str] path to save the plot.
+        Output: 
+                [DataFrame] true positive rates and false positive rates.
         '''
         plt.close()
         fpr_lst, tpr_lst = [], []
@@ -50,6 +58,7 @@ class Evaluation:
         if plot:
             plt.show()
         return( pd.DataFrame( {'TPR':tpr_lst, 'FPR':fpr_lst} ) )
+
     def summary(self):
         '''
         Return a DataFrame with TPR, FPR, TP, FN, FP, TN.
@@ -67,15 +76,19 @@ class Evaluation:
         summary['FP'] = (summary['FPR'] * n_num).round().astype('int')
         summary['TN'] = n_num - summary['FP']
         return(summary)
+
     def roc_subplot(self, data_path, time_span, dim, eps=False, save_path=None):
         '''
         ROC subplot of all months.
-        Input : data_path = [str] Path to the folder containing subfolders of data of
+
+        Input : 
+                data_path = [str] Path to the folder containing subfolders of data of
                             each month. Data must contain "TPR" and "FPR"
                 save_path = [str] path to save figure. Equals data_path by default.
                 time_span = [list of int] time span of the data in the form YYYYMM.
                 dim = [list] list of 2 integers indicating the dimension of
                       subplot.
+                eps = [bool] whether to save the plot as .eps.
         '''
         if save_path is None:
             save_path = data_path
@@ -107,12 +120,19 @@ class Evaluation:
         else:
             plt.savefig(save_path + 'full_roc.png')
         plt.close()
+
     def roc_aggregate(self, data_path, time_span, eps=False, save_path=None):
         '''
         Plot aggregate ROC (overall FPR vs. TPR)
+
+        Input :
+                data_path = [str] path of the csv containing aggregate TPR and FPR.
+                eps = [bool] whether to save the plot as .eps.
+                save_path = [str] path to save the plot.
         '''
         if save_path is None:
             save_path = data_path
+
         for i, time in enumerate(time_span[3:]):
             # Load and make aggregate data
             csv_name = data_path + f'{time}/summary_{time}.csv'
@@ -120,11 +140,13 @@ class Evaluation:
                 summary = pd.read_csv(csv_name)
             else:
                 summary = pd.read_csv(csv_name) + summary
+
         # Compute aggregate TPR and FPR
         # Adding a regularization term for numerical stability
         tpr = summary['TP'] / (summary['TP'] + summary['FN'] + 1e-8)
         fpr = summary['FP'] / (summary['TN'] + summary['FP'] + 1e-8)
         roc_auc = sk.metrics.auc(fpr, tpr)
+
         # Plot ROC
         _ = plt.title('One-month Ahead Aggregate ROC')
         _ = plt.plot(fpr, tpr, 'b', label = 'AUC = %0.3f' % roc_auc)
@@ -146,15 +168,17 @@ class Evaluation:
 
 
 class FeatureImportance:
+    '''
+    Class for evaluating feature importance.
+
+    Input : 
+            mean = [list, Series] vector of means of the importance scores.
+            var = [list, Series] vector of variances of the importance scores.
+            model_name = [str] name of the model used in title of plot
+            show_num = [int or str] number of top important features to show,
+                        or "all" to show all features.
+    '''
     def __init__(self, mean, var, feature_names, model_name=None, show_num="all"):
-        '''
-        Class for evaluating feature importance
-        Input : mean = [list, Series] vector of means of the importance scores.
-                var = [list, Series] vector of variances of the importance scores.
-                model_name = [str] name of the model used in title of plot
-                show_num = [int or str] number of top important features to show,
-                            or "all" to show all features.
-        '''
         self.mean = mean
         self.var = var
         self.feature_names = feature_names
@@ -165,11 +189,17 @@ class FeatureImportance:
             self.show_num = len(feature_names)
         else:
             self.show_num = show_num
+
     def FI_plot(self, sorted_features=None, save_path=None, y_fontsize=8, eps=False):
         '''
         Plot the feature importance.
-        Input : sorted_features = [list] If given, this would be used as the y-ticks on the plot.
+
+        Input : 
+                sorted_features = [list] If given, this would be used as the y-ticks on the plot.
                                   Default as feature_names sorted by the mean scores.
+                save_path = [str] path to save the plot.
+                y_fontsize = [int] font size of the y-tickes.
+                eps = [bool] whether to save the plot as .eps.
         '''
         if sorted_features is None:
             sorted_features = self.sorted_names

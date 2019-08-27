@@ -1,6 +1,12 @@
-# May have bug if nn_pipeline.py and run_bert_pipeline.py
+# ----------------------------------------------------
+# To run:
+# 1. customize hyper-parameters and DATA_PATH in Section 0
+# 2. in Terminal:
+#       python random_forest_pipeline.py
+#
+# May run into bugs if nn_pipeline.py and run_bert_pipeline.py
 # didn't run properly!
-
+# ----------------------------------------------------
 from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
@@ -20,16 +26,16 @@ MODE = "a"
 FPR_THRESHOLD = 0.1
 
 NUM_CLASS = 2
-NUM_EPOCHS = 400
+NUM_EPOCHS = 350
 BATCH_SIZE = 128
-LEARNING_RATE = 5e-4
+LEARNING_RATE = 1e-4
 DROP_PROB = 0.4
 HIDDEN_SIZE = 50
 
-# Parameters of NN (for loading results)
-NUM_EPOCHS_NN = 1000
-HIDDEN_SIZE_NN = 500 
-# Parameters of BERT (for loading results)
+# Parameters of NN (for loading results only)
+NUM_EPOCHS_NN = 200
+HIDDEN_SIZE_NN = 800 
+# Parameters of BERT (for loading results only)
 TASK_NAME = "epic_task"
 
 
@@ -59,14 +65,15 @@ def setup_parser():
 # args = parser.parse_args()
 
 
+# ----------------------------------------------------
 # Path set-up
 FIG_PATH = "../../results/stacked/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
 FIG_ROOT_PATH = FIG_PATH + f"dynamic_{NUM_EPOCHS}epochs/"
-NN_ROOT_PATH =  f"../../results/neural_net/dynamic_{MODE}_{NUM_EPOCHS_NN}epochs_{HIDDEN_SIZE_NN}hiddenSize/"
-BERT_ROOT_PATH = f"../../results/bert/dynamic/{TASK_NAME}/"
 
-TIME_SPAN_PATH = "../../results/bert/Raw_Notes/time_span"
+# For loading NN and BERT results
+NN_ROOT_PATH =  f"../../results/neural_net/dynamic_{MODE}_{NUM_EPOCHS_NN}epochs_{2 * HIDDEN_SIZE_NN}hiddenSize/"
+BERT_ROOT_PATH = f"../../results/bert/dynamic/{TASK_NAME}/"
 
 
 # Create folder if not already exist
@@ -186,6 +193,7 @@ for j, time in enumerate(time_span[2:-1]):
                         input_size = input_size,
                         drop_prob = DROP_PROB,
                         hidden_size = HIDDEN_SIZE).to(device)
+
     # Loss and optimizer
     criterion = nn.CrossEntropyLoss(weight = torch.FloatTensor([CLASS_WEIGHT0, CLASS_WEIGHT1])).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr = LEARNING_RATE)

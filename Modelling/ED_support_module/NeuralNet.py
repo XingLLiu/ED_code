@@ -20,6 +20,7 @@ class NeuralNet(nn.Module):
         self.device = device
         nn.init.xavier_normal_(self.fc1.weight)
         nn.init.xavier_normal_(self.fc2.weight)
+
     def forward(self, x):
         h = self.fc1(x)
         h = self.ac1(h)
@@ -34,6 +35,7 @@ class NeuralNet(nn.Module):
         h = self.ac4(h)
         h = self.dp_layer4(h)
         return self.classification(h)
+
     def train_model(self, train_loader, criterion, optimizer):
         '''
         Train and back-propagate the neural network model. Note that
@@ -42,13 +44,15 @@ class NeuralNet(nn.Module):
 
         Model will be set to evaluation mode internally.
 
-        Input : train_loader = [DataLoader] training set. The
+        Input : 
+                train_loader = [DataLoader] training set. The
                                last column must be the response.
                 criterion = [Function] tensor function for evaluatin
                             the loss.
                 optimizer = [Function] tensor optimizer function.
                 device = [object] cuda or cpu
-        Output: loss
+        Output: 
+                loss for each epoch
         '''
         self.train()
         loss_sum = 0
@@ -67,6 +71,7 @@ class NeuralNet(nn.Module):
             # Add loss
             loss_sum += loss.item()
         return loss_sum
+
     def eval_model(self, test_loader, transformation=None, criterion=None,
                     if_y_data=False):
         '''
@@ -120,10 +125,12 @@ class NeuralNet(nn.Module):
             return outputs_vec, loss_sum
         else:
             return outputs_vec
+
     def predict_proba_single(self, x_data, batch_size=None, transformation=None):
         '''
         Transform x_data into dataloader and return predicted scores
         for being of class 1.
+
         Input :
                 x_data = [DataFrame] train set.
                 y_data = [DataFrame] labels. If not given, criterion must be
@@ -147,11 +154,13 @@ class NeuralNet(nn.Module):
         if transformation is None:
             transformation = nn.Sigmoid().to(self.device)
         return self.eval_model(test_loader, transformation, criterion = None, if_y_data = False)[:, 1]
+
     def validate(self, x_data, y_data=None, batch_size=None,
                 transformation=None, criterion=None):
         '''
         Transform x_data into dataloader and return predicted scores
-        for being of class 1.
+        for being of class 1. Useful for validation.
+
         Input :
                 x_data = [DataFrame] train set.
                 y_data = [DataFrame] labels. If not given, criterion must be
@@ -195,7 +204,9 @@ class NeuralNet(nn.Module):
                 batch_size = [int] batch size
                 optimizer = [pytorch function] optimizer for training
                 criterion = [pytorch function] loss function
-        Output: trained model, train loss
+        Output:         
+                trained model.
+                train loss for each epoch.
         '''
         # Check if the indices match. This may affect the concatenation step in preparing dataloader
         if any(x_data.index != y_data.index):
@@ -211,9 +222,11 @@ class NeuralNet(nn.Module):
                                         optimizer = optimizer)
             loss_vec[epoch] = loss_sum
         return self, loss_vec
+
     def save_model(self, save_path):
         '''
         Save the model to save_path.
+
         Input :
                 save_path = [str] path to save the model parameters.
         Output:

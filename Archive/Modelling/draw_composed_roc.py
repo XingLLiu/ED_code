@@ -35,8 +35,6 @@ FIG_ROOT_PATH_LR_LST = [FIG_PATH_LR + f"dynamic_c_l1penalty/",
 
 
 # RF paths
-# FIG_PATH_RF = "../../results/random_forest/"
-# FIG_ROOT_PATH_RF = FIG_PATH_RF + f"dynamic_c/"
 FIG_PATH_RF = "../../results/random_forest/"
 FIG_ROOT_PATH_RF_LST = [FIG_PATH_RF + f"dynamic_c_seeds10_2000estimators/",
                         FIG_PATH_RF + f"dynamic_c_seeds20_2000estimators/",

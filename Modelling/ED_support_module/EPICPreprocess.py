@@ -4,7 +4,18 @@ from ED_support_module import *
 # EDA pipeline (further preprocessing)
 class Preprocess:
     '''
-    Preparing datasets for modelling using the preprocessed EPIC dataset.
+    Preparing datasets for modelling using the preprocessed EPIC dataset. The .streamline method is the
+    main API that
+
+        1. Loads the preprocessed EPIC dataset.
+        2. Cleans the column names to the format "Abc.Def".
+        3. Binarizes the response by the disease of interest (Sepsis by default).
+        4. Removes features that the user defines and features available only after triage.
+        5. Groups classes in some features (e.g. keeping the top k frequent classes + others).
+        6. Removes obvious outliers (e.g. temperature > 50).
+        7. Removes instances with missing arrival time.
+        8. Simples impute missing values by i) the mean for numerical and ii) the most frequent
+           class for categorical variables.
 
     Input :
             path = [str] path to preprocessed data.
@@ -23,22 +34,31 @@ class Preprocess:
     def SeparateData(self, EPIC):
         '''
         Takes in full EPIC data with arrival date and CUIs,
-        and output three versions of data:
-        EPIC, EPIC_CUI, EPIC_arrival
+        and outputs three versions of data.
+        
+        Output :    
+                    EPIC = [DataFrame] preprocessed EPIC with only numerics.
+                    EPIC_CUI = [DataFrame] clinical notes in the form of CUIs.
+                    EPIC_arrival = [DataFrame] EPIC with month of arrival appended.
         '''
+        # Notes data
         notes = ['Notes', 'Provider.Notes', 'Triage.Notes']
         EPIC_CUI = EPIC[notes]
         EPIC = EPIC.drop(notes, axis = 1)
+
         # Separate MRN and arrival date
         EPIC_arrival = EPIC[['MRN', 'Arrived']]
         EPIC = EPIC.drop(['MRN', 'Arrived'], axis = 1)
+
         # Convert three cols of notes to list
         for col in notes:
             noteLst = pd.Series( map( lambda note: note[2:-2].split('\', \''), EPIC_CUI[col] ) )
             EPIC_CUI.loc[:, col] = noteLst.values
+
         # Change 'Disch.Date.Time' and 'Roomed' to categorical
         EPIC['Disch.Date.Time'] = EPIC['Disch.Date.Time'].astype('object')
         EPIC['Roomed'] = EPIC['Roomed'].astype('object')
+
         # Change 'Will.Return' to binary if present
         if 'Will.Return' in EPIC.columns:
             EPIC['WillReturn'] = EPIC['WillReturn'].astype('object')
@@ -49,31 +69,44 @@ class Preprocess:
         '''
         Takes in EPIC and the same dataset with the
         format of its column names unified.
+
+        Input : 
+                EPIC = [DataFrame] EPIC dataset after being preprocessed by the R
+                        scripts.
+        Output: 
+                EPIC with unified name format.
         '''
         colNames = list(EPIC.columns)
         # Special cases
         indexVec = np.linspace(0, len(colNames) - 1, len(colNames), dtype = 'int')
         ifCC = int(indexVec[EPIC.columns == 'CC'])
         ifFSA = int(indexVec[EPIC.columns == 'FSA'])
+
         for i in range(len(colNames)):
             name = colNames[i]
             # Change names of the form 'XX XXX'
             if len(name.split(' ')) > 1:
                 name = name.replace(' ', '.')
+
             # Change names of the form 'XxXxx'
             elif len(name.split('.')) == 1:
                 nameList = re.findall('[A-Z][a-z]+', name)
                 name = '.'.join(nameList)
+
             colNames[i] = name
+
         # Assign special cases back
         colNames[ifCC] = 'CC'
         colNames[ifFSA] = 'FSA'
+
         # Re-assign col names
         EPIC.columns = colNames
+
         # Print error warning if there is empty colname remaining
         for name in colNames:
             if len(colNames) == 0:
-                print('Empty column name warning! Column name assignment may be wrong!')
+                raise Warning('Empty column name warning! Column name assignment may be wrong!')
+
         return EPIC
 
 
@@ -81,18 +114,26 @@ class Preprocess:
         '''
         Binarize Primary.Dx for is(1)/not(0) sepsis.
         Mark as sepsis if any of the following shows the
-        keyword sepsis/Sepsis:
+        keyword in the disease list:
         Primary.Dx, Diagnosis, Diagnoses.
-        Return EPIC with Diagnosis and Diagnoses removed.
+
+        Input : 
+                EPIC = [DataFrame] EPIC dataset. Must contain Primary.Dx,
+                        Diagnosis and Diagnoses.
+        Output: 
+                EPIC with Primary.Dx being binarized and with Diagnosis and
+                Diagnoses removed.
         '''
         # Separate diagnoses columns
         diagnosis = EPIC['Diagnosis']
         diagnoses = EPIC['Diagnoses']
         EPIC = EPIC.drop(['Diagnosis', 'Diagnoses'], axis = 1)
+
         # Initialize indicators
         if_disease1 = np.zeros(EPIC.shape[0], dtype = bool)
         if_disease2 = np.zeros(EPIC.shape[0], dtype = bool)
         if_disease3 = np.zeros(EPIC.shape[0], dtype = bool)
+
         for name in self.disease:
             # Check if Primary.Dx contains disease
             if_disease1 = EPIC['Primary.Dx'].str.contains(name) | if_disease1
@@ -100,6 +141,7 @@ class Preprocess:
             if_disease2 = diagnosis.str.contains(name) | if_disease2
             # Check if Diagnoses contains disease
             if_disease3 = diagnoses.str.contains(name) | if_disease3
+
         # Convert into binary class
         if_disease = if_disease1 | if_disease2 | if_disease3
         EPIC.loc[-if_disease, 'Primary.Dx'] = 0
@@ -115,15 +157,14 @@ class Preprocess:
         Return dataset with the given feature names in
         drop_cols and after_triage removed.
         '''
-        # Discard the following features in modelling
+        # Discard the following features in modelling (feature selection)
         if self.drop_cols == 'default':
             self.drop_cols = ['First.ED.Provider', 'Last.ED.Provider', 'ED.Longest.Attending.ED.Provider',
                 'Day.of.Arrival', 'Arrival.Month', 'FSA', 'Name.Of.Walkin', 'Name.Of.Hospital',
                 'Admitting.Provider', 'Disch.Date.Time', 'Discharge.Admit.Time',
-                'Distance.To.Sick.Kids', 'Distance.To.Walkin', 'Distance.To.Hospital', 'Systolic',
-                'Pulse']
+                'Distance.To.Walkin', 'Distance.To.Hospital', 'Systolic', 'Pulse']
 
-        # (Some) features obtained after triage
+        # Features available only after triage
         if self.after_triage == 'default':
             self.after_triage = ['Lab.Status', 'Rad.Status', 'ED.PIA.Threshold', 'Same.First.And.Last',
                                  'Dispo', 'Size.Of.Treatment.Team', 'Number.Of.Prescriptions',
@@ -142,10 +183,12 @@ class Preprocess:
         topLangs = EPIC['Pref.Language'].value_counts().index[:4]
         ifTopLangs = [not language in topLangs for language in EPIC['Pref.Language'].values]
         EPIC['Pref.Language'].loc[ ifTopLangs ] = 'Others'
+
         # CC: Keep top 19 + others
         topCC = EPIC['CC'].value_counts().index[:49]
         ifTopCC = [not complaint in topCC for complaint in EPIC['CC'].values]
         EPIC['CC'].loc[ ifTopCC ] = 'Others'
+
         # Arrival method: combine 'Unknown' and 'Other' and keep top 9 + others
         EPIC.loc[EPIC['Arrival.Method'] == 'Unknown', 'Arrival.Method'] = 'Others'
         topMethods = EPIC['Arrival.Method'].value_counts().index[:14]
@@ -156,8 +199,9 @@ class Preprocess:
 
     def RemoveOutliers(self, EPIC):
         '''
-        Takes in EPIC and output a boolean pd.Series
-        indicating which instance is an obvious outlier.
+        Takes in EPIC and output a boolean pd.Series indicating which instance is an
+        obvious outlier.
+
         1 for outliers, 0 for inliers.
         '''
         # Abnormal cases. Suspected to be typos
@@ -179,6 +223,7 @@ class Preprocess:
         Takes in EPIC and perform mean-imputation on the
         numerical features, and most-frequent-class imputation
         on the categorical features.
+
         Output the imputed dataset, categorical column names and
         numerical column names.
         '''
@@ -203,26 +248,21 @@ class Preprocess:
         return EPIC, catCols, numCols
     
     
-    def DateFillNA(self, EPIC_arrival, how="both"):
+    def DateFillNA(self, EPIC_arrival):
         '''
         Fill in the missing values in Arrived with
-        the adjacent values.
-        how = 1. before: fill in the missing value with
-                 the immediately previous one.
-              2. after: fill in the missing value with
-                 the immediately succeeding one.
-              3. both: fill in the missing value with
-                 the immediately previous then the
-                 succeeding.
+        the immediately previous values.
         '''
         null_date = EPIC_arrival.index[EPIC_arrival['Arrived'].isnull()]
         null_date = null_date.values
+
         # Check if no previous or existing instance
         indicator1 = null_date == 0
         # Impute by the proceeding instance if it is the first one
         if (indicator1).any():
             null_date[indicator1] = 2
-        EPIC_arrival['Arrived'][null_date] = EPIC_arrival.loc[null_date - 1, 'Arrived']   
+        EPIC_arrival['Arrived'][null_date] = EPIC_arrival.loc[null_date - 1, 'Arrived']  
+
         # Impute with the proceeding value if still missing
         null_date = EPIC_arrival.index[EPIC_arrival['Arrived'].isnull()]
         if len(null_date) > 0:
@@ -232,6 +272,7 @@ class Preprocess:
             if (indicator2).any():
                 null_date[indicator2] = EPIC_arrival.shape[0] - 2
             EPIC_arrival['Arrived'][null_date] = EPIC_arrival.loc[null_date + 1, 'Arrived']
+
         # Print warning if still missing
         if len(EPIC_arrival.index[EPIC_arrival['Arrived'].isnull()]) > 0:
             raise ValueError("Arrival date ('Arrived') still missing after imputation.")
@@ -240,15 +281,20 @@ class Preprocess:
     
     def TFIDF(self, cui, EPIC):
         '''
-        Compute the TF-IDF of the CUIs in cui and append to EPIC.
-        Input : cui: dataframe of the triage notes CUIs. Must contain column Triage.Notes
+        Compute the TF-IDF of the CUIs in cui and append to EPIC. Not used in the .streamline
+        method.
+
+        Input : 
+                cui: dataframe of the triage notes CUIs. Must contain column Triage.Notes
                 EPIC: dataframe to which the TF-IDFs are appended. Must have Primary.Dx.
-        Output: EPIC: dataframe with the TF-IDFs appended.
+        Output: 
+                EPIC: dataframe with the TF-IDFs appended.
                 cuiCols: Column names of the CUIs
         '''
         # Find all Sepsis
         if_disease = EPIC['Primary.Dx'] == 1
         CUISepsis = EPIC.iloc[if_disease.values]
+
         # Get all unique CUIs
         triageNotes = {}
         for i in CUISepsis.index:
@@ -256,11 +302,13 @@ class Preprocess:
             for cui in cuiLst:
                 if cui not in triageNotes.keys():
                     triageNotes[cui] = 0
+
         # For each unique CUI, count the number of documents that contains it
         for notes in EPIC['Triage.Notes']:
             for cui in triageNotes.keys():
                 if cui in notes:
                     triageNotes[cui] += 1
+
         # Create TF-IDF dataframe
         triageDf = pd.DataFrame(index = range(len(EPIC)),
                                 columns = range(len(triageNotes)),
@@ -268,6 +316,7 @@ class Preprocess:
         triageDf.iloc[:, :] = 0
         triageDf.columns = triageNotes.keys()
         triageDf.index = EPIC.index
+
         # Compute TF and IDF
         corpusLen = len(EPIC)
         for i in triageDf.index:
@@ -281,6 +330,7 @@ class Preprocess:
                     idf = np.log( corpusLen / triageNotes[cui] )
                     # Store TF-IDF
                     triageDf.loc[i, cui] = tf * idf
+
         # Append to EPIC
         cuiCols = triageDf.columns
         EPIC = pd.concat([EPIC, triageDf], axis = 1, sort = False)
@@ -314,8 +364,6 @@ class Preprocess:
         EPIC, catCols, _ = self.SimpleInpute(EPIC)
         # One-hot encode the categorical variables
         EPIC_enc = pd.get_dummies(EPIC, columns = catCols, drop_first = True).copy()
-        # # Fill in missing arrival date and append
-        # EPIC_arrival = self.DateFillNA(EPIC_arrival)
         # Append arrival date
         EPIC_arrival = pd.concat([EPIC_enc, EPIC_arrival['Arrived'].astype('int')], axis = 1)
         return EPIC, EPIC_enc, EPIC_CUI, EPIC_arrival
@@ -324,8 +372,11 @@ class Preprocess:
     def which_numerical(self, data):
         '''
         Get names of numerical columns.
-        Input : data = [DataFrame]
-        Output: num_cols = [list] col names of numerical features
+
+        Input : 
+                data = [DataFrame]
+        Output: 
+                num_cols = [list] col names of numerical features
         '''
         num_cols = data.select_dtypes(include = [np.number]).columns.tolist()
         # Disch.Date.Time should have been categorical
@@ -337,6 +388,7 @@ class Preprocess:
     def missing_index(self, data, col_name):
         '''
         Remove cases with missing values in col_name.
+
         Input :
                 data = [DataFrame] dataset with arrival date in
                         pd.datetime format.

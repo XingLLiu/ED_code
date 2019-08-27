@@ -1,6 +1,7 @@
 from ED_support_module import *
 from ED_support_module.NeuralNet import NeuralNet
 
+
 class StackedModel(nn.Module):
     def __init__(self, device, input_size=2, hidden_size=20, num_classes=2, drop_prob=0):
         super().__init__()
@@ -15,6 +16,7 @@ class StackedModel(nn.Module):
         self.dp_layer2 = nn.Dropout(drop_prob)
         nn.init.xavier_normal_(self.classification.weight)
         self.device = device
+
     def forward(self, x):
         h = self.fc1(x)
         h = self.ac1(h)
@@ -23,6 +25,7 @@ class StackedModel(nn.Module):
         h = self.ac2(h)
         h = self.dp_layer2(h)
         return self.classification(h)
+
     def train_model(self, train_loader, criterion, optimizer):
         '''
         Train and back-propagate the neural network model. Note that
@@ -31,13 +34,15 @@ class StackedModel(nn.Module):
 
         Model will be set to evaluation mode internally.
 
-        Input : train_loader = [DataLoader] training set. The
+        Input : 
+                train_loader = [DataLoader] training set. The
                                last column must be the response.
                 criterion = [Function] tensor function for evaluatin
                             the loss.
                 optimizer = [Function] tensor optimizer function.
                 device = [object] cuda or cpu
-        Output: loss
+        Output: 
+                loss
         '''
         self.train()
         loss_sum = 0
@@ -56,6 +61,7 @@ class StackedModel(nn.Module):
             # Add loss
             loss_sum += loss.item()
         return loss_sum
+
     def eval_model(self, test_loader, transformation=None, criterion=None,
                     if_y_data=False):
         '''
@@ -109,10 +115,12 @@ class StackedModel(nn.Module):
             return outputs_vec, loss_sum
         else:
             return outputs_vec
+
     def predict_proba_single(self, x_data, batch_size=None, transformation=None):
         '''
         Transform x_data into dataloader and return predicted scores
         for being of class 1.
+
         Input :
                 x_data = [DataFrame] train set.
                 y_data = [DataFrame] labels. If not given, criterion must be
@@ -136,11 +144,13 @@ class StackedModel(nn.Module):
         if transformation is None:
             transformation = nn.Sigmoid().to(self.device)
         return self.eval_model(test_loader, transformation, criterion = None, if_y_data = False)[:, 1]
+
     def validate(self, x_data, y_data=None, batch_size=None,
                 transformation=None, criterion=None):
         '''
         Transform x_data into dataloader and return predicted scores
-        for being of class 1.
+        for being of class 1. Useful for validation.
+
         Input :
                 x_data = [DataFrame] train set.
                 y_data = [DataFrame] labels. If not given, criterion must be
@@ -173,6 +183,7 @@ class StackedModel(nn.Module):
             return pred_prob[:, 1], loss
         else:
             return self.eval_model(test_loader, transformation, criterion, if_y_data)[:, 1]
+
     def fit(self, x_data, y_data, num_epochs, batch_size, optimizer, criterion):
         '''
         Fit the model on x_data and y_data.
@@ -184,7 +195,9 @@ class StackedModel(nn.Module):
                 batch_size = [int] batch size
                 optimizer = [pytorch function] optimizer for training
                 criterion = [pytorch function] loss function
-        Output: trained model, train loss
+        Output: 
+                trained model
+                train loss
         '''
         if any(x_data.index != y_data.index):
             raise ValueError("Indices of x_data and y_data do not match! Make sure the indices are the same.")
@@ -199,9 +212,11 @@ class StackedModel(nn.Module):
                                         optimizer = optimizer)
             loss_vec[epoch] = loss_sum
         return self, loss_vec
+
     def save_model(self, save_path):
         '''
         Save the model to save_path.
+
         Input :
                 save_path = [str] path to save the model parameters.
         Output:

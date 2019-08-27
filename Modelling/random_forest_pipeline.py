@@ -1,19 +1,24 @@
+# ----------------------------------------------------
+# To run:
+# 1. customize hyper-parameters and DATA_PATH in Section 0
+# 2. in Terminal:
+#       python random_forest_pipeline.py
+# ----------------------------------------------------
 from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
 from ED_support_module import RandomForest
-# About 20 mins for each iteration
 
 
 # ----------------------------------------------------
 # ========= 0. Preliminary seetings =========
 MODEL_NAME = "RF"
-RANDOM_SEED = 20
+RANDOM_SEED = 30
 CLASS_WEIGHT = 500
-MODE = "a"
+MODE = "e"
 FPR_THRESHOLD = 0.1
 
-N_ESTIMATORS = 2000
+N_ESTIMATORS = 1000
 MAX_DEPTH = 30
 MAX_FEATURES = "auto"
 
@@ -44,10 +49,11 @@ def setup_parser():
 # args = parser.parse_args()
 
 
+# ----------------------------------------------------
 # Path set-up
 FIG_PATH = "../../results/random_forest/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
-FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}/"
+FIG_ROOT_PATH = FIG_PATH + f"dynamic_{MODE}_seeds{RANDOM_SEED}_{N_ESTIMATORS}estimators/"
 
 
 # Create folder if not already exist
@@ -115,33 +121,33 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.a.ii. Feature importances by Gini impurity =========
-    # # Get importance scores
-    # importance_vals = model.feature_importances_
-    # std = np.std( [tree.feature_importances_ for tree in model.estimators_] , axis=0 )
-    # indices = np.argsort(importance_vals)[::-1]
-    # _ = plt.figure()
-    # _ = plt.title("Random Forest Feature Importance (Gini)")
-    # _ = sns.barplot(y = XTrain.columns[indices][:20], x = importance_vals[indices][:20], xerr = std[indices][:20])
-    # _ = plt.yticks(fontsize = 11)
-    # plt.savefig(DYNAMIC_PATH + f"feature_imp_by_gini_{time_pred}.eps", format = 'eps', dpi = 800)
-    # plt.close()
+    # Get importance scores
+    importance_vals = model.feature_importances_
+    std = np.std( [tree.feature_importances_ for tree in model.estimators_] , axis=0 )
+    indices = np.argsort(importance_vals)[::-1]
+    _ = plt.figure()
+    _ = plt.title("Random Forest Feature Importance (Gini)")
+    _ = sns.barplot(y = XTrain.columns[indices][:20], x = importance_vals[indices][:20], xerr = std[indices][:20])
+    _ = plt.yticks(fontsize = 11)
+    plt.savefig(DYNAMIC_PATH + f"feature_imp_by_gini_{time_pred}.eps", format = 'eps', dpi = 800)
+    plt.close()
 
 
     # ========= 2.a.iii. Feature importance by permutation test =========
+    # Permutation test
+    imp_means, imp_vars = feature_importance_permutation(
+                            predict_method = model.predict_proba_single,
+                            X = np.array(XTest),
+                            y = np.array(yTest),
+                            metric = true_positive_rate,
+                            fpr_threshold = FPR_THRESHOLD,
+                            num_rounds = 10,
+                            seed = RANDOM_SEED)
 
-    # # Permutation test
-    # imp_means, imp_vars = feature_importance_permutation(
-    #                         predict_method = model.predict_proba_single,
-    #                         X = np.array(XTest),
-    #                         y = np.array(yTest),
-    #                         metric = true_positive_rate,
-    #                         fpr_threshold = FPR_THRESHOLD,
-    #                         num_rounds = 10,
-    #                         seed = RANDOM_SEED)
+    # Save feature importance plot
+    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
-    # # Save feature importance plot
-    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
     # ========= 2.b. Evaluation =========
     evaluator = Evaluation.Evaluation(yTest, pred)

@@ -1,3 +1,9 @@
+# ----------------------------------------------------
+# To run:
+# 1. customize hyper-parameters and DATA_PATH in Section 0
+# 2. in Terminal:
+#       python logistic_regression_pipeline.py
+# ----------------------------------------------------
 from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
@@ -12,19 +18,6 @@ MODE = "c"
 FPR_THRESHOLD = 0.1
 
 PENALTY = "l1"   # Penalty of the first fit
-
-
-
-# # Set logger
-# logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
-#                     datefmt = '%m/%d/%Y %H:%M:%S',
-#                     level = logging.INFO)
-# console = logging.StreamHandler()
-# console.setLevel(logging.INFO)
-# formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
-# console.setFormatter(formatter)
-# logging.getLogger("").addHandler(console)
-# logger = logging.getLogger("Activity")
 
 
 # Arguments
@@ -143,19 +136,19 @@ for j, time in enumerate(time_span[2:-1]):
 
 
     # ========= 2.c. Feature importance =========
-    # # Permutation test
-    # imp_means, imp_vars = feature_importance_permutation(
-    #                         predict_method = model_new.predict_proba_single,
-    #                         X = np.array(XTest),
-    #                         y = np.array(yTest),
-    #                         metric = true_positive_rate,
-    #                         fpr_threshold = FPR_THRESHOLD,
-    #                         num_rounds = 5,
-    #                         seed = RANDOM_SEED)
+    # Permutation test
+    imp_means, imp_vars = feature_importance_permutation(
+                            predict_method = model_new.predict_proba_single,
+                            X = np.array(XTest),
+                            y = np.array(yTest),
+                            metric = true_positive_rate,
+                            fpr_threshold = FPR_THRESHOLD,
+                            num_rounds = 5,
+                            seed = RANDOM_SEED)
 
-    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    # # Save feature importance plot
-    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 8, eps = True)
+    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    # Save feature importance plot
+    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 8, eps = True)
 
 
     # ========= 2.b. Evaluation =========

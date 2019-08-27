@@ -1,3 +1,9 @@
+# ----------------------------------------------------
+# To run:
+# 1. customize hyper-parameters and DATA_PATH in Section 0
+# 2. in Terminal:
+#       python nn_pipeline.py
+# ----------------------------------------------------
 from ED_support_module import *
 from ED_support_module import EPICPreprocess
 from ED_support_module import Evaluation
@@ -5,20 +11,21 @@ from ED_support_module.NeuralNet import NeuralNet
 
 
 # ----------------------------------------------------
-# ========= 0. Preliminary seetings =========
+# ========= 0. Preliminary Settings =========
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# Hyper-parameters
 MODEL_NAME = "NN"
 RANDOM_SEED = 27
 CLASS_WEIGHT1 = 300000
 CLASS_WEIGHT0 = 100
-MODE = "c"
+MODE = "a"
 FPR_THRESHOLD = 0.1
 NUM_CLASS = 2
-NUM_EPOCHS = 100
+NUM_EPOCHS = 1000
 BATCH_SIZE = 125
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 4e-3
 DROP_PROB = 0.4
 HIDDEN_SIZE = 1000
 
@@ -49,6 +56,7 @@ def setup_parser():
 # args = parser.parse_args()
 
 
+# ----------------------------------------------------
 # Path set-up
 FIG_PATH = "../../results/neural_net/"
 DATA_PATH = "../../data/EPIC_DATA/preprocessed_EPIC_with_dates_and_notes.csv"
@@ -153,17 +161,17 @@ for j, time in enumerate(time_span[2:-1]):
 
     # ========= 2.a.ii. Feature importance by permutation test =========
     # Permutation test
-    # imp_means, imp_vars = feature_importance_permutation(
-    #                         predict_method = model.predict_proba_single,
-    #                         X = np.array(XTest),
-    #                         y = np.array(yTest),
-    #                         metric = true_positive_rate,
-    #                         fpr_threshold = FPR_THRESHOLD,
-    #                         num_rounds = 5,
-    #                         seed = RANDOM_SEED)
-    # # Save feature importance plot
-    # fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
-    # fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
+    imp_means, imp_vars = feature_importance_permutation(
+                            predict_method = model.predict_proba_single,
+                            X = np.array(XTest),
+                            y = np.array(yTest),
+                            metric = true_positive_rate,
+                            fpr_threshold = FPR_THRESHOLD,
+                            num_rounds = 5,
+                            seed = RANDOM_SEED)
+    # Save feature importance plot
+    fi_evaluator = Evaluation.FeatureImportance(imp_means, imp_vars, XTest.columns, MODEL_NAME)
+    fi_evaluator.FI_plot(save_path = DYNAMIC_PATH, y_fontsize = 4, eps = True)
 
 
     # ========= 2.b. Evaluation =========

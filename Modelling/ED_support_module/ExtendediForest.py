@@ -4,7 +4,9 @@ from ED_support_module import *
 def predict_proba(self, x_data):
     '''
     Predict the outlier score of x_data.
-    Input : x_data = [DataFrame or array] x test set
+
+    Input : 
+            x_data = [DataFrame or array] x test set
     '''
     try:
         # Get values if x_data is DataFrame
@@ -18,7 +20,9 @@ def predict_proba(self, x_data):
 def predict(self, x_data, outlier_proportion, anomaly_scores=None):
     '''
     Predict the response variable using x_data.
-    Input : x_data = [DataFrame] design matrix. Omitted if anomaly_score
+
+    Input : 
+            x_data = [DataFrame] design matrix. Omitted if anomaly_score
                                  is not None.
             outlier_proportion = [float] proportion of outliers required.
                                          Must be between 0 and 1.
@@ -26,7 +30,8 @@ def predict(self, x_data, outlier_proportion, anomaly_scores=None):
                              instances. The higher the score, the more
                              likely it is an outlier. If None, predict
                              by using x_data first.
-    Output: y_pred = [Series] predicted response vector. 1 for outlier.
+    Output: 
+            y_pred = [Series] predicted response vector. 1 for outlier.
     '''
     if not isinstance(x_data, pd.DataFrame):
         raise TypeError("Type of x_data must be DataFrame but got {} instead."
@@ -47,9 +52,11 @@ def predict(self, x_data, outlier_proportion, anomaly_scores=None):
 def plot_scores(self, anomaly_scores, y_true, y_pred, save_path=None, title=None, eps=False):
     '''
     Plot the anomaly scores.
-    Input : anomaly_scores = [Series or array] anomaly scores.
+    Input : 
+            anomaly_scores = [Series or array] anomaly scores.
             y_true = [Series or array] response vector.
-            title = title of the plot
+            y_pred = [Series or array] predicted response vector.
+            title = [str] title of the plot.
     '''
     # Convert to numpy array
     anomaly_scores = np.array(anomaly_scores)
@@ -81,7 +88,7 @@ def plot_scores(self, anomaly_scores, y_true, y_pred, save_path=None, title=None
 
 
 
-
+# Add methods
 eif.iForest.predict_proba = predict_proba
 eif.iForest.predict = predict
 eif.iForest.plot_scores = plot_scores
