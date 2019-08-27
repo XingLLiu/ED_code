@@ -13,21 +13,16 @@ Now assume that ED_code is contained in the same subfolder as the ED folder avai
 ```bash
 
 |-- Archive                      # Archived files
-|-- Modelling 
-|   |-- EDA.py                   # EDA and modelling on the preprocessed data
-|   |-- EDA_old_data.py          # EDA on the orignial EPIC data
-|   |-- Models.py                # Modelling
-|   |-- ED_support_module        # Functions used by other scripts
-|       |__ __init__.py
-|   |__ saved_results            # Saved results from the models
+|-- Modelling                    # Modelling pipelines
+|   |__ ED_support_module        # Functions, modules and utils
 |-- Preprocessing
 |   |-- ED_data_process.sh     
 |   |-- combineEPICData.R        
 |   |-- preprocessEPIC.R 
-|   |-- EPICpreProcessing.sh     # Produce EPIC.csv
-|   |-- appendAlerts.py          # Produce EPICpreProcessed.csv
+|   |-- EPICpreProcessing.sh     # Creates EPIC.csv
+|   |-- appendAlerts.py          # Creates EPICpreProcessed.csv
 |   |-- requiredPackages.R       # Packages required by EPICpreProcessing.sh
-|   |__ Sepsis_Reports.R      
+|   |__ Sepsis_Reports.R
 |-- Exploratory
 |   |-- ED_devin_data_clean_excel.py
 |   |-- ED_support_funs.py
@@ -74,19 +69,19 @@ sh ./Preprocessing/EPICpreProcessing.sh
 ```
 
 ## Modelling
-A one-month ahead framework is used to train and test the models. The model is first trained on the first three months of data, tested on the fourth, and re-trained on the four months of data, tested on the fifth and so on. The motivation is that this would fit the real implementation setting more than random sampling for train/test splitting.
+An one-month ahead framework is used to train and test the models. A model is first trained on the first three months of data, tested on the fourth, and re-trained on the four months of data, tested on the fifth and so on. The motivation is that this would fit the real implementation setting better than random sampling for train/test splitting.
 
 ### Runing the existing models
 Each script in the `./Modelling` ending with `pipeline.py` is the main script for that model. To run:
 
-1. Customize the hyper parameters as outlined in the script.
+1. Customize the hyper-parameters in Section 0 of the script.
 
 2. In Terminal, run
 ```bash
 python some_model_pipeline.py
 ```
 
-Evaluation reports for each month and an aggregate ROC plot can be found in `ED/results/` after the runing completes.
+This will create a folder in `ED/results/model_name/` that contains all evaluation plots and prediction results.
 
 The Python classes for the models, together with utility functions, can be found in `./Modelling/ED_support_module/`
 
